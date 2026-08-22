@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/distance-profile.schema.json",
+  "title": "Distance Profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "id", "userId", "memoryConsent", "pushConsent", "quietHours",
+    "maxPushesPerWeek", "preferredTone", "maxTravelMinutes", "maxBudgetYen",
+    "socialBattery", "maxSocialIntensity", "preferredCategories", "avoidedCategories",
+    "rejectionStreak", "cooldownUntil", "pauseUntil", "lastPushAt", "explicitPreferences",
+    "inferredPreferences", "currentSignals", "createdAt", "updatedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "userId": { "$ref": "common.schema.json#/$defs/uuid" },
+    "memoryConsent": { "type": "boolean" },
+    "pushConsent": { "type": "boolean" },
+    "quietHours": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end", "timezone"],
+      "properties": {
+        "start": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+        "end": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+        "timezone": { "type": "string", "const": "Asia/Tokyo" }
+      }
+    },
+    "maxPushesPerWeek": { "type": "integer", "minimum": 0, "maximum": 14 },
+    "preferredTone": { "$ref": "common.schema.json#/$defs/pushTone" },
+    "maxTravelMinutes": { "type": "integer", "minimum": 0, "maximum": 240 },
+    "maxBudgetYen": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+    "socialBattery": { "type": ["integer", "null"], "minimum": 0, "maximum": 100 },
+    "maxSocialIntensity": { "$ref": "common.schema.json#/$defs/socialIntensity" },
+    "preferredCategories": { "type": "array", "uniqueItems": true, "items": { "type": "string", "maxLength": 80 } },
+    "avoidedCategories": { "type": "array", "uniqueItems": true, "items": { "type": "string", "maxLength": 80 } },
+    "rejectionStreak": { "type": "integer", "minimum": 0 },
+    "cooldownUntil": { "oneOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }] },
+    "pauseUntil": { "oneOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }] },
+    "lastPushAt": { "oneOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }] },
+    "explicitPreferences": { "type": "object" },
+    "inferredPreferences": {
+      "type": "object",
+      "additionalProperties": { "$ref": "common.schema.json#/$defs/inferredPreference" }
+    },
+    "currentSignals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["interventionHint", "currentReceptivity", "safety", "observedAt"],
+      "properties": {
+        "interventionHint": { "type": "string", "enum": ["none", "do_not_push", "consider_push"] },
+        "currentReceptivity": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "safety": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["level", "requiresHumanSupport"],
+          "properties": {
+            "level": { "type": "string", "enum": ["normal", "urgent"] },
+            "requiresHumanSupport": { "type": "boolean" }
+          }
+        },
+        "observedAt": { "oneOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }] }
+      }
+    },
+    "createdAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/demo-reset-request.schema.json",
+  "title": "Demo reset request",
+  "type": "object",
+  "additionalProperties": false,
+  "maxProperties": 0
+}

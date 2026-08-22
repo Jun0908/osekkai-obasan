@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/chat-result.schema.json",
+  "title": "Chat result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "reply", "profileDelta", "interventionHint", "confidence", "safety", "persisted", "conversationId", "profile"],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "reply": { "type": "string", "minLength": 1, "maxLength": 2000 },
+    "profileDelta": { "type": "object" },
+    "interventionHint": { "type": "string", "enum": ["none", "do_not_push", "consider_push"] },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "safety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requiresHumanSupport", "level", "message", "supportResourcesVerified"],
+      "properties": {
+        "requiresHumanSupport": { "type": "boolean" },
+        "level": { "type": "string", "enum": ["normal", "urgent"] },
+        "message": { "type": ["string", "null"], "maxLength": 1000 },
+        "supportResourcesVerified": { "type": "boolean" }
+      }
+    },
+    "persisted": { "type": "boolean" },
+    "conversationId": { "oneOf": [{ "$ref": "common.schema.json#/$defs/uuid" }, { "type": "null" }] },
+    "profile": { "$ref": "distance-profile.schema.json" }
+  }
+}

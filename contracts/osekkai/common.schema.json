@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/common.schema.json",
+  "title": "Osekkai common definitions",
+  "$defs": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0"
+    },
+    "uuid": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+    },
+    "dateTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "dataMode": {
+      "type": "string",
+      "enum": ["demo", "live"]
+    },
+    "classification": {
+      "type": "string",
+      "enum": ["measured", "reference_estimate", "demo", "unverified"]
+    },
+    "socialIntensity": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5
+    },
+    "pushTone": {
+      "type": "string",
+      "enum": ["gentle", "casual", "direct", "quiet"]
+    },
+    "reasonCode": {
+      "type": "string",
+      "enum": [
+        "NO_PUSH_CONSENT",
+        "QUIET_HOURS",
+        "COOLDOWN_ACTIVE",
+        "WEEKLY_LIMIT_REACHED",
+        "EXPLICIT_PAUSE",
+        "EXPLICIT_NO_ACTION",
+        "HUMAN_SUPPORT_REQUIRED",
+        "NO_FREE_WINDOW",
+        "NO_VERIFIED_OPPORTUNITY",
+        "OUTSIDE_FREE_WINDOW",
+        "TRAVEL_LIMIT",
+        "OVER_BUDGET",
+        "SOCIAL_INTENSITY_LIMIT",
+        "INVALID_SOURCE",
+        "SCORE_BELOW_THRESHOLD",
+        "FREE_WINDOW_AVAILABLE",
+        "LOW_SOCIAL_BATTERY",
+        "LOW_CONVERSATION_REQUIREMENT",
+        "WITHIN_TRAVEL_LIMIT",
+        "UNDER_BUDGET"
+      ]
+    },
+    "fieldProvenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["classification"],
+      "properties": {
+        "classification": {
+          "type": "string",
+          "enum": ["source_snapshot", "source_verified", "organizer_verified", "ai_derived", "synthetic_demo"]
+        },
+        "sourceUrl": { "type": "string", "format": "uri" },
+        "capturedAt": { "$ref": "#/$defs/dateTime" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidenceField": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "evidence": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "inferredPreference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "confidence", "evidence"],
+      "properties": {
+        "value": {},
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "text", "createdAt"],
+            "properties": {
+              "id": { "$ref": "#/$defs/uuid" },
+              "text": { "type": "string", "minLength": 1, "maxLength": 160 },
+              "createdAt": { "$ref": "#/$defs/dateTime" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

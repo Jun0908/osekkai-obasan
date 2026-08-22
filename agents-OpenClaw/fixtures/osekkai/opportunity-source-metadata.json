@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0",
+  "dataMode": "demo",
+  "dataset": "江東区 イベント一覧",
+  "datasetUrl": "https://catalog.data.metro.tokyo.lg.jp/dataset/t131083d0000000017",
+  "sourceUrl": "https://www.opendata.metro.tokyo.lg.jp/koto/131083_012_event.csv",
+  "provider": "江東区",
+  "license": "CC BY 4.0",
+  "capturedAt": "2026-08-22T00:00:00+09:00",
+  "recordId": "131083B00016",
+  "recordSha256": "922eb13f8506be1c80d041a4961d227035d46bb6291d6d97a245fc6a383824fb",
+  "notice": "公開データの過去スナップショットです。現在の開催情報ではありません。"
+}

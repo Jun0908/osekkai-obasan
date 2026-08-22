@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/profile-update-request.schema.json",
+  "title": "Profile update request",
+  "type": "object",
+  "additionalProperties": false,
+  "minProperties": 1,
+  "properties": {
+    "patch": {
+      "type": "object",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "properties": {
+        "memoryConsent": { "type": "boolean" },
+        "pushConsent": { "type": "boolean" },
+        "quietHours": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start", "end", "timezone"],
+          "properties": {
+            "start": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+            "end": { "type": "string", "pattern": "^(?:[01]\\d|2[0-3]):[0-5]\\d$" },
+            "timezone": { "type": "string", "const": "Asia/Tokyo" }
+          }
+        },
+        "maxPushesPerWeek": { "type": "integer", "minimum": 0, "maximum": 14 },
+        "preferredTone": { "$ref": "common.schema.json#/$defs/pushTone" },
+        "maxTravelMinutes": { "type": "integer", "minimum": 0, "maximum": 240 },
+        "maxBudgetYen": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "maxSocialIntensity": { "$ref": "common.schema.json#/$defs/socialIntensity" },
+        "preferredCategories": {
+          "type": "array",
+          "maxItems": 50,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "\\S" }
+        },
+        "avoidedCategories": {
+          "type": "array",
+          "maxItems": 50,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1, "maxLength": 80, "pattern": "\\S" }
+        }
+      }
+    },
+    "removeEvidenceId": { "$ref": "common.schema.json#/$defs/uuid" },
+    "removeInferredPreferenceKey": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "\\S"
+    },
+    "pauseOneWeek": { "type": "boolean", "const": true }
+  }
+}

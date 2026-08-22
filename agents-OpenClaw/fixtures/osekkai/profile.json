@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0",
+  "id": "26287525-b833-5f8f-b3cf-824cbf1d5b2e",
+  "userId": "11111111-1111-4111-8111-111111111111",
+  "memoryConsent": true,
+  "pushConsent": true,
+  "quietHours": {
+    "start": "21:00",
+    "end": "08:00",
+    "timezone": "Asia/Tokyo"
+  },
+  "maxPushesPerWeek": 2,
+  "preferredTone": "gentle",
+  "maxTravelMinutes": 30,
+  "maxBudgetYen": 2000,
+  "maxSocialIntensity": 2,
+  "socialBattery": 55,
+  "preferredCategories": [],
+  "avoidedCategories": [],
+  "rejectionStreak": 0,
+  "cooldownUntil": null,
+  "lastPushAt": null,
+  "pauseUntil": null,
+  "explicitPreferences": {
+    "demoSeed": {
+      "value": true,
+      "notice": "デモ用に記憶とPUSHへの同意を有効化しています。"
+    }
+  },
+  "inferredPreferences": {},
+  "currentSignals": {
+    "interventionHint": "none",
+    "currentReceptivity": null,
+    "safety": {
+      "level": "normal",
+      "requiresHumanSupport": false
+    },
+    "observedAt": null
+  },
+  "createdAt": "2019-02-23T10:00:00+09:00",
+  "updatedAt": "2019-02-23T10:00:00+09:00"
+}

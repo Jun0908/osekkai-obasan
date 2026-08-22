@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "1.0",
+  "policyVersion": "osekkai-p0-v1",
+  "timezone": "Asia/Tokyo",
+  "minimumFreeWindowMinutes": 180,
+  "batteryBands": {
+    "lowMax": 30,
+    "mediumMax": 60
+  },
+  "effectiveIntensityCaps": {
+    "low": 1,
+    "medium": 2,
+    "high": 5,
+    "unknown": 1
+  },
+  "weights": {
+    "opportunityFit": 0.3,
+    "currentReceptivity": 0.3,
+    "trust": 0.2,
+    "feasibility": 0.2,
+    "burden": -0.15,
+    "intrusionRisk": -0.15
+  },
+  "pushThreshold": 0.55,
+  "cooldownHours": {
+    "firstDecline": 24,
+    "secondDecline": 72,
+    "thirdAndLaterDecline": 168,
+    "tooMuchMinimum": 72,
+    "pauseOneWeek": 168
+  },
+  "tieBreak": [
+    "sourceTrustDescending",
+    "startsAtAscending",
+    "travelMinutesAscending",
+    "idAscending"
+  ],
+  "reasonCodes": [
+    "NO_PUSH_CONSENT",
+    "QUIET_HOURS",
+    "COOLDOWN_ACTIVE",
+    "WEEKLY_LIMIT_REACHED",
+    "EXPLICIT_PAUSE",
+    "EXPLICIT_NO_ACTION",
+    "HUMAN_SUPPORT_REQUIRED",
+    "NO_FREE_WINDOW",
+    "NO_VERIFIED_OPPORTUNITY",
+    "OUTSIDE_FREE_WINDOW",
+    "TRAVEL_LIMIT",
+    "OVER_BUDGET",
+    "SOCIAL_INTENSITY_LIMIT",
+    "INVALID_SOURCE",
+    "SCORE_BELOW_THRESHOLD",
+    "FREE_WINDOW_AVAILABLE",
+    "LOW_SOCIAL_BATTERY",
+    "LOW_CONVERSATION_REQUIREMENT",
+    "WITHIN_TRAVEL_LIMIT",
+    "UNDER_BUDGET"
+  ]
+}

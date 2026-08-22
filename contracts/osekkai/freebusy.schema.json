@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/freebusy.schema.json",
+  "title": "Privacy-minimized FreeBusy result",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "freeWindow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "start", "end", "durationMinutes", "verificationStatus"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "start": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "end": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "durationMinutes": { "type": "integer", "minimum": 1 },
+        "verificationStatus": { "type": "string", "enum": ["synthetic_demo", "source_verified"] },
+        "suggestedVisitStart": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "suggestedVisitEnd": { "$ref": "common.schema.json#/$defs/dateTime" }
+      }
+    }
+  },
+  "required": ["schemaVersion", "dataMode", "generatedAt", "source", "freeWindows"],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "dataMode": { "$ref": "common.schema.json#/$defs/dataMode" },
+    "generatedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "notice"],
+      "properties": {
+        "type": { "type": "string", "enum": ["synthetic_demo", "google_freebusy"] },
+        "notice": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "freeWindows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/freeWindow" }
+    }
+  }
+}

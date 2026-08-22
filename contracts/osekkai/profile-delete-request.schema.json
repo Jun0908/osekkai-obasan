@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/profile-delete-request.schema.json",
+  "title": "Profile delete request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["confirm"],
+  "properties": {
+    "confirm": { "type": "boolean", "const": true }
+  }
+}

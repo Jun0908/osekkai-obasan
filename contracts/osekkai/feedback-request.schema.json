@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/feedback-request.schema.json",
+  "title": "Feedback request",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["episodeId", "actionResponse"],
+      "properties": {
+        "episodeId": { "$ref": "common.schema.json#/$defs/uuid" },
+        "actionResponse": {
+          "type": "string",
+          "enum": ["accepted", "declined", "show_another", "pause_one_week"]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["episodeId", "distanceFeedback"],
+      "properties": {
+        "episodeId": { "$ref": "common.schema.json#/$defs/uuid" },
+        "distanceFeedback": {
+          "type": "string",
+          "enum": ["too_much", "just_right", "push_more"]
+        }
+      }
+    }
+  ]
+}

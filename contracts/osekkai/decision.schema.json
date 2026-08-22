@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/decision.schema.json",
+  "title": "Public intervention decision",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "episodeId", "policyVersion", "decision", "shouldPush", "reasonCodes",
+    "score", "selectedOpportunity", "excludedCandidates", "notification", "dataMode", "createdAt"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "episodeId": { "$ref": "common.schema.json#/$defs/uuid" },
+    "policyVersion": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "decision": {
+      "type": "string",
+      "enum": ["do_not_push", "check_in_only", "suggest_solo_place", "suggest_light_social", "suggest_small_role"]
+    },
+    "shouldPush": { "type": "boolean" },
+    "reasonCodes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/reasonCode" }
+    },
+    "score": { "type": ["number", "null"], "minimum": -1, "maximum": 1 },
+    "selectedOpportunity": {
+      "oneOf": [
+        { "$ref": "opportunity.schema.json" },
+        { "type": "null" }
+      ]
+    },
+    "excludedCandidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["opportunityId", "reasonCodes"],
+        "properties": {
+          "opportunityId": { "type": "string", "minLength": 1 },
+          "reasonCodes": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "$ref": "common.schema.json#/$defs/reasonCode" }
+          }
+        }
+      }
+    },
+    "notification": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["text", "tone"],
+          "properties": {
+            "text": { "type": "string", "minLength": 1, "maxLength": 1000 },
+            "tone": { "$ref": "common.schema.json#/$defs/pushTone" }
+          }
+        },
+        { "type": "null" }
+      ]
+    },
+    "dataMode": { "$ref": "common.schema.json#/$defs/dataMode" },
+    "createdAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+  }
+}

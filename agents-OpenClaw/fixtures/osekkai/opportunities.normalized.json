@@ -1,0 +1,104 @@
+{
+  "schemaVersion": "1.0",
+  "dataMode": "demo",
+  "notice": "公開データの過去スナップショットを使ったデモです。現在の開催情報ではありません。",
+  "opportunities": [
+    {
+      "schemaVersion": "1.0",
+      "id": "koto-131083B00016",
+      "sourceRecordId": "131083B00016",
+      "title": "亀戸天神梅まつり",
+      "description": "境内には300本を超す紅白の梅が植えられており、早咲きから遅咲きまで、ながきにわたり楽しむことができます。",
+      "startsAt": "2019-02-10T00:00:00+09:00",
+      "endsAt": "2019-03-10T23:59:00+09:00",
+      "address": "東京都江東区亀戸3-6-1",
+      "latitude": 35.702931,
+      "longitude": 139.820668,
+      "priceYen": 0,
+      "provider": "江東区",
+      "sourceType": "open_data",
+      "sourceDataset": "江東区 イベント一覧",
+      "sourceUrl": "https://www.opendata.metro.tokyo.lg.jp/koto/131083_012_event.csv",
+      "datasetUrl": "https://catalog.data.metro.tokyo.lg.jp/dataset/t131083d0000000017",
+      "license": "CC BY 4.0",
+      "capturedAt": "2026-08-22T00:00:00+09:00",
+      "checksum": "922eb13f8506be1c80d041a4961d227035d46bb6291d6d97a245fc6a383824fb",
+      "dataMode": "demo",
+      "verificationStatus": "source_snapshot",
+      "sourceTrust": 0.85,
+      "socialIntensity": 1,
+      "conversationRequired": "none",
+      "soloFriendly": true,
+      "flexibleVisit": true,
+      "visitDurationMinutes": 30,
+      "roleAvailable": null,
+      "roleDescription": null,
+      "travelEstimate": {
+        "mode": "walk",
+        "minutes": 8,
+        "source": "synthetic_demo"
+      },
+      "fieldProvenance": {
+        "title": {
+          "classification": "source_snapshot",
+          "sourceUrl": "https://www.opendata.metro.tokyo.lg.jp/koto/131083_012_event.csv",
+          "capturedAt": "2026-08-22T00:00:00+09:00"
+        },
+        "startsAt": {
+          "classification": "source_snapshot",
+          "sourceUrl": "https://www.opendata.metro.tokyo.lg.jp/koto/131083_012_event.csv",
+          "capturedAt": "2026-08-22T00:00:00+09:00"
+        },
+        "endsAt": {
+          "classification": "source_snapshot",
+          "sourceUrl": "https://www.opendata.metro.tokyo.lg.jp/koto/131083_012_event.csv",
+          "capturedAt": "2026-08-22T00:00:00+09:00"
+        },
+        "address": {
+          "classification": "source_snapshot",
+          "sourceUrl": "https://www.opendata.metro.tokyo.lg.jp/koto/131083_012_event.csv",
+          "capturedAt": "2026-08-22T00:00:00+09:00"
+        },
+        "priceYen": {
+          "classification": "source_snapshot",
+          "sourceUrl": "https://www.opendata.metro.tokyo.lg.jp/koto/131083_012_event.csv",
+          "capturedAt": "2026-08-22T00:00:00+09:00"
+        },
+        "socialIntensity": {
+          "classification": "ai_derived",
+          "confidence": 0.72,
+          "evidenceField": "開催条件",
+          "evidence": "誰でも自由に観覧できます。"
+        },
+        "conversationRequired": {
+          "classification": "ai_derived",
+          "confidence": 0.78,
+          "evidenceField": "開催条件",
+          "evidence": "誰でも自由に観覧できます。"
+        },
+        "soloFriendly": {
+          "classification": "ai_derived",
+          "confidence": 0.74,
+          "evidenceField": "開催条件",
+          "evidence": "誰でも自由に観覧できます。"
+        },
+        "flexibleVisit": {
+          "classification": "ai_derived",
+          "confidence": 0.95,
+          "evidenceField": "開始日時特記事項",
+          "evidence": "神社境内は24時間入れます。"
+        },
+        "visitDurationMinutes": {
+          "classification": "synthetic_demo",
+          "confidence": 1.0,
+          "evidence": "デモでの短時間訪問案。元データの所要時間ではありません。"
+        },
+        "travelEstimate": {
+          "classification": "synthetic_demo",
+          "confidence": 1.0,
+          "evidence": "デモ用生活圏からの合成徒歩時間。"
+        }
+      }
+    }
+  ]
+}

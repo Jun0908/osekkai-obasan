@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/intervention-episode.schema.json",
+  "title": "Intervention episode",
+  "type": "object",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "required": ["minimalRecord"],
+        "properties": { "minimalRecord": { "const": true } }
+      },
+      "then": {
+        "properties": {
+          "profileSnapshot": { "type": "null" },
+          "freeWindowSnapshot": { "type": "null" },
+          "candidateIdsBeforeFilter": { "type": "array", "maxItems": 0 },
+          "candidateIdsAfterFilter": { "type": "array", "maxItems": 0 },
+          "excludedCandidates": { "type": "array", "maxItems": 0 },
+          "selectedOpportunity": { "type": "null" },
+          "notification": { "type": "null" }
+        }
+      }
+    }
+  ],
+  "required": [
+    "schemaVersion", "id", "userId", "sequence", "policyVersion", "decision", "shouldPush", "reasonCodes", "score",
+    "profileSnapshot", "freeWindowSnapshot", "candidateIdsBeforeFilter", "candidateIdsAfterFilter",
+    "excludedCandidates", "selectedOpportunity", "notification", "dataMode", "metricClassification",
+    "minimalRecord", "pushedAt", "noPushAt", "actionResponse", "actionResponseAt",
+    "distanceFeedback", "distanceFeedbackAt", "attendedAt", "revisitedAt", "selfInitiatedAt",
+    "createdAt", "updatedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "userId": { "$ref": "common.schema.json#/$defs/uuid" },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "policyVersion": { "type": "string", "minLength": 1, "maxLength": 80 },
+    "decision": {
+      "type": "string",
+      "enum": ["do_not_push", "check_in_only", "suggest_solo_place", "suggest_light_social", "suggest_small_role"]
+    },
+    "shouldPush": { "type": "boolean" },
+    "reasonCodes": { "type": "array", "uniqueItems": true, "items": { "$ref": "common.schema.json#/$defs/reasonCode" } },
+    "score": { "type": ["number", "null"], "minimum": -1, "maximum": 1 },
+    "profileSnapshot": { "oneOf": [{ "$ref": "distance-profile.schema.json" }, { "type": "null" }] },
+    "freeWindowSnapshot": { "oneOf": [{ "$ref": "freebusy.schema.json#/$defs/freeWindow" }, { "type": "null" }] },
+    "candidateIdsBeforeFilter": { "type": "array", "items": { "type": "string" } },
+    "candidateIdsAfterFilter": { "type": "array", "items": { "type": "string" } },
+    "excludedCandidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["opportunityId", "reasonCodes"],
+        "properties": {
+          "opportunityId": { "type": "string" },
+          "reasonCodes": { "type": "array", "items": { "$ref": "common.schema.json#/$defs/reasonCode" } }
+        }
+      }
+    },
+    "selectedOpportunity": { "oneOf": [{ "$ref": "opportunity.schema.json" }, { "type": "null" }] },
+    "notification": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["text", "tone", "shownOpportunityIds"],
+          "properties": {
+            "text": { "type": "string", "minLength": 1, "maxLength": 1000 },
+            "tone": { "$ref": "common.schema.json#/$defs/pushTone" },
+            "shownOpportunityIds": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        { "type": "null" }
+      ]
+    },
+    "pushedAt": { "oneOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }] },
+    "noPushAt": { "oneOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }] },
+    "actionResponse": { "type": ["string", "null"], "enum": ["accepted", "declined", "show_another", "pause_one_week", null] },
+    "actionResponseAt": { "oneOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }] },
+    "distanceFeedback": { "type": ["string", "null"], "enum": ["too_much", "just_right", "push_more", null] },
+    "distanceFeedbackAt": { "oneOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }] },
+    "attendedAt": { "oneOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }] },
+    "revisitedAt": { "oneOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }] },
+    "selfInitiatedAt": { "oneOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }] },
+    "dataMode": { "$ref": "common.schema.json#/$defs/dataMode" },
+    "metricClassification": { "$ref": "common.schema.json#/$defs/classification" },
+    "minimalRecord": { "type": "boolean" },
+    "createdAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+  }
+}

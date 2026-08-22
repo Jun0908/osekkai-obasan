@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/intervention-record-request.schema.json",
+  "title": "Intervention record request",
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "episodeId", "eventType"],
+      "properties": {
+        "action": { "type": "string", "const": "record" },
+        "episodeId": { "$ref": "common.schema.json#/$defs/uuid" },
+        "eventType": {
+          "type": "string",
+          "enum": ["attendance", "attended", "revisit", "revisited", "selfInitiated", "self_initiated"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["attended", "revisited", "self_initiated", "recorded"]
+        }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "episodeId", "outcome"],
+      "properties": {
+        "action": { "type": "string", "const": "record" },
+        "episodeId": { "$ref": "common.schema.json#/$defs/uuid" },
+        "outcome": {
+          "type": "string",
+          "enum": ["attendance", "attended", "revisit", "revisited", "selfInitiated", "self_initiated"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["attended", "revisited", "self_initiated", "recorded"]
+        }
+      }
+    }
+  ]
+}

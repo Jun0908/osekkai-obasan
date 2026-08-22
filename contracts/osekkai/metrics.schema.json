@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/metrics.schema.json",
+  "title": "Osekkai metrics",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "generatedAt", "dataMode", "metrics", "unverifiedMetrics"],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "generatedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "dataMode": { "$ref": "common.schema.json#/$defs/dataMode" },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "label", "value", "numerator", "denominator", "classification", "note"],
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": ["just_right_push_rate", "overreach_rate", "under_support_rate", "acceptance_rate", "attendance_rate", "revisit_rate"]
+          },
+          "label": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "value": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+          "numerator": { "type": "integer", "minimum": 0 },
+          "denominator": { "type": "integer", "minimum": 0 },
+          "classification": { "$ref": "common.schema.json#/$defs/classification" },
+          "note": { "type": "string", "maxLength": 500 }
+        }
+      }
+    },
+    "unverifiedMetrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["key", "label", "value", "classification", "note"],
+        "properties": {
+          "key": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "label": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "value": { "type": "null" },
+          "classification": { "type": "string", "const": "unverified" },
+          "note": { "type": "string", "maxLength": 500 }
+        }
+      }
+    }
+  }
+}

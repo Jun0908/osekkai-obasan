@@ -1,0 +1,7 @@
+google-api-python-client
+google-auth
+google-auth-oauthlib
+jsonschema==4.26.0
+python-dateutil
+python-dotenv
+requests

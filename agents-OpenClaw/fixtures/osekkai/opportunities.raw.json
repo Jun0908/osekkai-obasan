@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0",
+  "dataMode": "demo",
+  "dataset": "江東区 イベント一覧",
+  "datasetUrl": "https://catalog.data.metro.tokyo.lg.jp/dataset/t131083d0000000017",
+  "sourceUrl": "https://www.opendata.metro.tokyo.lg.jp/koto/131083_012_event.csv",
+  "license": "CC BY 4.0",
+  "capturedAt": "2026-08-22T00:00:00+09:00",
+  "checksumAlgorithm": "sha256-utf8-csv-row-without-line-ending",
+  "checksum": "922eb13f8506be1c80d041a4961d227035d46bb6291d6d97a245fc6a383824fb",
+  "recordId": "131083B00016",
+  "rawCsvRow": "131083,,131083B00016,江東区,亀戸天神梅まつり,,,,カメイドテンジンウメマツリ,Kameido Tenjin plum Festival,,,,,,,2019-02-10,2019-03-10,00:00:00,23:59:00,神社境内は24時間入れます。,,,,,境内には300本を超す紅白の梅が植えられており、早咲きから遅咲きまで、ながきにわたり楽しむことができます。,,,0,,江東区観光協会,(03)6458-7400,,江東区亀戸観光協会,,,,,亀戸天神社,,131083,,東京都江東区亀戸3-6-1,東京都,江東区,亀戸3丁目,6-1,,35.702931,139.820668,JR総武線亀戸駅下車北口より徒歩15分 JR総武線、東京メトロ半蔵門線錦糸町駅下車北口より徒歩15分 都バス亀戸天神前下車徒歩1分,,,,,,,,,無料,,,,,,,誰でも自由に観覧できます。,,,,https://koto-kanko.jp/event/,,,,,,,,,文化観光課"
+}

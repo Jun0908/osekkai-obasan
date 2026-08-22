@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/opportunity.schema.json",
+  "title": "Opportunity",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "id", "title", "startsAt", "endsAt", "address", "priceYen",
+    "socialIntensity", "conversationRequired", "soloFriendly", "provider", "sourceType",
+    "sourceUrl", "sourceDataset", "license", "capturedAt", "checksum", "dataMode",
+    "verificationStatus", "fieldProvenance", "travelEstimate"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "id": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "sourceRecordId": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "title": { "type": "string", "minLength": 1, "maxLength": 240 },
+    "description": { "type": "string", "maxLength": 3000 },
+    "startsAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "endsAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "address": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+    "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
+    "priceYen": { "type": "integer", "minimum": 0 },
+    "socialIntensity": { "$ref": "common.schema.json#/$defs/socialIntensity" },
+    "conversationRequired": { "type": "string", "enum": ["none", "low", "medium", "high"] },
+    "soloFriendly": { "type": "boolean" },
+    "recurring": { "type": "boolean" },
+    "flexibleVisit": { "type": "boolean" },
+    "visitDurationMinutes": { "type": "integer", "minimum": 1, "maximum": 1440 },
+    "roleAvailable": { "type": ["boolean", "null"] },
+    "roleDescription": { "type": ["string", "null"], "maxLength": 500 },
+    "categories": { "type": "array", "uniqueItems": true, "items": { "type": "string", "maxLength": 80 } },
+    "provider": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "sourceType": { "type": "string", "enum": ["open_data", "organizer_verified", "ai_derived"] },
+    "sourceUrl": { "type": "string", "format": "uri" },
+    "datasetUrl": { "type": "string", "format": "uri" },
+    "sourceDataset": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "license": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "capturedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "checksum": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "sourceTrust": { "type": "number", "minimum": 0, "maximum": 1 },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "dataMode": { "$ref": "common.schema.json#/$defs/dataMode" },
+    "verificationStatus": {
+      "type": "string",
+      "enum": ["synthetic_demo", "source_snapshot", "source_verified", "organizer_verified", "unverified"]
+    },
+    "fieldProvenance": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "common.schema.json#/$defs/fieldProvenance" }
+    },
+    "travelEstimate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "minutes", "source"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["walk", "transit", "bicycle"] },
+        "minutes": { "type": "integer", "minimum": 0, "maximum": 360 },
+        "source": { "type": "string", "enum": ["synthetic_demo", "maps_verified"] }
+      }
+    }
+  }
+}

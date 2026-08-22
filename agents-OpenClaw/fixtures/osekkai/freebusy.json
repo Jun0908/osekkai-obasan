@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1.0",
+  "dataMode": "demo",
+  "generatedAt": "2019-02-23T10:00:00+09:00",
+  "source": {
+    "type": "synthetic_demo",
+    "notice": "デモ用に合成した空き時間です。Calendarの予定詳細は含みません。"
+  },
+  "freeWindows": [
+    {
+      "id": "demo-free-window-4h",
+      "start": "2019-02-23T13:00:00+09:00",
+      "end": "2019-02-23T17:00:00+09:00",
+      "durationMinutes": 240,
+      "verificationStatus": "synthetic_demo"
+    }
+  ]
+}

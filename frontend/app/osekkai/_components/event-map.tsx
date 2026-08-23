@@ -147,7 +147,8 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
     if (!communities) return [];
     const byWard = new Map<string, CommunityFacilitySummary>();
     for (const facility of communities.facilities) {
-      if (!byWard.has(facility.ward)) byWard.set(facility.ward, facility);
+      const current = byWard.get(facility.ward);
+      if (!current || facility.locationKind === 'ward_office') byWard.set(facility.ward, facility);
     }
     return Array.from(byWard.values()).sort((left, right) => left.ward.localeCompare(right.ward, 'ja'));
   }, [communities]);
@@ -347,8 +348,8 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
       {communities ? (
         <p className={styles.mapCount}>
           {wardChoice === ALL_WARDS_VALUE
-            ? `東京23区の地域コミュニティ${communities.counts.total.toLocaleString()}件を${communities.facilities.length.toLocaleString()}拠点にまとめて表示（Open Data・開催日時未確認）。`
-            : `${wardChoice}の地域コミュニティ${visibleCommunityCount.toLocaleString()}件を${visibleFacilities.length.toLocaleString()}拠点で表示中（東京23区全体では${communities.counts.total.toLocaleString()}件）。他の区は上のセレクトから選べます。`}
+            ? `東京23区の地域コミュニティ${communities.counts.total.toLocaleString()}件を${communities.facilities.length.toLocaleString()}地点に表示。地域名・町丁目の活動区域${communities.counts.withAreaLocation.toLocaleString()}件を区役所から分散（Open Data・開催日時未確認）。`
+            : `${wardChoice}の地域コミュニティ${visibleCommunityCount.toLocaleString()}件を${visibleFacilities.length.toLocaleString()}地点で表示中（東京23区全体では${communities.counts.total.toLocaleString()}件）。他の区は上のセレクトから選べます。`}
         </p>
       ) : null}
       {facilityError ? <p className={styles.mapRouteError} role="alert">{facilityError}</p> : null}

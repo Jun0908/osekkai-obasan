@@ -3,16 +3,17 @@
 `data/tokyo-community/communities.csv` already backs the map's "地域コミュニティ"
 layer (see `frontend/lib/osekkai/community-directory.ts`), but nothing on the
 Python side ever read it, so the chat LLM had no way to mention it. This
-module resolves the same way the TypeScript loader does: a row's own
-`latitude`/`longitude` (produced upstream by
-https://github.com/Jun0908/tokyo_community_data, grouped by `map_location_id`
-when several communities share the same real place) when present, otherwise
-the community's ward office, geocoded once via the Geospatial Information
-Authority of Japan address-search API and stored in
-`data/tokyo-community/ward-geocoding-directory.json`. Both sides read that
-same file so coordinates never drift apart between the two languages. Unlike
-the Map API, this loader stays scoped to one ward at a time: chat Grounding
-only ever needs the facts relevant to what the user just asked about.
+module resolves the same way the TypeScript loader does, in priority order:
+(1) a verified single venue address, or the representative first point of an
+explicitly listed multi-venue record, carried by communities.csv;
+(2) a known `venue_name` anchor;
+(3) an approximate activity-area point derived from an official area statement
+or the town/chome in an official association name;
+(4) otherwise the ward office. Address and area coordinates travel in the CSV;
+both sides also read the same shared ward/venue JSON fallbacks, so coordinates
+and precision labels never drift apart between the two languages. Unlike the Map
+API, this loader stays scoped to one ward at a time: chat Grounding only
+ever needs the facts relevant to what the user just asked about.
 
 This data is `raw_open_data_unverified` per the Provenance table in
 Plan2.md §7: it is a directory listing, not a Live Provider event, so it
@@ -22,6 +23,7 @@ must never be phrased as confirming that a circle is currently meeting.
 from __future__ import annotations
 
 import csv
+import io
 import json
 import os
 from datetime import datetime, timezone
@@ -38,11 +40,14 @@ REQUIRED_COLUMNS = (
     "description",
     "venue_name",
     "venue_address",
-    "venue_address_source_url",
+    "area_name",
     "map_location_id",
     "latitude",
     "longitude",
     "geocoded_address",
+    "location_precision",
+    "location_source",
+    "location_source_url",
     "target_audience",
     "official_url",
     "online_participation",
@@ -62,16 +67,16 @@ def _resolve_data_root(data_root: Path | None) -> Path:
     return Path(configured) if configured else _default_data_root()
 
 
-_WARD_OFFICE_FIELDS = {"key", "name", "address", "latitude", "longitude", "sourceUrl"}
+_FACILITY_FIELDS = {"key", "name", "address", "latitude", "longitude", "sourceUrl"}
 
 
-def _as_ward_office(value: Any, context: str) -> dict[str, Any]:
-    if not isinstance(value, dict) or not _WARD_OFFICE_FIELDS.issubset(value):
+def _as_facility(value: Any, context: str) -> dict[str, Any]:
+    if not isinstance(value, dict) or not _FACILITY_FIELDS.issubset(value):
         raise ValueError(f"{context} is malformed")
     return value
 
 
-def _read_ward_offices(root: Path) -> dict[str, dict[str, Any]]:
+def _read_ward_geocoding_directory(root: Path) -> dict[str, dict[str, Any]]:
     path = root / "ward-geocoding-directory.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
     wards = payload.get("wards")
@@ -81,46 +86,112 @@ def _read_ward_offices(root: Path) -> dict[str, dict[str, Any]]:
     for ward_name, value in wards.items():
         if not isinstance(value, dict):
             raise ValueError(f"ward-geocoding-directory.json wards.{ward_name} is malformed")
-        result[ward_name] = _as_ward_office(
-            value.get("wardOffice"), f"ward-geocoding-directory.json wards.{ward_name}.wardOffice"
-        )
+        ward_office = _as_facility(value.get("wardOffice"), f"ward-geocoding-directory.json wards.{ward_name}.wardOffice")
+        anchors = value.get("anchors")
+        if not isinstance(anchors, list):
+            raise ValueError(f"ward-geocoding-directory.json wards.{ward_name}.anchors must be a list")
+        resolved_anchors = [
+            _as_facility(anchor, f"ward-geocoding-directory.json wards.{ward_name}.anchors[{index}]")
+            for index, anchor in enumerate(anchors)
+        ]
+        result[ward_name] = {"wardOffice": ward_office, "anchors": resolved_anchors}
     return result
 
 
-def _parse_coordinate(value: str) -> float | None:
-    if not value:
+def _read_venue_address_directory(root: Path) -> dict[str, dict[str, Any]]:
+    path = root / "venue-address-directory.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    addresses = payload.get("addresses")
+    if not isinstance(addresses, dict):
+        raise ValueError("venue-address-directory.json is missing an addresses object")
+    for address, value in addresses.items():
+        if (
+            not isinstance(value, dict)
+            or not isinstance(value.get("ward"), str)
+            or not isinstance(value.get("latitude"), (int, float))
+            or not isinstance(value.get("longitude"), (int, float))
+        ):
+            raise ValueError(f"venue-address-directory.json addresses.{address} is malformed")
+    return addresses
+
+
+def _address_facility(address: str, entry: Mapping[str, Any]) -> dict[str, Any]:
+    return {
+        "key": f"addr:{address}",
+        "name": address.removeprefix("東京都"),
+        "address": address,
+        "latitude": entry["latitude"],
+        "longitude": entry["longitude"],
+        "sourceUrl": "",
+        "locationKind": "exact_address",
+        "locationPrecision": "exact_address",
+    }
+
+
+def _optional_float(value: Any) -> float | None:
+    text = str(value or "").strip()
+    if not text:
         return None
     try:
-        return float(value)
+        return float(text)
     except ValueError:
         return None
 
 
-def _resolve_point(
-    ward: str,
-    csv_row: Mapping[str, str],
-    ward_offices: dict[str, dict[str, Any]],
-) -> dict[str, Any] | None:
-    latitude = _parse_coordinate(csv_row.get("latitude", ""))
-    longitude = _parse_coordinate(csv_row.get("longitude", ""))
-    if latitude is not None and longitude is not None:
-        location_id = csv_row.get("map_location_id", "").strip() or f"latlng:{latitude:.5f},{longitude:.5f}"
-        raw_name = csv_row.get("venue_name", "").strip().split(";")[0].strip()
-        address = csv_row.get("geocoded_address", "").strip() or csv_row.get("venue_address", "").strip().split("|")[0].strip()
-        name = raw_name or address.removeprefix("東京都") or f"{ward}の活動場所"
-        return {
-            "key": f"loc:{location_id}",
-            "name": name,
-            "address": address,
-            "latitude": latitude,
-            "longitude": longitude,
-            "sourceUrl": csv_row.get("venue_address_source_url", "").strip() or csv_row.get("official_url", "").strip(),
-            "precise": True,
-        }
-    office = ward_offices.get(ward)
-    if office is None:
+def _csv_map_facility(row: Mapping[str, str]) -> dict[str, Any] | None:
+    key = (row.get("map_location_id") or "").strip()
+    latitude = _optional_float(row.get("latitude"))
+    longitude = _optional_float(row.get("longitude"))
+    address = (row.get("geocoded_address") or "").strip()
+    if not key or latitude is None or longitude is None or not address:
         return None
-    return {**office, "precise": False}
+    precision = (row.get("location_precision") or "").strip()
+    source = (row.get("location_source") or "").strip()
+    exact = source in {"venue_address", "venue_name_address"} and precision == "exact_address"
+    multiple = source == "venue_address" and precision == "multiple_addresses_representative"
+    area_name = (row.get("area_name") or "").strip()
+    if exact:
+        label = address.removeprefix("東京都")
+    elif multiple:
+        label = f"{address.removeprefix('東京都')}（複数会場の代表）"
+    else:
+        label = f"{area_name or address}（活動区域の目安）"
+    return {
+        "key": key,
+        "name": label,
+        "address": address,
+        "latitude": latitude,
+        "longitude": longitude,
+        "sourceUrl": (row.get("location_source_url") or "").strip(),
+        "locationKind": "exact_address" if exact else "multiple_addresses" if multiple else "activity_area",
+        "locationPrecision": precision or None,
+    }
+
+
+def _resolve_facility(
+    ward: str,
+    venue_name: str,
+    venue_address: str,
+    row: Mapping[str, str],
+    wards: dict[str, dict[str, Any]],
+    addresses: dict[str, dict[str, Any]],
+) -> dict[str, Any] | None:
+    csv_facility = _csv_map_facility(row)
+    if csv_facility is not None and csv_facility["locationKind"] in {"exact_address", "multiple_addresses"}:
+        return csv_facility
+    if venue_address:
+        known = addresses.get(venue_address)
+        if known is not None and known.get("ward") == ward:
+            return _address_facility(venue_address, known)
+    definition = wards.get(ward)
+    if definition is None:
+        return None
+    for anchor in definition["anchors"]:
+        if str(anchor.get("match", "")) and str(anchor["match"]) in venue_name:
+            return {**anchor, "locationKind": "known_facility", "locationPrecision": "known_facility"}
+    if csv_facility is not None:
+        return csv_facility
+    return {**definition["wardOffice"], "locationKind": "ward_office", "locationPrecision": "ward_office"}
 
 
 def _read_communities_csv(root: Path) -> list[dict[str, str]]:
@@ -138,7 +209,7 @@ def _read_communities_csv(root: Path) -> list[dict[str, str]]:
 def load_community_directory(
     ward: str = DEFAULT_WARD, *, data_root: Path | None = None
 ) -> dict[str, Any]:
-    """Group a ward's community/circle rows by the real place they resolve to.
+    """Group Chiyoda community/circle rows by the facility their venue resolves to.
 
     Raises OSError/ValueError on a missing or malformed source file; callers
     that treat this as an enhancement (never block chat on it) should catch
@@ -146,12 +217,15 @@ def load_community_directory(
     """
 
     root = _resolve_data_root(data_root)
-    ward_offices = _read_ward_offices(root)
+    wards = _read_ward_geocoding_directory(root)
+    addresses = _read_venue_address_directory(root)
     rows = _read_communities_csv(root)
 
     facilities_by_key: dict[str, dict[str, Any]] = {}
     total_in_ward = 0
-    with_precise_location = 0
+    with_venue_address = 0
+    with_known_facility = 0
+    with_area_location = 0
     with_ward_office_fallback = 0
 
     for row in rows:
@@ -159,11 +233,17 @@ def load_community_directory(
             continue
         total_in_ward += 1
 
-        point = _resolve_point(ward, row, ward_offices)
-        if point is None:
+        venue_name_raw = (row.get("venue_name") or "").strip()
+        venue_address_raw = (row.get("venue_address") or "").strip()
+        facility = _resolve_facility(ward, venue_name_raw, venue_address_raw, row, wards, addresses)
+        if facility is None:
             continue
-        if point["precise"]:
-            with_precise_location += 1
+        if facility.get("locationKind") in {"exact_address", "multiple_addresses"}:
+            with_venue_address += 1
+        elif facility.get("locationKind") == "known_facility":
+            with_known_facility += 1
+        elif facility.get("locationKind") == "activity_area":
+            with_area_location += 1
         else:
             with_ward_office_fallback += 1
 
@@ -177,10 +257,12 @@ def load_community_directory(
             "name": name,
             "nameKana": (row.get("name_kana") or "").strip() or None,
             "category": (row.get("description") or "").strip() or None,
-            "venueName": (row.get("venue_name") or "").strip() or point["name"],
-            "venueAddress": (row.get("venue_address") or "").strip() or point["address"],
-            "latitude": point["latitude"],
-            "longitude": point["longitude"],
+            "venueName": facility["name"],
+            "venueAddress": (row.get("venue_address") or "").strip() or facility["address"],
+            "latitude": facility["latitude"],
+            "longitude": facility["longitude"],
+            "locationKind": facility.get("locationKind", "ward_office"),
+            "locationPrecision": facility.get("locationPrecision"),
             "targetAudience": (row.get("target_audience") or "").strip() or None,
             "officialUrl": (row.get("official_url") or "").strip() or None,
             "onlineParticipation": (row.get("online_participation") or "").strip() or None,
@@ -188,19 +270,20 @@ def load_community_directory(
             "fetchedAt": (row.get("fetched_at") or "").strip() or None,
         }
 
-        bucket = facilities_by_key.get(point["key"])
+        bucket = facilities_by_key.get(facility["key"])
         if bucket is None:
             bucket = {
-                "key": point["key"],
-                "name": point["name"],
-                "address": point["address"],
-                "latitude": point["latitude"],
-                "longitude": point["longitude"],
-                "sourceUrl": point["sourceUrl"],
-                "precise": point["precise"],
+                "key": facility["key"],
+                "name": facility["name"],
+                "address": facility["address"],
+                "latitude": facility["latitude"],
+                "longitude": facility["longitude"],
+                "sourceUrl": facility["sourceUrl"],
+                "locationKind": facility.get("locationKind", "ward_office"),
+                "locationPrecision": facility.get("locationPrecision"),
                 "communities": [],
             }
-            facilities_by_key[point["key"]] = bucket
+            facilities_by_key[facility["key"]] = bucket
         bucket["communities"].append(entry)
 
     facilities = sorted(
@@ -220,13 +303,15 @@ def load_community_directory(
             "classification": "raw_open_data_unverified",
             "note": (
                 "区が公開する地域コミュニティ一覧（Open Data CSV）を地図・会話へ表示しています。"
-                "ジオコーディング済みの活動場所（緯度経度）があればその場所、"
-                "無い行は区役所単位の目安地点です。個々の開催日時・現在の活動有無は確認していません。"
+                "単一会場住所、複数会場の代表地点、確認済み施設、公式区域または地域名・町丁目、区役所の順に位置を解決します。"
+                "複数会場は一覧の最初の住所、地域名・町丁目は活動区域の目安です。個々の開催日時・現在の活動有無は確認していません。"
             ),
         },
         "counts": {
             "totalInWard": total_in_ward,
-            "withPreciseLocation": with_precise_location,
+            "withVenueAddress": with_venue_address,
+            "withKnownFacility": with_known_facility,
+            "withAreaLocation": with_area_location,
             "withWardOfficeFallback": with_ward_office_fallback,
         },
         "facilities": facilities,

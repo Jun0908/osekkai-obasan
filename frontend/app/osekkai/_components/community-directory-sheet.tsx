@@ -16,11 +16,13 @@ export default function CommunityDirectorySheet({
       <div className={styles.mapSheetLabels}>
         <span>Open Data</span>
         <span>{facility.ward}</span>
-        <span>{facility.precise ? '活動場所の座標' : '区役所の目安地点'}</span>
+        <span>{facility.locationKind === 'exact_address' || facility.locationKind === 'known_facility' ? '確認済み場所' : facility.locationKind === 'multiple_addresses' ? '複数会場の代表' : facility.locationKind === 'activity_area' ? '活動区域の目安' : '区役所単位の目安'}</span>
         <span>{facility.communities.length}件</span>
       </div>
       <h2>{facility.name}</h2>
       <p className={styles.mapSheetWhen}>{facility.address}</p>
+      {facility.locationKind === 'activity_area' ? <p className={styles.communityDirectoryNote}>このピンは町丁目の代表点です。実際の集合場所・開催場所ではありません。</p> : null}
+      {facility.locationKind === 'multiple_addresses' ? <p className={styles.communityDirectoryNote}>複数の会場住所が掲載されているため、地図には一覧の最初の会場を代表表示しています。</p> : null}
       <p className={styles.communityDirectoryNote}>{note}</p>
       <ul className={styles.communityDirectoryList}>
         {facility.communities.map((community) => (
@@ -33,7 +35,7 @@ export default function CommunityDirectorySheet({
       {facility.sourceUrl ? (
         <div className={styles.mapSheetSources}>
           <strong>Source</strong>
-          <a href={facility.sourceUrl} target="_blank" rel="noreferrer">{facility.ward}公式ページ ↗</a>
+          <a href={facility.sourceUrl} target="_blank" rel="noreferrer">位置・掲載情報の根拠 ↗</a>
         </div>
       ) : null}
     </aside>

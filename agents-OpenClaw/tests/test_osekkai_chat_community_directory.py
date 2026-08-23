@@ -16,11 +16,10 @@ from osekkai_store import JsonStore
 HEADER = [
     "community_id", "ward_code", "ward_name", "name", "name_kana", "category", "activity_status",
     "description", "source_comment", "target_audience", "target_audience_notes", "venue_name",
-    "venue_notes", "venue_address", "venue_address_source_url", "venue_address_match_status",
-    "area_name", "map_query", "map_location_id", "latitude", "longitude", "geocoded_address",
-    "location_precision", "location_source", "location_source_url", "official_url",
-    "online_participation", "foreign_language_support", "supported_languages", "inbound_program",
-    "notes", "source_updated_at", "fetched_at",
+    "venue_notes", "venue_address", "official_url", "online_participation", "foreign_language_support",
+    "area_name", "map_location_id", "latitude", "longitude", "geocoded_address",
+    "location_precision", "location_source", "location_source_url",
+    "supported_languages", "inbound_program", "notes", "source_updated_at", "fetched_at",
 ]
 
 WARD_DIRECTORY_FIXTURE = {
@@ -31,6 +30,13 @@ WARD_DIRECTORY_FIXTURE = {
                 "key": "chiyoda-office", "name": "千代田区役所", "address": "東京都千代田区九段南1-6-11",
                 "latitude": 35.694138, "longitude": 139.752228, "sourceUrl": "https://www.city.chiyoda.lg.jp/",
             },
+            "anchors": [
+                {
+                    "key": "kudan", "match": "九段", "name": "九段生涯学習館", "address": "東京都千代田区九段南1-5-10",
+                    "latitude": 35.695339, "longitude": 139.751984,
+                    "sourceUrl": "https://www.city.chiyoda.lg.jp/shisetsu/bunka/kudan-gakushu.html",
+                },
+            ],
         },
     },
 }
@@ -40,17 +46,16 @@ def _write_directory_fixture(directory: Path) -> None:
     (directory / "ward-geocoding-directory.json").write_text(
         json.dumps(WARD_DIRECTORY_FIXTURE, ensure_ascii=False), encoding="utf-8"
     )
+    (directory / "venue-address-directory.json").write_text(
+        json.dumps({"schemaVersion": "1.0", "addresses": {}}, ensure_ascii=False), encoding="utf-8"
+    )
     row = {column: "" for column in HEADER}
     row.update(
         community_id="community_1",
         ward_name="千代田区",
         name="読書会さくら",
         description="読書",
-        venue_name="九段生涯学習館",
-        map_location_id="map_kudan",
-        latitude="35.695339",
-        longitude="139.751984",
-        geocoded_address="東京都千代田区九段南一丁目5番10号",
+        venue_name="九段",
     )
     with (directory / "communities.csv").open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=HEADER)

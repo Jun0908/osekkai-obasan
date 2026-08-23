@@ -7,12 +7,16 @@ export type CommunityDirectoryEntry = {
   venueAddress: string;
   latitude: number;
   longitude: number;
+  locationKind: CommunityLocationKind;
+  locationPrecision: string | null;
   targetAudience: string | null;
   officialUrl: string | null;
   onlineParticipation: string | null;
   sourceUpdatedAt: string | null;
   fetchedAt: string | null;
 };
+
+export type CommunityLocationKind = 'exact_address' | 'multiple_addresses' | 'known_facility' | 'activity_area' | 'ward_office';
 
 export type CommunityFacilitySummary = {
   key: string;
@@ -22,7 +26,8 @@ export type CommunityFacilitySummary = {
   latitude: number;
   longitude: number;
   sourceUrl: string;
-  precise: boolean;
+  locationKind: CommunityLocationKind;
+  locationPrecision: string | null;
   count: number;
 };
 
@@ -39,7 +44,9 @@ export type CommunityDirectoryResult = {
   };
   counts: {
     total: number;
-    withPreciseLocation: number;
+    withVenueAddress: number;
+    withKnownFacility: number;
+    withAreaLocation: number;
     withWardOfficeFallback: number;
   };
   facilities: CommunityFacilitySummary[];

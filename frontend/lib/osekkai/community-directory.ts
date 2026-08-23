@@ -11,7 +11,8 @@ import type {
 
 /**
  * Each community is placed on the map by trying, in order:
- *   1. a verified single venue address carried by communities.csv;
+ *   1. a verified single venue address, or the representative first point of
+ *      an explicitly listed multi-venue record, carried by communities.csv;
  *   2. a known venue-name anchor such as 九段生涯学習館;
  *   3. an activity-area point derived from an official area statement or the
  *      town/chome in an official town-association name;
@@ -70,17 +71,20 @@ function addressFacility(address: string, entry: VenueAddressEntry): FacilityDef
 
 function csvMapFacility(location: CsvMapLocation): FacilityDefinition | null {
   if (!location.id || location.latitude === null || location.longitude === null || !location.geocodedAddress) return null;
-  const exact = location.source === 'venue_address' && location.precision === 'exact_address';
+  const exact = ['venue_address', 'venue_name_address'].includes(location.source) && location.precision === 'exact_address';
+  const multiple = location.source === 'venue_address' && location.precision === 'multiple_addresses_representative';
   return {
     key: location.id,
     name: exact
       ? location.geocodedAddress.replace(/^東京都/, '')
-      : `${location.areaName || location.geocodedAddress.replace(/^東京都[^区]+区/, '')}（活動区域の目安）`,
+      : multiple
+        ? `${location.geocodedAddress.replace(/^東京都/, '')}（複数会場の代表）`
+        : `${location.areaName || location.geocodedAddress.replace(/^東京都[^区]+区/, '')}（活動区域の目安）`,
     address: location.geocodedAddress,
     latitude: location.latitude,
     longitude: location.longitude,
     sourceUrl: location.sourceUrl,
-    locationKind: exact ? 'exact_address' : 'activity_area',
+    locationKind: exact ? 'exact_address' : multiple ? 'multiple_addresses' : 'activity_area',
     locationPrecision: location.precision || null,
   };
 }
@@ -94,7 +98,7 @@ function resolveFacility(
   addresses: Map<string, VenueAddressEntry>,
 ): FacilityDefinition | null {
   const csvFacility = csvMapFacility(mapLocation);
-  if (csvFacility?.locationKind === 'exact_address') return csvFacility;
+  if (csvFacility?.locationKind === 'exact_address' || csvFacility?.locationKind === 'multiple_addresses') return csvFacility;
   if (venueAddress) {
     const known = addresses.get(venueAddress);
     if (known && known.ward === ward) return addressFacility(venueAddress, known);
@@ -281,7 +285,7 @@ const REQUIRED_COLUMNS = [
 ] as const;
 
 const DATA_SOURCE_NOTE =
-  '区が公開する地域コミュニティ一覧（Open Data CSV）を地図へ表示しています。単一の会場住所、確認済み施設、公式区域または町会・自治会名の地域名・町丁目、区役所の順に位置を解決します。地域名・町丁目のピンは実開催地ではなく活動区域の目安です。個々の開催日時・現在の活動有無は確認していません。';
+  '区が公開する地域コミュニティ一覧（Open Data CSV）を地図へ表示しています。単一会場住所、複数会場の代表地点、確認済み施設、公式区域または地域名・町丁目、区役所の順に位置を解決します。複数会場は一覧の最初の住所、地域名・町丁目は活動区域の目安です。個々の開催日時・現在の活動有無は確認していません。';
 
 function mapLocationFromRow(row: string[], at: (column: (typeof REQUIRED_COLUMNS)[number]) => number): CsvMapLocation {
   return {
@@ -336,7 +340,7 @@ export async function loadCommunityDirectorySummary(): Promise<CommunityDirector
     const facility = resolveFacility(ward, venueName, venueAddress, mapLocationFromRow(row, at), wards, addresses);
     if (!facility) continue;
     total += 1;
-    if (facility.locationKind === 'exact_address') withVenueAddress += 1;
+    if (facility.locationKind === 'exact_address' || facility.locationKind === 'multiple_addresses') withVenueAddress += 1;
     else if (facility.locationKind === 'known_facility') withKnownFacility += 1;
     else if (facility.locationKind === 'activity_area') withAreaLocation += 1;
     else withWardOfficeFallback += 1;

@@ -4,7 +4,8 @@
 layer (see `frontend/lib/osekkai/community-directory.ts`), but nothing on the
 Python side ever read it, so the chat LLM had no way to mention it. This
 module resolves the same way the TypeScript loader does, in priority order:
-(1) a verified single venue address carried by communities.csv;
+(1) a verified single venue address, or the representative first point of an
+explicitly listed multi-venue record, carried by communities.csv;
 (2) a known `venue_name` anchor;
 (3) an approximate activity-area point derived from an official area statement
 or the town/chome in an official association name;
@@ -146,9 +147,15 @@ def _csv_map_facility(row: Mapping[str, str]) -> dict[str, Any] | None:
         return None
     precision = (row.get("location_precision") or "").strip()
     source = (row.get("location_source") or "").strip()
-    exact = source == "venue_address" and precision == "exact_address"
+    exact = source in {"venue_address", "venue_name_address"} and precision == "exact_address"
+    multiple = source == "venue_address" and precision == "multiple_addresses_representative"
     area_name = (row.get("area_name") or "").strip()
-    label = address.removeprefix("東京都") if exact else f"{area_name or address}（活動区域の目安）"
+    if exact:
+        label = address.removeprefix("東京都")
+    elif multiple:
+        label = f"{address.removeprefix('東京都')}（複数会場の代表）"
+    else:
+        label = f"{area_name or address}（活動区域の目安）"
     return {
         "key": key,
         "name": label,
@@ -156,7 +163,7 @@ def _csv_map_facility(row: Mapping[str, str]) -> dict[str, Any] | None:
         "latitude": latitude,
         "longitude": longitude,
         "sourceUrl": (row.get("location_source_url") or "").strip(),
-        "locationKind": "exact_address" if exact else "activity_area",
+        "locationKind": "exact_address" if exact else "multiple_addresses" if multiple else "activity_area",
         "locationPrecision": precision or None,
     }
 
@@ -170,7 +177,7 @@ def _resolve_facility(
     addresses: dict[str, dict[str, Any]],
 ) -> dict[str, Any] | None:
     csv_facility = _csv_map_facility(row)
-    if csv_facility is not None and csv_facility["locationKind"] == "exact_address":
+    if csv_facility is not None and csv_facility["locationKind"] in {"exact_address", "multiple_addresses"}:
         return csv_facility
     if venue_address:
         known = addresses.get(venue_address)
@@ -231,7 +238,7 @@ def load_community_directory(
         facility = _resolve_facility(ward, venue_name_raw, venue_address_raw, row, wards, addresses)
         if facility is None:
             continue
-        if facility.get("locationKind") == "exact_address":
+        if facility.get("locationKind") in {"exact_address", "multiple_addresses"}:
             with_venue_address += 1
         elif facility.get("locationKind") == "known_facility":
             with_known_facility += 1
@@ -296,8 +303,8 @@ def load_community_directory(
             "classification": "raw_open_data_unverified",
             "note": (
                 "区が公開する地域コミュニティ一覧（Open Data CSV）を地図・会話へ表示しています。"
-                "単一の会場住所、確認済み施設、公式区域または町会・自治会名の地域名・町丁目、区役所の順に位置を解決します。"
-                "地域名・町丁目のピンは実開催地ではなく活動区域の目安です。個々の開催日時・現在の活動有無は確認していません。"
+                "単一会場住所、複数会場の代表地点、確認済み施設、公式区域または地域名・町丁目、区役所の順に位置を解決します。"
+                "複数会場は一覧の最初の住所、地域名・町丁目は活動区域の目安です。個々の開催日時・現在の活動有無は確認していません。"
             ),
         },
         "counts": {

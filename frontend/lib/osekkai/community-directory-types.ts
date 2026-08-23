@@ -16,7 +16,7 @@ export type CommunityDirectoryEntry = {
   fetchedAt: string | null;
 };
 
-export type CommunityLocationKind = 'exact_address' | 'known_facility' | 'activity_area' | 'ward_office';
+export type CommunityLocationKind = 'exact_address' | 'multiple_addresses' | 'known_facility' | 'activity_area' | 'ward_office';
 
 export type CommunityFacilitySummary = {
   key: string;

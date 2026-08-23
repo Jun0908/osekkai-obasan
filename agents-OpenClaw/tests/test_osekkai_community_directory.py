@@ -223,6 +223,28 @@ class CommunityDirectoryTests(unittest.TestCase):
             self.assertEqual(result["facilities"][0]["key"], "map_nishishinjuku")
             self.assertEqual(result["facilities"][0]["locationKind"], "activity_area")
 
+    def test_marks_first_multi_venue_address_as_representative(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_fixture(
+                root,
+                [
+                    row(
+                        community_id="community_multi", ward_name="千代田区", name="二会場の会",
+                        description="文化", venue_address="東京都千代田区九段南1-5-10 | 東京都千代田区内神田2-1-8",
+                        map_location_id="map_multi", latitude="35.6953", longitude="139.7520",
+                        geocoded_address="東京都千代田区九段南一丁目5番10号",
+                        location_precision="multiple_addresses_representative", location_source="venue_address",
+                    )
+                ],
+            )
+
+            result = load_community_directory("千代田区", data_root=root)
+
+            self.assertEqual(result["counts"]["withVenueAddress"], 1)
+            self.assertEqual(result["facilities"][0]["locationKind"], "multiple_addresses")
+            self.assertIn("複数会場の代表", result["facilities"][0]["name"])
+
     def test_format_community_facts_is_bounded_and_carries_the_unverified_caveat(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

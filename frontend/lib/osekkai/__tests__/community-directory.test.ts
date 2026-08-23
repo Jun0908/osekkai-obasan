@@ -139,6 +139,26 @@ describe('loadCommunityDirectorySummary', () => {
       name: '西新宿一丁目（活動区域の目安）',
     });
   });
+
+  it('labels the first point of an explicit multi-venue record as representative', async () => {
+    writeCommunitiesCsv([
+      row({
+        community_id: 'community_multi', ward_name: '千代田区', name: '二会場の会', description: '文化',
+        venue_address: '東京都千代田区九段南1-5-10 | 東京都千代田区内神田2-1-8',
+        map_location_id: 'map_multi', latitude: '35.6953', longitude: '139.7520',
+        geocoded_address: '東京都千代田区九段南一丁目5番10号',
+        location_precision: 'multiple_addresses_representative', location_source: 'venue_address',
+      }),
+    ]);
+
+    const result = await loadCommunityDirectorySummary();
+
+    expect(result.counts.withVenueAddress).toBe(1);
+    expect(result.facilities[0]).toMatchObject({
+      key: 'map_multi', locationKind: 'multiple_addresses',
+      name: '千代田区九段南一丁目5番10号（複数会場の代表）',
+    });
+  });
 });
 
 describe('loadCommunityFacilityDetail', () => {

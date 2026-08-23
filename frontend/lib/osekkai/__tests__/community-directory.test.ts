@@ -11,6 +11,8 @@ const HEADER = [
   'community_id', 'ward_code', 'ward_name', 'name', 'name_kana', 'category', 'activity_status',
   'description', 'source_comment', 'target_audience', 'target_audience_notes', 'venue_name',
   'venue_notes', 'venue_address', 'official_url', 'online_participation', 'foreign_language_support',
+  'area_name', 'map_location_id', 'latitude', 'longitude', 'geocoded_address',
+  'location_precision', 'location_source', 'location_source_url',
   'supported_languages', 'inbound_program', 'notes', 'source_updated_at', 'fetched_at',
 ];
 
@@ -68,7 +70,7 @@ describe('loadCommunityDirectorySummary', () => {
 
     const result = await loadCommunityDirectorySummary();
 
-    expect(result.counts).toEqual({ total: 4, withVenueAddress: 0, withKnownFacility: 2, withWardOfficeFallback: 2 });
+    expect(result.counts).toEqual({ total: 4, withVenueAddress: 0, withKnownFacility: 2, withAreaLocation: 0, withWardOfficeFallback: 2 });
     expect(result.facilities).toHaveLength(4);
 
     const kudan = result.facilities.find((facility) => facility.key === 'kudan');
@@ -115,8 +117,27 @@ describe('loadCommunityDirectorySummary', () => {
 
     // The address is geocoded for 渋谷区, not 千代田区, so it must not be trusted
     // here — the row falls back to the Chiyoda ward office instead.
-    expect(result.counts).toEqual({ total: 1, withVenueAddress: 0, withKnownFacility: 0, withWardOfficeFallback: 1 });
+    expect(result.counts).toEqual({ total: 1, withVenueAddress: 0, withKnownFacility: 0, withAreaLocation: 0, withWardOfficeFallback: 1 });
     expect(result.facilities[0].key).toBe('chiyoda-office');
+  });
+
+  it('uses a CSV activity-area point before the ward office and labels it approximate', async () => {
+    writeCommunitiesCsv([
+      row({
+        community_id: 'community_area', ward_name: '新宿区', name: '西新宿一丁目町会', description: '町会・自治会',
+        area_name: '西新宿一丁目', map_location_id: 'map_nishishinjuku', latitude: '35.6912', longitude: '139.6996',
+        geocoded_address: '東京都新宿区西新宿一丁目', location_precision: 'name_chome',
+        location_source: 'community_name', location_source_url: 'https://maps.gsi.go.jp/',
+      }),
+    ]);
+
+    const result = await loadCommunityDirectorySummary();
+
+    expect(result.counts).toEqual({ total: 1, withVenueAddress: 0, withKnownFacility: 0, withAreaLocation: 1, withWardOfficeFallback: 0 });
+    expect(result.facilities[0]).toMatchObject({
+      key: 'map_nishishinjuku', locationKind: 'activity_area', locationPrecision: 'name_chome',
+      name: '西新宿一丁目（活動区域の目安）',
+    });
   });
 });
 

@@ -17,6 +17,8 @@ HEADER = [
     "community_id", "ward_code", "ward_name", "name", "name_kana", "category", "activity_status",
     "description", "source_comment", "target_audience", "target_audience_notes", "venue_name",
     "venue_notes", "venue_address", "official_url", "online_participation", "foreign_language_support",
+    "area_name", "map_location_id", "latitude", "longitude", "geocoded_address",
+    "location_precision", "location_source", "location_source_url",
     "supported_languages", "inbound_program", "notes", "source_updated_at", "fetched_at",
 ]
 

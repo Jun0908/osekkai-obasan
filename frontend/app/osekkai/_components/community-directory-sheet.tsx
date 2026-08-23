@@ -16,10 +16,12 @@ export default function CommunityDirectorySheet({
       <div className={styles.mapSheetLabels}>
         <span>Open Data</span>
         <span>{facility.ward}</span>
+        <span>{facility.locationKind === 'exact_address' || facility.locationKind === 'known_facility' ? '確認済み場所' : facility.locationKind === 'activity_area' ? '活動区域の目安' : '区役所単位の目安'}</span>
         <span>{facility.communities.length}件</span>
       </div>
       <h2>{facility.name}</h2>
       <p className={styles.mapSheetWhen}>{facility.address}</p>
+      {facility.locationKind === 'activity_area' ? <p className={styles.communityDirectoryNote}>このピンは町丁目の代表点です。実際の集合場所・開催場所ではありません。</p> : null}
       <p className={styles.communityDirectoryNote}>{note}</p>
       <ul className={styles.communityDirectoryList}>
         {facility.communities.map((community) => (
@@ -32,7 +34,7 @@ export default function CommunityDirectorySheet({
       {facility.sourceUrl ? (
         <div className={styles.mapSheetSources}>
           <strong>Source</strong>
-          <a href={facility.sourceUrl} target="_blank" rel="noreferrer">{facility.ward}公式ページ ↗</a>
+          <a href={facility.sourceUrl} target="_blank" rel="noreferrer">位置・掲載情報の根拠 ↗</a>
         </div>
       ) : null}
     </aside>

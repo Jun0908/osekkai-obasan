@@ -14,6 +14,8 @@ HEADER = [
     "community_id", "ward_code", "ward_name", "name", "name_kana", "category", "activity_status",
     "description", "source_comment", "target_audience", "target_audience_notes", "venue_name",
     "venue_notes", "venue_address", "official_url", "online_participation", "foreign_language_support",
+    "area_name", "map_location_id", "latitude", "longitude", "geocoded_address",
+    "location_precision", "location_source", "location_source_url",
     "supported_languages", "inbound_program", "notes", "source_updated_at", "fetched_at",
 ]
 
@@ -98,7 +100,7 @@ class CommunityDirectoryTests(unittest.TestCase):
             self.assertEqual(result["ward"], "千代田区")
             self.assertEqual(
                 result["counts"],
-                {"totalInWard": 3, "withVenueAddress": 0, "withKnownFacility": 2, "withWardOfficeFallback": 1},
+                {"totalInWard": 3, "withVenueAddress": 0, "withKnownFacility": 2, "withAreaLocation": 0, "withWardOfficeFallback": 1},
             )
             self.assertEqual(len(result["facilities"]), 3)
 
@@ -127,7 +129,7 @@ class CommunityDirectoryTests(unittest.TestCase):
 
             self.assertEqual(
                 result["counts"],
-                {"totalInWard": 1, "withVenueAddress": 0, "withKnownFacility": 0, "withWardOfficeFallback": 1},
+                {"totalInWard": 1, "withVenueAddress": 0, "withKnownFacility": 0, "withAreaLocation": 0, "withWardOfficeFallback": 1},
             )
             self.assertEqual(result["facilities"][0]["key"], "shinjuku-office")
             self.assertEqual(result["facilities"][0]["name"], "新宿区役所")
@@ -144,7 +146,7 @@ class CommunityDirectoryTests(unittest.TestCase):
 
             self.assertEqual(
                 result["counts"],
-                {"totalInWard": 0, "withVenueAddress": 0, "withKnownFacility": 0, "withWardOfficeFallback": 0},
+                {"totalInWard": 0, "withVenueAddress": 0, "withKnownFacility": 0, "withAreaLocation": 0, "withWardOfficeFallback": 0},
             )
             self.assertEqual(result["facilities"], [])
 
@@ -192,9 +194,34 @@ class CommunityDirectoryTests(unittest.TestCase):
             # trusted here — the row falls back to the Chiyoda ward office instead.
             self.assertEqual(
                 result["counts"],
-                {"totalInWard": 1, "withVenueAddress": 0, "withKnownFacility": 0, "withWardOfficeFallback": 1},
+                {"totalInWard": 1, "withVenueAddress": 0, "withKnownFacility": 0, "withAreaLocation": 0, "withWardOfficeFallback": 1},
             )
             self.assertEqual(result["facilities"][0]["key"], "chiyoda-office")
+
+    def test_prefers_a_csv_activity_area_before_the_ward_office(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_fixture(
+                root,
+                [
+                    row(
+                        community_id="community_area", ward_name="新宿区", name="西新宿一丁目町会",
+                        description="町会・自治会", area_name="西新宿一丁目", map_location_id="map_nishishinjuku",
+                        latitude="35.6912", longitude="139.6996", geocoded_address="東京都新宿区西新宿一丁目",
+                        location_precision="name_chome", location_source="community_name",
+                        location_source_url="https://maps.gsi.go.jp/",
+                    )
+                ],
+            )
+
+            result = load_community_directory("新宿区", data_root=root)
+
+            self.assertEqual(
+                result["counts"],
+                {"totalInWard": 1, "withVenueAddress": 0, "withKnownFacility": 0, "withAreaLocation": 1, "withWardOfficeFallback": 0},
+            )
+            self.assertEqual(result["facilities"][0]["key"], "map_nishishinjuku")
+            self.assertEqual(result["facilities"][0]["locationKind"], "activity_area")
 
     def test_format_community_facts_is_bounded_and_carries_the_unverified_caveat(self):
         with tempfile.TemporaryDirectory() as directory:

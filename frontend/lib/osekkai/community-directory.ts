@@ -6,23 +6,24 @@ import type {
   CommunityDirectoryResult,
   CommunityFacilityDetail,
   CommunityFacilitySummary,
+  CommunityLocationKind,
 } from './community-directory-types';
 
 /**
- * `data/tokyo-community/communities.csv` carries almost no usable address or
- * coordinate data (venue_address is populated for only ~1.3% of rows, mostly
- * in 渋谷区). Each community is placed on the map by trying, in order:
- *   1. its own `venue_address`, if that exact string was geocoded into
- *      `data/tokyo-community/venue-address-directory.json` (real, per-row
- *      precision — the closest this data gets to an actual building);
- *   2. for 千代田区, a `venue_name` match against one of two real facilities;
- *   3. otherwise the ward office, so every community still lands somewhere
- *      real rather than being dropped.
- * All of these are geocoded once via the Geospatial Information Authority of
- * Japan address-search API and stored in
- * `data/tokyo-community/{ward-geocoding-directory,venue-address-directory}.json`,
- * which this loader and the Python-side `osekkai_community_directory.py`
- * both read, so coordinates never drift apart between the two languages.
+ * Each community is placed on the map by trying, in order:
+ *   1. a verified single venue address carried by communities.csv;
+ *   2. a known venue-name anchor such as 九段生涯学習館;
+ *   3. an activity-area point derived from an official area statement or the
+ *      town/chome in an official town-association name;
+ *   4. otherwise the ward office.
+ * Area points are explicitly approximate and must never be presented as a
+ * confirmed meeting venue.
+ * Address and area coordinates are geocoded once via the Geospatial
+ * Information Authority of Japan address-search API and carried in the CSV.
+ * Shared venue anchors and ward-office fallbacks remain in
+ * `ward-geocoding-directory.json`; the legacy address dictionary remains a
+ * compatibility fallback. TypeScript and Python read the same files, so their
+ * coordinates and precision labels cannot drift apart.
  */
 type FacilityDefinition = {
   key: string;
@@ -32,6 +33,8 @@ type FacilityDefinition = {
   latitude: number;
   longitude: number;
   sourceUrl: string;
+  locationKind?: CommunityLocationKind;
+  locationPrecision?: string | null;
 };
 
 type WardDefinition = {
@@ -41,6 +44,17 @@ type WardDefinition = {
 
 type VenueAddressEntry = { ward: string; latitude: number; longitude: number };
 
+type CsvMapLocation = {
+  id: string;
+  areaName: string;
+  latitude: number | null;
+  longitude: number | null;
+  geocodedAddress: string;
+  precision: string;
+  source: string;
+  sourceUrl: string;
+};
+
 function addressFacility(address: string, entry: VenueAddressEntry): FacilityDefinition {
   return {
     key: `addr:${address}`,
@@ -49,6 +63,25 @@ function addressFacility(address: string, entry: VenueAddressEntry): FacilityDef
     latitude: entry.latitude,
     longitude: entry.longitude,
     sourceUrl: '',
+    locationKind: 'exact_address',
+    locationPrecision: 'exact_address',
+  };
+}
+
+function csvMapFacility(location: CsvMapLocation): FacilityDefinition | null {
+  if (!location.id || location.latitude === null || location.longitude === null || !location.geocodedAddress) return null;
+  const exact = location.source === 'venue_address' && location.precision === 'exact_address';
+  return {
+    key: location.id,
+    name: exact
+      ? location.geocodedAddress.replace(/^東京都/, '')
+      : `${location.areaName || location.geocodedAddress.replace(/^東京都[^区]+区/, '')}（活動区域の目安）`,
+    address: location.geocodedAddress,
+    latitude: location.latitude,
+    longitude: location.longitude,
+    sourceUrl: location.sourceUrl,
+    locationKind: exact ? 'exact_address' : 'activity_area',
+    locationPrecision: location.precision || null,
   };
 }
 
@@ -56,9 +89,12 @@ function resolveFacility(
   ward: string,
   venueName: string,
   venueAddress: string,
+  mapLocation: CsvMapLocation,
   wards: Map<string, WardDefinition>,
   addresses: Map<string, VenueAddressEntry>,
 ): FacilityDefinition | null {
+  const csvFacility = csvMapFacility(mapLocation);
+  if (csvFacility?.locationKind === 'exact_address') return csvFacility;
   if (venueAddress) {
     const known = addresses.get(venueAddress);
     if (known && known.ward === ward) return addressFacility(venueAddress, known);
@@ -66,9 +102,18 @@ function resolveFacility(
   const definition = wards.get(ward);
   if (!definition) return null;
   for (const anchor of definition.anchors) {
-    if (anchor.match && venueName.includes(anchor.match)) return anchor;
+    if (anchor.match && venueName.includes(anchor.match)) {
+      return { ...anchor, locationKind: 'known_facility', locationPrecision: 'known_facility' };
+    }
   }
-  return definition.wardOffice;
+  if (csvFacility) return csvFacility;
+  return { ...definition.wardOffice, locationKind: 'ward_office', locationPrecision: 'ward_office' };
+}
+
+function optionalNumber(value: string): number | null {
+  if (!value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
 function parseCsv(text: string): string[][] {
@@ -220,6 +265,14 @@ const REQUIRED_COLUMNS = [
   'description',
   'venue_name',
   'venue_address',
+  'area_name',
+  'map_location_id',
+  'latitude',
+  'longitude',
+  'geocoded_address',
+  'location_precision',
+  'location_source',
+  'location_source_url',
   'target_audience',
   'official_url',
   'online_participation',
@@ -228,7 +281,20 @@ const REQUIRED_COLUMNS = [
 ] as const;
 
 const DATA_SOURCE_NOTE =
-  '区が公開する地域コミュニティ一覧（Open Data CSV）を地図へ表示しています。活動場所の住所が記載されている行はその住所（主に渋谷区）、千代田区は施設名から特定できた拠点（九段生涯学習館・千代田区立スポーツセンター）、それ以外は区役所単位の目安地点です。個々の開催日時・現在の活動有無は確認していません。';
+  '区が公開する地域コミュニティ一覧（Open Data CSV）を地図へ表示しています。単一の会場住所、確認済み施設、公式区域または町会・自治会名の地域名・町丁目、区役所の順に位置を解決します。地域名・町丁目のピンは実開催地ではなく活動区域の目安です。個々の開催日時・現在の活動有無は確認していません。';
+
+function mapLocationFromRow(row: string[], at: (column: (typeof REQUIRED_COLUMNS)[number]) => number): CsvMapLocation {
+  return {
+    id: (row[at('map_location_id')] ?? '').trim(),
+    areaName: (row[at('area_name')] ?? '').trim(),
+    latitude: optionalNumber(row[at('latitude')] ?? ''),
+    longitude: optionalNumber(row[at('longitude')] ?? ''),
+    geocodedAddress: (row[at('geocoded_address')] ?? '').trim(),
+    precision: (row[at('location_precision')] ?? '').trim(),
+    source: (row[at('location_source')] ?? '').trim(),
+    sourceUrl: (row[at('location_source_url')] ?? '').trim(),
+  };
+}
 
 async function readRows(): Promise<{ header: string[]; columnAt: (column: (typeof REQUIRED_COLUMNS)[number]) => number; rows: string[][] }> {
   const raw = await readCommunitiesCsv();
@@ -256,6 +322,7 @@ export async function loadCommunityDirectorySummary(): Promise<CommunityDirector
   let total = 0;
   let withVenueAddress = 0;
   let withKnownFacility = 0;
+  let withAreaLocation = 0;
   let withWardOfficeFallback = 0;
 
   for (const row of rows) {
@@ -266,11 +333,12 @@ export async function loadCommunityDirectorySummary(): Promise<CommunityDirector
     if (!ward || !id || !name) continue;
     const venueName = (row[at('venue_name')] ?? '').trim();
     const venueAddress = (row[at('venue_address')] ?? '').trim();
-    const facility = resolveFacility(ward, venueName, venueAddress, wards, addresses);
+    const facility = resolveFacility(ward, venueName, venueAddress, mapLocationFromRow(row, at), wards, addresses);
     if (!facility) continue;
     total += 1;
-    if (facility.key.startsWith('addr:')) withVenueAddress += 1;
-    else if (facility.match) withKnownFacility += 1;
+    if (facility.locationKind === 'exact_address') withVenueAddress += 1;
+    else if (facility.locationKind === 'known_facility') withKnownFacility += 1;
+    else if (facility.locationKind === 'activity_area') withAreaLocation += 1;
     else withWardOfficeFallback += 1;
     const entry = counts.get(facility.key);
     if (entry) entry.count += 1;
@@ -286,6 +354,8 @@ export async function loadCommunityDirectorySummary(): Promise<CommunityDirector
       latitude: facility.latitude,
       longitude: facility.longitude,
       sourceUrl: facility.sourceUrl,
+      locationKind: facility.locationKind ?? 'ward_office',
+      locationPrecision: facility.locationPrecision ?? null,
       count,
     }))
     .sort((left, right) => right.count - left.count);
@@ -297,7 +367,7 @@ export async function loadCommunityDirectorySummary(): Promise<CommunityDirector
       classification: 'raw_open_data_unverified',
       note: DATA_SOURCE_NOTE,
     },
-    counts: { total, withVenueAddress, withKnownFacility, withWardOfficeFallback },
+    counts: { total, withVenueAddress, withKnownFacility, withAreaLocation, withWardOfficeFallback },
     facilities,
   };
 }
@@ -322,7 +392,7 @@ export async function loadCommunityFacilityDetail(facilityKey: string): Promise<
     if (!ward || !id || !name) continue;
     const venueName = (row[at('venue_name')] ?? '').trim();
     const venueAddress = (row[at('venue_address')] ?? '').trim();
-    const facility = resolveFacility(ward, venueName, venueAddress, wards, addresses);
+    const facility = resolveFacility(ward, venueName, venueAddress, mapLocationFromRow(row, at), wards, addresses);
     if (!facility || facility.key !== facilityKey) continue;
     matchedFacility = facility;
     matchedWard = ward;
@@ -335,6 +405,8 @@ export async function loadCommunityFacilityDetail(facilityKey: string): Promise<
       venueAddress: (row[at('venue_address')] ?? '').trim() || facility.address,
       latitude: facility.latitude,
       longitude: facility.longitude,
+      locationKind: facility.locationKind ?? 'ward_office',
+      locationPrecision: facility.locationPrecision ?? null,
       targetAudience: (row[at('target_audience')] ?? '').trim() || null,
       officialUrl: (row[at('official_url')] ?? '').trim() || null,
       onlineParticipation: (row[at('online_participation')] ?? '').trim() || null,
@@ -354,6 +426,8 @@ export async function loadCommunityFacilityDetail(facilityKey: string): Promise<
     latitude: matchedFacility.latitude,
     longitude: matchedFacility.longitude,
     sourceUrl: matchedFacility.sourceUrl,
+    locationKind: matchedFacility.locationKind ?? 'ward_office',
+    locationPrecision: matchedFacility.locationPrecision ?? null,
     count: communities.length,
     communities,
   };

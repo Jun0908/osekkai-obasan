@@ -4,12 +4,13 @@
 layer (see `frontend/lib/osekkai/community-directory.ts`), but nothing on the
 Python side ever read it, so the chat LLM had no way to mention it. This
 module resolves the same way the TypeScript loader does, in priority order:
-(1) the row's own `venue_address`, if geocoded in
-`venue-address-directory.json` (real per-row precision, mostly 渋谷区);
-(2) for 千代田区, a `venue_name` match against one of two real facilities;
-(3) otherwise the ward office. Both sides read the same
-`data/tokyo-community/{ward-geocoding-directory,venue-address-directory}.json`
-so coordinates never drift apart between the two languages. Unlike the Map
+(1) a verified single venue address carried by communities.csv;
+(2) a known `venue_name` anchor;
+(3) an approximate activity-area point derived from an official area statement
+or the town/chome in an official association name;
+(4) otherwise the ward office. Address and area coordinates travel in the CSV;
+both sides also read the same shared ward/venue JSON fallbacks, so coordinates
+and precision labels never drift apart between the two languages. Unlike the Map
 API, this loader stays scoped to one ward at a time: chat Grounding only
 ever needs the facts relevant to what the user just asked about.
 
@@ -38,6 +39,14 @@ REQUIRED_COLUMNS = (
     "description",
     "venue_name",
     "venue_address",
+    "area_name",
+    "map_location_id",
+    "latitude",
+    "longitude",
+    "geocoded_address",
+    "location_precision",
+    "location_source",
+    "location_source_url",
     "target_audience",
     "official_url",
     "online_participation",
@@ -113,6 +122,42 @@ def _address_facility(address: str, entry: Mapping[str, Any]) -> dict[str, Any]:
         "latitude": entry["latitude"],
         "longitude": entry["longitude"],
         "sourceUrl": "",
+        "locationKind": "exact_address",
+        "locationPrecision": "exact_address",
+    }
+
+
+def _optional_float(value: Any) -> float | None:
+    text = str(value or "").strip()
+    if not text:
+        return None
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def _csv_map_facility(row: Mapping[str, str]) -> dict[str, Any] | None:
+    key = (row.get("map_location_id") or "").strip()
+    latitude = _optional_float(row.get("latitude"))
+    longitude = _optional_float(row.get("longitude"))
+    address = (row.get("geocoded_address") or "").strip()
+    if not key or latitude is None or longitude is None or not address:
+        return None
+    precision = (row.get("location_precision") or "").strip()
+    source = (row.get("location_source") or "").strip()
+    exact = source == "venue_address" and precision == "exact_address"
+    area_name = (row.get("area_name") or "").strip()
+    label = address.removeprefix("東京都") if exact else f"{area_name or address}（活動区域の目安）"
+    return {
+        "key": key,
+        "name": label,
+        "address": address,
+        "latitude": latitude,
+        "longitude": longitude,
+        "sourceUrl": (row.get("location_source_url") or "").strip(),
+        "locationKind": "exact_address" if exact else "activity_area",
+        "locationPrecision": precision or None,
     }
 
 
@@ -120,9 +165,13 @@ def _resolve_facility(
     ward: str,
     venue_name: str,
     venue_address: str,
+    row: Mapping[str, str],
     wards: dict[str, dict[str, Any]],
     addresses: dict[str, dict[str, Any]],
 ) -> dict[str, Any] | None:
+    csv_facility = _csv_map_facility(row)
+    if csv_facility is not None and csv_facility["locationKind"] == "exact_address":
+        return csv_facility
     if venue_address:
         known = addresses.get(venue_address)
         if known is not None and known.get("ward") == ward:
@@ -132,8 +181,10 @@ def _resolve_facility(
         return None
     for anchor in definition["anchors"]:
         if str(anchor.get("match", "")) and str(anchor["match"]) in venue_name:
-            return anchor
-    return definition["wardOffice"]
+            return {**anchor, "locationKind": "known_facility", "locationPrecision": "known_facility"}
+    if csv_facility is not None:
+        return csv_facility
+    return {**definition["wardOffice"], "locationKind": "ward_office", "locationPrecision": "ward_office"}
 
 
 def _read_communities_csv(root: Path) -> list[dict[str, str]]:
@@ -167,6 +218,7 @@ def load_community_directory(
     total_in_ward = 0
     with_venue_address = 0
     with_known_facility = 0
+    with_area_location = 0
     with_ward_office_fallback = 0
 
     for row in rows:
@@ -176,13 +228,15 @@ def load_community_directory(
 
         venue_name_raw = (row.get("venue_name") or "").strip()
         venue_address_raw = (row.get("venue_address") or "").strip()
-        facility = _resolve_facility(ward, venue_name_raw, venue_address_raw, wards, addresses)
+        facility = _resolve_facility(ward, venue_name_raw, venue_address_raw, row, wards, addresses)
         if facility is None:
             continue
-        if str(facility["key"]).startswith("addr:"):
+        if facility.get("locationKind") == "exact_address":
             with_venue_address += 1
-        elif facility.get("match"):
+        elif facility.get("locationKind") == "known_facility":
             with_known_facility += 1
+        elif facility.get("locationKind") == "activity_area":
+            with_area_location += 1
         else:
             with_ward_office_fallback += 1
 
@@ -200,6 +254,8 @@ def load_community_directory(
             "venueAddress": (row.get("venue_address") or "").strip() or facility["address"],
             "latitude": facility["latitude"],
             "longitude": facility["longitude"],
+            "locationKind": facility.get("locationKind", "ward_office"),
+            "locationPrecision": facility.get("locationPrecision"),
             "targetAudience": (row.get("target_audience") or "").strip() or None,
             "officialUrl": (row.get("official_url") or "").strip() or None,
             "onlineParticipation": (row.get("online_participation") or "").strip() or None,
@@ -216,6 +272,8 @@ def load_community_directory(
                 "latitude": facility["latitude"],
                 "longitude": facility["longitude"],
                 "sourceUrl": facility["sourceUrl"],
+                "locationKind": facility.get("locationKind", "ward_office"),
+                "locationPrecision": facility.get("locationPrecision"),
                 "communities": [],
             }
             facilities_by_key[facility["key"]] = bucket
@@ -238,15 +296,15 @@ def load_community_directory(
             "classification": "raw_open_data_unverified",
             "note": (
                 "区が公開する地域コミュニティ一覧（Open Data CSV）を地図・会話へ表示しています。"
-                "活動場所の住所が記載されている行はその住所（主に渋谷区）、"
-                "千代田区は施設名から特定できた拠点（九段生涯学習館・千代田区立スポーツセンター）、"
-                "それ以外は区役所単位の目安地点です。個々の開催日時・現在の活動有無は確認していません。"
+                "単一の会場住所、確認済み施設、公式区域または町会・自治会名の地域名・町丁目、区役所の順に位置を解決します。"
+                "地域名・町丁目のピンは実開催地ではなく活動区域の目安です。個々の開催日時・現在の活動有無は確認していません。"
             ),
         },
         "counts": {
             "totalInWard": total_in_ward,
             "withVenueAddress": with_venue_address,
             "withKnownFacility": with_known_facility,
+            "withAreaLocation": with_area_location,
             "withWardOfficeFallback": with_ward_office_fallback,
         },
         "facilities": facilities,

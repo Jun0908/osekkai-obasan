@@ -1,6 +1,6 @@
 # おっせかいおばさん
 
-**Current Version — Three-Distance Judge Demo + LLM Memory + Chiyoda Fast Map + 自作Community Open Data Build 2026-08-23**
+**Current Version — Three-Distance Judge Demo + LLM Memory + Tokyo 23-Ward Community Map + 自作Community Open Data Build 2026-08-23**
 
 [Demoを見る](https://www.youtube.com/watch?v=Ttxw2MQRpzY) · [スライドを見る](https://canva.link/uro4qx4tm4llm9n) · [PVを見る](https://www.youtube.com/watch?v=me60PvZPABQ)
 
@@ -54,7 +54,7 @@ Today、Memory、Whyといった内部判断パネルは通常の会話画面に
 - OpenAI Responses APIによる構造化理解とGrounding済み返答、timeout・quota・不正応答時の固定文Fallback
 - 利用者別Obsidian Vaultへの短いMemory Note、関連検索、同意OFF、個別削除、全削除、retention
 - 麹町を初期表示し、千代田区の住所・座標を確認できたEventを250件ずつ段階取得するMapと一覧fallback
-- 自作の[東京23区 地域コミュニティDataset](https://github.com/Jun0908/tokyo_community_data)から千代田区分を拠点別（九段生涯学習館・千代田区立スポーツセンター）に集約してMapへ表示し、`話す`のLLM Groundingにも根拠付きで接続
+- 自作の[東京23区 地域コミュニティDataset](https://github.com/Jun0908/tokyo_community_data)10,076件をMapへ表示。正確な会場、確認済み施設、公式区域・町丁目、区役所の順に位置を解決し、4,452件を区役所集約から分散。`話す`のLLM Groundingにも根拠付きで接続
 - Map上の明示操作でBrowser Geolocationを一時取得し、選択EventのRoutes計算にだけ使う位置情報導線
 - 再現可能なJudge Demo・P0オフラインデモと、Live Provider fixtureを使う統合テスト
 - Google Cloud Billing、Calendar OAuth / FreeBusy、Google Routes / Geocoding、Google Maps JavaScriptの実接続
@@ -80,13 +80,13 @@ Live Dataの依存関係は[Plan2.md](Plan2.md#131-task運用ルール)、LLMと
 
 ## Event Map
 
-`/osekkai/map`は麹町を中心とするGoogle Map上で、座標を確認できたEventと、自作Dataset由来の地域コミュニティを一緒に探せます。Markerから開催時刻・移動時間・料金・募集状態・交流根拠・Sourceを確認でき、`今日 / 今週末 / ひとり参加可 / 継続あり`などで絞り込めます。
+`/osekkai/map`は麹町を中心とするGoogle Map上で、座標を確認できたEventと、自作Dataset由来の東京23区の地域コミュニティを一緒に探せます。地域名・町丁目由来のピンは「活動区域の目安」と明示し、実際の集合場所とは区別します。Markerから開催時刻・移動時間・料金・募集状態・交流根拠・Sourceを確認でき、`今日 / 今週末 / ひとり参加可 / 継続あり`などで絞り込めます。
 
 ## 利用予定のデータ
 
 | Source | 用途 | Plan2上の扱い |
 |---|---|---|
-| 自作: [Tokyo Community Data](https://github.com/Jun0908/tokyo_community_data) | 東京23区の地域コミュニティ・活動情報を区ごとのアダプターで収集・正規化した独自Dataset（Community 10,076件・Activity 5,624件、2026-08-23時点） | 千代田区分をMapの地域コミュニティ表示とLLM Groundingへ統合済み |
+| 自作: [Tokyo Community Data](https://github.com/Jun0908/tokyo_community_data) | 東京23区の地域コミュニティ・活動情報を区ごとのアダプターで収集・正規化した独自Dataset（Community 10,076件・Activity 5,624件、2026-08-23時点） | 23区Map（1,706地点）とLLM Groundingへ統合済み |
 | 東京都Open Data CKAN | 東京都・自治体が公開する最新Event | 必須・Credential不要・同期確認済み |
 | Lu.ma公開Event | Community、趣味、Networking | 必須・許可されたiCalから同期確認済み |
 | Doorkeeper公開Event | 継続Community、勉強会 | 必須・APIから同期確認済み |

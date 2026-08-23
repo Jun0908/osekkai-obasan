@@ -1,0 +1,517 @@
+{
+  "schemaVersion": "1.0",
+  "dataMode": "live",
+  "generatedAt": "2026-08-23T13:13:19.324064+09:00",
+  "scope": {
+    "id": "chiyoda_kojimachi",
+    "ward": "千代田区",
+    "center": {
+      "latitude": 35.684,
+      "longitude": 139.7373
+    },
+    "zoom": 14
+  },
+  "events": [
+    {
+      "id": "event-doorkeeper-d9559952a2f9a3b450f0b926",
+      "title": "[秋葉原] AI駆動開発 / LLM もくもく会 (初参加・初心者大歓迎！)",
+      "startsAt": "2026-08-23T04:00:00+00:00",
+      "endsAt": "2026-08-23T08:00:00+00:00",
+      "venueName": "コワーキングスペース秋葉原 Weeyble",
+      "address": "東京都千代田区神田佐久間町3-37-1 (山茂登ビル3階)",
+      "latitude": 35.6976181,
+      "longitude": 139.7775192,
+      "status": "scheduled",
+      "registrationStatus": "open",
+      "capacity": 8,
+      "participants": 0,
+      "priceYen": null,
+      "categories": [],
+      "provider": "doorkeeper",
+      "sourceUrl": "https://weeyble.doorkeeper.jp/events/198940",
+      "sourceClassification": "live_provider",
+      "revalidatedAt": "2026-08-23T12:57:13.663185+09:00",
+      "seriesId": null,
+      "opportunityId": null,
+      "travelMinutes": null,
+      "connectionEvidence": {
+        "beginnerFriendly": "unknown",
+        "connectionLevel": 0,
+        "evaluatedAt": "2026-08-23T13:13:19.324064+09:00",
+        "eventId": "event-doorkeeper-d9559952a2f9a3b450f0b926",
+        "evidence": [
+          {
+            "capturedAt": "2026-08-23T12:57:13.663185+09:00",
+            "classification": "live_provider",
+            "confidence": 1,
+            "evidenceField": "description",
+            "kind": "risk",
+            "text": "公開説明: [秋葉原] AI駆動開発 / LLM もくもく会 (初参加・初心者大歓迎！)",
+            "url": "https://weeyble.doorkeeper.jp/events/198940"
+          }
+        ],
+        "futureOccurrenceCount": 0,
+        "groupWork": "unknown",
+        "model": {
+          "confidence": 0.63,
+          "method": "rules",
+          "version": "connection-v1"
+        },
+        "recurring": "unknown",
+        "roleAvailable": "unknown",
+        "schemaVersion": "1.0",
+        "sharedMeal": "unknown",
+        "solicitationRisk": "unknown",
+        "soloFriendly": "unknown",
+        "structuredConversation": "unknown"
+      }
+    },
+    {
+      "id": "event-doorkeeper-2d34322db51b61fc601c995b",
+      "title": "ゼロからはじめるPython入門講座（対面・無料）",
+      "startsAt": "2026-08-29T04:00:00+00:00",
+      "endsAt": "2026-08-29T05:00:00+00:00",
+      "venueName": "VORT永田町6F",
+      "address": "東京都千代田区平河町2-7-2",
+      "latitude": 35.6791053,
+      "longitude": 139.7403868,
+      "status": "scheduled",
+      "registrationStatus": "open",
+      "capacity": 5,
+      "participants": 0,
+      "priceYen": null,
+      "categories": [],
+      "provider": "doorkeeper",
+      "sourceUrl": "https://techgym.doorkeeper.jp/events/198722",
+      "sourceClassification": "live_provider",
+      "revalidatedAt": "2026-08-23T12:57:13.663185+09:00",
+      "seriesId": null,
+      "opportunityId": null,
+      "travelMinutes": null,
+      "connectionEvidence": {
+        "beginnerFriendly": "yes",
+        "connectionLevel": 0,
+        "evaluatedAt": "2026-08-23T13:13:19.324064+09:00",
+        "eventId": "event-doorkeeper-2d34322db51b61fc601c995b",
+        "evidence": [
+          {
+            "capturedAt": "2026-08-23T12:57:13.663185+09:00",
+            "classification": "live_provider",
+            "confidence": 1,
+            "evidenceField": "description",
+            "kind": "beginner_friendly",
+            "text": "n/\" rel=\"nofollow\">東京のPython講座おすすめ｜初心者向け対面・会場型講座を比較</a><br>\n■<a href=\"https://techgym.jp/tokyo/tokyo_python_sc",
+            "url": "https://techgym.doorkeeper.jp/events/198722"
+          }
+        ],
+        "futureOccurrenceCount": 0,
+        "groupWork": "unknown",
+        "model": {
+          "confidence": 0.63,
+          "method": "rules",
+          "version": "connection-v1"
+        },
+        "recurring": "unknown",
+        "roleAvailable": "unknown",
+        "schemaVersion": "1.0",
+        "sharedMeal": "unknown",
+        "solicitationRisk": "unknown",
+        "soloFriendly": "unknown",
+        "structuredConversation": "unknown"
+      }
+    },
+    {
+      "id": "event-doorkeeper-a75c08d000cc51792f60d635",
+      "title": "ゼロからはじめるClaude Code入門講座（対面・無料）",
+      "startsAt": "2026-08-29T06:00:00+00:00",
+      "endsAt": "2026-08-29T07:00:00+00:00",
+      "venueName": "テックジム東京本校",
+      "address": "東京都千代田区平河町2-7-2 VORT永田町6F",
+      "latitude": 35.6791227,
+      "longitude": 139.7404343,
+      "status": "scheduled",
+      "registrationStatus": "open",
+      "capacity": 5,
+      "participants": 0,
+      "priceYen": null,
+      "categories": [
+        "ダンス・健康"
+      ],
+      "provider": "doorkeeper",
+      "sourceUrl": "https://techgym.doorkeeper.jp/events/198721",
+      "sourceClassification": "live_provider",
+      "revalidatedAt": "2026-08-23T12:57:13.663185+09:00",
+      "seriesId": null,
+      "opportunityId": null,
+      "travelMinutes": null,
+      "connectionEvidence": {
+        "beginnerFriendly": "yes",
+        "connectionLevel": 0,
+        "evaluatedAt": "2026-08-23T13:13:19.324064+09:00",
+        "eventId": "event-doorkeeper-a75c08d000cc51792f60d635",
+        "evidence": [
+          {
+            "capturedAt": "2026-08-23T12:57:13.663185+09:00",
+            "classification": "live_provider",
+            "confidence": 1,
+            "evidenceField": "description",
+            "kind": "beginner_friendly",
+            "text": "n/\" rel=\"nofollow\">東京のPython講座おすすめ｜初心者向け対面・会場型講座を比較</a><br>\n■<a href=\"https://techgym.jp/tokyo/tokyo_python_sc",
+            "url": "https://techgym.doorkeeper.jp/events/198721"
+          }
+        ],
+        "futureOccurrenceCount": 0,
+        "groupWork": "unknown",
+        "model": {
+          "confidence": 0.63,
+          "method": "rules",
+          "version": "connection-v1"
+        },
+        "recurring": "unknown",
+        "roleAvailable": "unknown",
+        "schemaVersion": "1.0",
+        "sharedMeal": "unknown",
+        "solicitationRisk": "unknown",
+        "soloFriendly": "unknown",
+        "structuredConversation": "unknown"
+      }
+    },
+    {
+      "id": "event-doorkeeper-b4a91ebd0f59d43e25594a1c",
+      "title": "不動産テック協会協会会員限定イベント「マンション管理DX部会」第12回会合",
+      "startsAt": "2026-09-10T07:00:00+00:00",
+      "endsAt": "2026-09-10T08:00:00+00:00",
+      "venueName": "MIRAI LAB PALETTE （ミライラボパレット）",
+      "address": "東京都千代田区大手町1-6-1　大手町ビル2階（中央部）",
+      "latitude": 35.6864055,
+      "longitude": 139.7648086,
+      "status": "scheduled",
+      "registrationStatus": "open",
+      "capacity": 60,
+      "participants": 3,
+      "priceYen": null,
+      "categories": [],
+      "provider": "doorkeeper",
+      "sourceUrl": "https://retech.doorkeeper.jp/events/198731",
+      "sourceClassification": "live_provider",
+      "revalidatedAt": "2026-08-23T12:57:13.663185+09:00",
+      "seriesId": null,
+      "opportunityId": null,
+      "travelMinutes": null,
+      "connectionEvidence": {
+        "beginnerFriendly": "unknown",
+        "connectionLevel": 0,
+        "evaluatedAt": "2026-08-23T13:13:19.324064+09:00",
+        "eventId": "event-doorkeeper-b4a91ebd0f59d43e25594a1c",
+        "evidence": [
+          {
+            "capturedAt": "2026-08-23T12:57:13.663185+09:00",
+            "classification": "live_provider",
+            "confidence": 1,
+            "evidenceField": "description",
+            "kind": "risk",
+            "text": "公開説明: 不動産テック協会協会会員限定イベント「マンション管理DX部会」第12回会合",
+            "url": "https://retech.doorkeeper.jp/events/198731"
+          }
+        ],
+        "futureOccurrenceCount": 0,
+        "groupWork": "unknown",
+        "model": {
+          "confidence": 0.63,
+          "method": "rules",
+          "version": "connection-v1"
+        },
+        "recurring": "unknown",
+        "roleAvailable": "unknown",
+        "schemaVersion": "1.0",
+        "sharedMeal": "unknown",
+        "solicitationRisk": "unknown",
+        "soloFriendly": "unknown",
+        "structuredConversation": "unknown"
+      }
+    },
+    {
+      "id": "event-doorkeeper-4fd72d87cf424bd8b09edad8",
+      "title": "【エージェント型AI、ClaudeCode活用事例特集】ビジネスマッチング部会",
+      "startsAt": "2026-09-10T09:00:00+00:00",
+      "endsAt": "2026-09-10T11:00:00+00:00",
+      "venueName": "MIRAI LAB PALETTE （ミライラボパレット）",
+      "address": "東京都千代田区大手町1-6-1　大手町ビル2階（中央部）",
+      "latitude": 35.6864055,
+      "longitude": 139.7648086,
+      "status": "scheduled",
+      "registrationStatus": "open",
+      "capacity": null,
+      "participants": 26,
+      "priceYen": null,
+      "categories": [],
+      "provider": "doorkeeper",
+      "sourceUrl": "https://retech.doorkeeper.jp/events/198730",
+      "sourceClassification": "live_provider",
+      "revalidatedAt": "2026-08-23T12:57:13.663185+09:00",
+      "seriesId": null,
+      "opportunityId": null,
+      "travelMinutes": null,
+      "connectionEvidence": {
+        "beginnerFriendly": "unknown",
+        "connectionLevel": 0,
+        "evaluatedAt": "2026-08-23T13:13:19.324064+09:00",
+        "eventId": "event-doorkeeper-4fd72d87cf424bd8b09edad8",
+        "evidence": [
+          {
+            "capturedAt": "2026-08-23T12:57:13.663185+09:00",
+            "classification": "live_provider",
+            "confidence": 1,
+            "evidenceField": "description",
+            "kind": "risk",
+            "text": "strong></p>\n\n<p>講演・パネルディスカッション終了後は、名刺交換会も実施いたします。<br>\nAI活用に関心のある皆様同士で交流いただき、<br>\n新たなビジネスや共創につながる機会として、ぜひご活用くださ",
+            "url": "https://retech.doorkeeper.jp/events/198730"
+          }
+        ],
+        "futureOccurrenceCount": 0,
+        "groupWork": "unknown",
+        "model": {
+          "confidence": 0.63,
+          "method": "rules",
+          "version": "connection-v1"
+        },
+        "recurring": "unknown",
+        "roleAvailable": "unknown",
+        "schemaVersion": "1.0",
+        "sharedMeal": "unknown",
+        "solicitationRisk": "high",
+        "soloFriendly": "unknown",
+        "structuredConversation": "unknown"
+      }
+    },
+    {
+      "id": "event-doorkeeper-fd58effb520baae0d77944df",
+      "title": "Day 1　配信会場 観覧チケット",
+      "startsAt": "2026-09-11T04:00:00+00:00",
+      "endsAt": "2026-09-11T13:00:00+00:00",
+      "venueName": "Kaien秋葉原サテライト",
+      "address": "〒101-0032 東京都千代田区岩本町3-10-7 東自機ビル3階",
+      "latitude": 35.6963596,
+      "longitude": 139.7759511,
+      "status": "scheduled",
+      "registrationStatus": "open",
+      "capacity": 30,
+      "participants": 25,
+      "priceYen": null,
+      "categories": [],
+      "provider": "doorkeeper",
+      "sourceUrl": "https://kakudai.doorkeeper.jp/events/197701",
+      "sourceClassification": "live_provider",
+      "revalidatedAt": "2026-08-23T12:57:13.663185+09:00",
+      "seriesId": null,
+      "opportunityId": null,
+      "travelMinutes": null,
+      "connectionEvidence": {
+        "beginnerFriendly": "unknown",
+        "connectionLevel": 0,
+        "evaluatedAt": "2026-08-23T13:13:19.324064+09:00",
+        "eventId": "event-doorkeeper-fd58effb520baae0d77944df",
+        "evidence": [
+          {
+            "capturedAt": "2026-08-23T12:57:13.663185+09:00",
+            "classification": "live_provider",
+            "confidence": 1,
+            "evidenceField": "description",
+            "kind": "risk",
+            "text": "公開説明: Day 1　配信会場 観覧チケット",
+            "url": "https://kakudai.doorkeeper.jp/events/197701"
+          }
+        ],
+        "futureOccurrenceCount": 0,
+        "groupWork": "unknown",
+        "model": {
+          "confidence": 0.63,
+          "method": "rules",
+          "version": "connection-v1"
+        },
+        "recurring": "unknown",
+        "roleAvailable": "unknown",
+        "schemaVersion": "1.0",
+        "sharedMeal": "unknown",
+        "solicitationRisk": "unknown",
+        "soloFriendly": "unknown",
+        "structuredConversation": "unknown"
+      }
+    },
+    {
+      "id": "event-doorkeeper-044c7c201d6441e8e39f0db1",
+      "title": "Day 2　配信会場 観覧チケット",
+      "startsAt": "2026-09-11T23:00:00+00:00",
+      "endsAt": "2026-09-12T04:00:00+00:00",
+      "venueName": "Kaien秋葉原サテライト",
+      "address": "〒101-0032 東京都千代田区岩本町3-10-7 東自機ビル3階",
+      "latitude": 35.6963596,
+      "longitude": 139.7759511,
+      "status": "scheduled",
+      "registrationStatus": "open",
+      "capacity": 30,
+      "participants": 17,
+      "priceYen": null,
+      "categories": [],
+      "provider": "doorkeeper",
+      "sourceUrl": "https://kakudai.doorkeeper.jp/events/197702",
+      "sourceClassification": "live_provider",
+      "revalidatedAt": "2026-08-23T12:57:13.663185+09:00",
+      "seriesId": null,
+      "opportunityId": null,
+      "travelMinutes": null,
+      "connectionEvidence": {
+        "beginnerFriendly": "unknown",
+        "connectionLevel": 0,
+        "evaluatedAt": "2026-08-23T13:13:19.324064+09:00",
+        "eventId": "event-doorkeeper-044c7c201d6441e8e39f0db1",
+        "evidence": [
+          {
+            "capturedAt": "2026-08-23T12:57:13.663185+09:00",
+            "classification": "live_provider",
+            "confidence": 1,
+            "evidenceField": "description",
+            "kind": "risk",
+            "text": "公開説明: Day 2　配信会場 観覧チケット",
+            "url": "https://kakudai.doorkeeper.jp/events/197702"
+          }
+        ],
+        "futureOccurrenceCount": 0,
+        "groupWork": "unknown",
+        "model": {
+          "confidence": 0.63,
+          "method": "rules",
+          "version": "connection-v1"
+        },
+        "recurring": "unknown",
+        "roleAvailable": "unknown",
+        "schemaVersion": "1.0",
+        "sharedMeal": "unknown",
+        "solicitationRisk": "unknown",
+        "soloFriendly": "unknown",
+        "structuredConversation": "unknown"
+      }
+    },
+    {
+      "id": "event-doorkeeper-9e67be52a72653f66124e7b0",
+      "title": "TokyoDev Talks Vol. 13: Treasure AI",
+      "startsAt": "2026-09-14T09:30:00+00:00",
+      "endsAt": "2026-09-14T11:50:00+00:00",
+      "venueName": "Tokyo Innovation Base (held in \"ROOM\", in the back of the 2nd floor)",
+      "address": "東京都千代田区丸の内3-8-3",
+      "latitude": 35.67577259999999,
+      "longitude": 139.7651281,
+      "status": "scheduled",
+      "registrationStatus": "open",
+      "capacity": 200,
+      "participants": 82,
+      "priceYen": null,
+      "categories": [
+        "ダンス・健康",
+        "趣味・実用",
+        "文学・歴史",
+        "区民参加・ボランティア"
+      ],
+      "provider": "doorkeeper",
+      "sourceUrl": "https://tokyodev.doorkeeper.jp/events/198702",
+      "sourceClassification": "live_provider",
+      "revalidatedAt": "2026-08-23T12:57:13.663185+09:00",
+      "seriesId": null,
+      "opportunityId": "opportunity-event-doorkeeper-9e67be52a72653f66124e7b0",
+      "travelMinutes": 14,
+      "connectionEvidence": {
+        "beginnerFriendly": "unknown",
+        "connectionLevel": 2,
+        "evaluatedAt": "2026-08-23T13:13:19.324064+09:00",
+        "eventId": "event-doorkeeper-9e67be52a72653f66124e7b0",
+        "evidence": [
+          {
+            "capturedAt": "2026-08-23T12:57:13.663185+09:00",
+            "classification": "live_provider",
+            "confidence": 1,
+            "evidenceField": "categories",
+            "kind": "role_available",
+            "text": "ダンス・健康 趣味・実用 文学・歴史 区民参加・ボランティア",
+            "url": "https://tokyodev.doorkeeper.jp/events/198702"
+          }
+        ],
+        "futureOccurrenceCount": 0,
+        "groupWork": "unknown",
+        "model": {
+          "confidence": 0.63,
+          "method": "rules",
+          "version": "connection-v1"
+        },
+        "recurring": "unknown",
+        "roleAvailable": "yes",
+        "schemaVersion": "1.0",
+        "sharedMeal": "unknown",
+        "solicitationRisk": "unknown",
+        "soloFriendly": "unknown",
+        "structuredConversation": "unknown"
+      }
+    },
+    {
+      "id": "event-doorkeeper-76ec00a10972a0101bb77f2d",
+      "title": "memoQ Day Tokyo 2026",
+      "startsAt": "2026-10-02T05:00:00+00:00",
+      "endsAt": "2026-10-02T10:30:00+00:00",
+      "venueName": "ワテラス コモン ホール",
+      "address": " 〒101-0063東京都千代田区神田淡路町2丁目101番地",
+      "latitude": 35.6967187,
+      "longitude": 139.7677045,
+      "status": "scheduled",
+      "registrationStatus": "open",
+      "capacity": 85,
+      "participants": 39,
+      "priceYen": null,
+      "categories": [],
+      "provider": "doorkeeper",
+      "sourceUrl": "https://memoq.doorkeeper.jp/events/198095",
+      "sourceClassification": "live_provider",
+      "revalidatedAt": "2026-08-23T12:57:13.663185+09:00",
+      "seriesId": null,
+      "opportunityId": null,
+      "travelMinutes": null,
+      "connectionEvidence": {
+        "beginnerFriendly": "unknown",
+        "connectionLevel": 0,
+        "evaluatedAt": "2026-08-23T13:13:19.324064+09:00",
+        "eventId": "event-doorkeeper-76ec00a10972a0101bb77f2d",
+        "evidence": [
+          {
+            "capturedAt": "2026-08-23T12:57:13.663185+09:00",
+            "classification": "live_provider",
+            "confidence": 1,
+            "evidenceField": "description",
+            "kind": "risk",
+            "text": "公開説明: memoQ Day Tokyo 2026",
+            "url": "https://memoq.doorkeeper.jp/events/198095"
+          }
+        ],
+        "futureOccurrenceCount": 0,
+        "groupWork": "unknown",
+        "model": {
+          "confidence": 0.63,
+          "method": "rules",
+          "version": "connection-v1"
+        },
+        "recurring": "unknown",
+        "roleAvailable": "unknown",
+        "schemaVersion": "1.0",
+        "sharedMeal": "unknown",
+        "solicitationRisk": "unknown",
+        "soloFriendly": "unknown",
+        "structuredConversation": "unknown"
+      }
+    }
+  ],
+  "counts": {
+    "totalInMesh": 239,
+    "inWard": 9,
+    "withCoordinates": 9,
+    "missingCoordinates": 0,
+    "returned": 9
+  },
+  "nextOffset": null
+}

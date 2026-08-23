@@ -1,19 +1,30 @@
 import { NextResponse } from 'next/server';
 
-import { loadCommunityDirectory } from '@/lib/osekkai/community-directory';
+import { loadCommunityDirectorySummary, loadCommunityFacilityDetail } from '@/lib/osekkai/community-directory';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
-  const ward = (params.get('ward') ?? '千代田区').trim();
-  if (!ward || ward.length > 20) {
-    return NextResponse.json({ error: 'ward is invalid' }, { status: 400 });
+  const key = params.get('key')?.trim();
+  if (key) {
+    if (key.length > 80) {
+      return NextResponse.json({ error: 'key is invalid' }, { status: 400 });
+    }
+    try {
+      const detail = await loadCommunityFacilityDetail(key);
+      if (!detail) {
+        return NextResponse.json({ error: 'facility not found' }, { status: 404 });
+      }
+      return NextResponse.json(detail);
+    } catch {
+      return NextResponse.json({ error: 'community directory is unavailable' }, { status: 503 });
+    }
   }
   try {
-    const result = await loadCommunityDirectory(ward);
-    return NextResponse.json(result);
+    const summary = await loadCommunityDirectorySummary();
+    return NextResponse.json(summary);
   } catch {
     return NextResponse.json({ error: 'community directory is unavailable' }, { status: 503 });
   }

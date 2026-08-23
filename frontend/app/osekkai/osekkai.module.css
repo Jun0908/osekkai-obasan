@@ -210,6 +210,7 @@
 .mapToolbar input { width: 13rem; border: 1px solid var(--o-line-dark); border-radius: 9px 0 0 9px; background: #fff; padding: .52rem .65rem; font-size: .72rem; }
 .mapToolbar > div button { border-radius: 0 9px 9px 0; }
 .mapToolbar button[data-active="false"] { background: var(--o-paper); color: var(--o-muted); border: 1px solid var(--o-line-dark); }
+.mapToolbar select { border: 1px solid var(--o-line-dark); border-radius: 9px; background: #fff; padding: .5rem .6rem; color: var(--o-ink); font-size: .68rem; }
 .mapToolbar > span { margin-left: auto; color: var(--o-muted); font-size: .62rem; }
 .mapFilters { display: flex; gap: .4rem; overflow-x: auto; padding: .15rem 0 .35rem; scrollbar-width: thin; }
 .mapFilters button { flex: 0 0 auto; border: 1px solid var(--o-line-dark); border-radius: 999px; background: var(--o-paper); padding: .4rem .65rem; color: var(--o-muted); cursor: pointer; font-size: .64rem; font-weight: 800; }

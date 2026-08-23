@@ -14,28 +14,33 @@ export type CommunityDirectoryEntry = {
   fetchedAt: string | null;
 };
 
-export type CommunityFacility = {
+export type CommunityFacilitySummary = {
   key: string;
+  ward: string;
   name: string;
   address: string;
   latitude: number;
   longitude: number;
   sourceUrl: string;
+  count: number;
+};
+
+export type CommunityFacilityDetail = CommunityFacilitySummary & {
   communities: CommunityDirectoryEntry[];
 };
 
 export type CommunityDirectoryResult = {
   generatedAt: string;
-  ward: string;
   dataSource: {
     file: string;
     classification: 'raw_open_data_unverified';
     note: string;
   };
   counts: {
-    totalInWard: number;
-    withKnownVenue: number;
-    withoutKnownVenue: number;
+    total: number;
+    withVenueAddress: number;
+    withKnownFacility: number;
+    withWardOfficeFallback: number;
   };
-  facilities: CommunityFacility[];
+  facilities: CommunityFacilitySummary[];
 };

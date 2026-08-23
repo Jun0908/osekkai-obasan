@@ -1,6 +1,8 @@
 import type { JsonObject, JsonValue, OsekkaiSessionView } from './osekkai-contract';
 import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
+import mapEventsSnapshotJson from '@/lib/osekkai/map-events-snapshot.generated.json';
+import type { MapEventsResult } from '@/lib/osekkai/types.generated';
 import { ensureOsekkaiDemoSeed } from './osekkai-demo-seed';
 import { OsekkaiHttpError } from './osekkai-errors';
 import { getOsekkaiMetrics } from './osekkai-metrics';
@@ -346,6 +348,27 @@ export function eventsGet(request: Request) {
   });
 }
 
+const mapEventsSnapshot = mapEventsSnapshotJson as unknown as MapEventsResult;
+
+// Vercel serverless functions cannot spawn the Python live-sync process this
+// route normally reads through. Rather than 500 there, fall back to the last
+// snapshot fetched locally (`lib/osekkai/map-events-snapshot.generated.json`)
+// so the map still renders real, already-fetched Events instead of nothing.
+function isPythonUnavailableError(error: unknown): boolean {
+  return error instanceof OsekkaiHttpError && error.code.startsWith('PYTHON_');
+}
+
+function mapEventsFromSnapshot(offset: number, limit: number): MapEventsResult {
+  const page = mapEventsSnapshot.events.slice(offset, offset + limit);
+  const end = offset + page.length;
+  return {
+    ...mapEventsSnapshot,
+    events: page,
+    counts: { ...mapEventsSnapshot.counts, returned: page.length },
+    nextOffset: end < mapEventsSnapshot.events.length ? end : null,
+  };
+}
+
 export function mapEventsGet(request: Request) {
   return withOsekkaiErrors(async () => {
     assertSafeGetRequest(request);
@@ -358,13 +381,20 @@ export function mapEventsGet(request: Request) {
     if (!/^\d{1,5}$/.test(offsetText) || !/^\d{1,3}$/.test(limitText)) {
       throw new OsekkaiHttpError('VALIDATION_ERROR', '地図の取得条件を確認してください。', 400);
     }
-    const session = await getOrCreateOsekkaiSession();
-    const result = await getOsekkaiMapEvents(session.userId, {
-      scope: 'chiyoda_kojimachi',
-      offset: Number(offsetText),
-      limit: Number(limitText),
-    });
-    return osekkaiSuccess(result.data, result.requestId);
+    const offset = Number(offsetText);
+    const limit = Number(limitText);
+    try {
+      const session = await getOrCreateOsekkaiSession();
+      const result = await getOsekkaiMapEvents(session.userId, {
+        scope: 'chiyoda_kojimachi',
+        offset,
+        limit,
+      });
+      return osekkaiSuccess(result.data, result.requestId);
+    } catch (error) {
+      if (!isPythonUnavailableError(error)) throw error;
+      return osekkaiSuccess(mapEventsFromSnapshot(offset, limit), randomUUID());
+    }
   });
 }
 

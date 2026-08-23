@@ -4,13 +4,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { friendlyApiError } from '@/components/osekkai/api-client';
 import { osekkaiApi } from '@/lib/osekkai/api';
-import type { CommunityDirectoryResult, CommunityFacility } from '@/lib/osekkai/community-directory-types';
+import type { CommunityDirectoryResult, CommunityFacilityDetail, CommunityFacilitySummary } from '@/lib/osekkai/community-directory-types';
 import type { EventRouteResult, MapEventSummary, MapEventsResult, RankedOpportunity } from '@/lib/osekkai/types.generated';
 import CommunityDirectorySheet from './community-directory-sheet';
 import MapEventSheet from './map-event-sheet';
 import styles from '../osekkai.module.css';
-
-const CHIYODA_WARD = '千代田区';
 
 type Coordinates = { latitude: number; longitude: number };
 type MapLike = {
@@ -32,7 +30,8 @@ declare global {
 }
 
 const KOJIMACHI = { latitude: 35.6840, longitude: 139.7373 };
-const INITIAL_ZOOM = 14;
+const INITIAL_ZOOM = 12;
+const WARD_ZOOM = 14;
 const INITIAL_LIST_LIMIT = 40;
 
 let mapsPromise: Promise<MapsApi> | null = null;
@@ -102,7 +101,10 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
   const [selected, setSelected] = useState<MapEventSummary | null>(null);
   const [communities, setCommunities] = useState<CommunityDirectoryResult | null>(null);
   const [showCommunities, setShowCommunities] = useState(true);
-  const [selectedFacility, setSelectedFacility] = useState<CommunityFacility | null>(null);
+  const [selectedFacility, setSelectedFacility] = useState<CommunityFacilityDetail | null>(null);
+  const [facilityLoading, setFacilityLoading] = useState(false);
+  const [facilityError, setFacilityError] = useState('');
+  const [wardChoice, setWardChoice] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [origin, setOrigin] = useState<Coordinates | null>(null);
   const [locationState, setLocationState] = useState('地図は麹町中心・現在地は保存しません');
@@ -138,6 +140,15 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
     });
   }, [events, filter, rankingByEvent, routes]);
 
+  const wardOptions = useMemo(() => {
+    if (!communities) return [];
+    const byWard = new Map<string, CommunityFacilitySummary>();
+    for (const facility of communities.facilities) {
+      if (!byWard.has(facility.ward)) byWard.set(facility.ward, facility);
+    }
+    return Array.from(byWard.values()).sort((left, right) => left.ward.localeCompare(right.ward, 'ja'));
+  }, [communities]);
+
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     if (!key || !mapNode.current) {
@@ -163,7 +174,7 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
 
   useEffect(() => {
     let cancelled = false;
-    void fetch(`/api/osekkai/community-directory?ward=${encodeURIComponent(CHIYODA_WARD)}`)
+    void fetch('/api/osekkai/community-directory')
       .then((response) => (response.ok ? (response.json() as Promise<CommunityDirectoryResult>) : null))
       .then((data) => { if (!cancelled && data) setCommunities(data); })
       .catch(() => {
@@ -171,6 +182,21 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
       });
     return () => { cancelled = true; };
   }, []);
+
+  const openFacility = (facility: CommunityFacilitySummary) => {
+    setSelected(null);
+    setSelectedFacility(null);
+    setFacilityError('');
+    setFacilityLoading(true);
+    void fetch(`/api/osekkai/community-directory?key=${encodeURIComponent(facility.key)}`)
+      .then((response) => (response.ok ? (response.json() as Promise<CommunityFacilityDetail>) : null))
+      .then((detail) => {
+        if (detail) setSelectedFacility(detail);
+        else setFacilityError('この拠点の一覧を取得できませんでした。');
+      })
+      .catch(() => setFacilityError('この拠点の一覧を取得できませんでした。'))
+      .finally(() => setFacilityLoading(false));
+  };
 
   useEffect(() => {
     const api = window.google?.maps;
@@ -182,10 +208,10 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
       const marker = new api.Marker({
         map: activeMap,
         position: { lat: facility.latitude, lng: facility.longitude },
-        title: `${facility.name} · 地域コミュニティ${facility.communities.length}件（Open Data・目安地点）`,
-        label: { text: String(facility.communities.length), color: '#fff', fontWeight: '700' },
+        title: `${facility.ward} ${facility.name} · 地域コミュニティ${facility.count}件（Open Data・目安地点）`,
+        label: { text: String(facility.count), color: '#fff', fontWeight: '700' },
       });
-      marker.addListener('click', () => { setSelected(null); setSelectedFacility(facility); });
+      marker.addListener('click', () => openFacility(facility));
       return marker;
     });
   }, [communities, showCommunities, mapRevision]);
@@ -243,8 +269,18 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
   };
 
   const resetToKojimachi = () => {
+    setWardChoice('');
     map.current?.setCenter({ lat: KOJIMACHI.latitude, lng: KOJIMACHI.longitude });
     map.current?.setZoom(INITIAL_ZOOM);
+  };
+
+  const jumpToWard = (ward: string) => {
+    setWardChoice(ward);
+    if (!ward) { resetToKojimachi(); return; }
+    const target = wardOptions.find((facility) => facility.ward === ward);
+    if (!target || !map.current) return;
+    map.current.setCenter({ lat: target.latitude, lng: target.longitude });
+    map.current.setZoom(WARD_ZOOM);
   };
 
   const loadRoute = async () => {
@@ -267,15 +303,20 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
         <button type="button" data-active={showCommunities} onClick={() => setShowCommunities((value) => !value)}>
           ⌂ 地域コミュニティ{showCommunities ? 'を隠す' : 'を表示'}
         </button>
+        <select aria-label="区を選んで地図を移動" value={wardChoice} onChange={(event) => jumpToWard(event.target.value)}>
+          <option value="">区を選んで移動…</option>
+          {wardOptions.map((option) => <option key={option.ward} value={option.ward}>{option.ward}</option>)}
+        </select>
         <span aria-live="polite">{locationState}</span>
       </div>
       <div className={styles.mapFilters} aria-label="Event絞り込み">
         {filters.map(([value, label]) => <button type="button" data-active={filter === value} aria-pressed={filter === value} onClick={() => { setFilter(value); setListLimit(INITIAL_LIST_LIMIT); }} key={value}>{label}</button>)}
       </div>
       <div className={styles.mapCanvasWrap}>
-        <div className={styles.mapCanvas} ref={mapNode} aria-label="麹町を中心に表示するEvent地図" />
+        <div className={styles.mapCanvas} ref={mapNode} aria-label="Event地図（区を選んで移動できます）" />
         {loading ? <div className={styles.mapLoadingBadge}>地図を先に表示中 · Eventを取得しています</div> : null}
         {loadingMore ? <div className={styles.mapLoadingBadge}>追加Eventを地図へ載せています</div> : null}
+        {facilityLoading ? <div className={styles.mapLoadingBadge}>拠点のコミュニティ一覧を取得中…</div> : null}
         {mapError ? <div className={styles.mapPlaceholder}><strong>Google Maps接続待ち</strong><span>{mapError}</span></div> : null}
       </div>
       <p className={styles.mapCount}>
@@ -283,10 +324,10 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
       </p>
       {communities ? (
         <p className={styles.mapCount}>
-          地域コミュニティ{communities.counts.withKnownVenue.toLocaleString()}件を{communities.facilities.length.toLocaleString()}拠点にまとめて表示（Open Data・開催日時未確認）
-          {communities.counts.withoutKnownVenue > 0 ? `、拠点未特定${communities.counts.withoutKnownVenue.toLocaleString()}件は非表示` : ''}。
+          東京23区の地域コミュニティ{communities.counts.total.toLocaleString()}件を{communities.facilities.length.toLocaleString()}拠点にまとめて表示（Open Data・開催日時未確認）。
         </p>
       ) : null}
+      {facilityError ? <p className={styles.mapRouteError} role="alert">{facilityError}</p> : null}
       {routeError ? <p className={styles.mapRouteError} role="alert">{routeError}</p> : null}
       <section className={styles.mapFallbackList} aria-labelledby="all-events-heading">
         <div><h2 id="all-events-heading">Event一覧</h2><span>{filtered.length}件</span></div>

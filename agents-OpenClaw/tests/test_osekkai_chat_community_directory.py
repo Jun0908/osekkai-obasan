@@ -20,26 +20,32 @@ HEADER = [
     "supported_languages", "inbound_program", "notes", "source_updated_at", "fetched_at",
 ]
 
-FACILITY_DIRECTORY_FIXTURE = {
+WARD_DIRECTORY_FIXTURE = {
     "schemaVersion": "1.0",
-    "ward": "千代田区",
-    "facilities": [
-        {
-            "key": "kudan",
-            "match": "九段",
-            "name": "九段生涯学習館",
-            "address": "東京都千代田区九段南1-5-10",
-            "latitude": 35.695339,
-            "longitude": 139.751984,
-            "sourceUrl": "https://www.city.chiyoda.lg.jp/shisetsu/bunka/kudan-gakushu.html",
+    "wards": {
+        "千代田区": {
+            "wardOffice": {
+                "key": "chiyoda-office", "name": "千代田区役所", "address": "東京都千代田区九段南1-6-11",
+                "latitude": 35.694138, "longitude": 139.752228, "sourceUrl": "https://www.city.chiyoda.lg.jp/",
+            },
+            "anchors": [
+                {
+                    "key": "kudan", "match": "九段", "name": "九段生涯学習館", "address": "東京都千代田区九段南1-5-10",
+                    "latitude": 35.695339, "longitude": 139.751984,
+                    "sourceUrl": "https://www.city.chiyoda.lg.jp/shisetsu/bunka/kudan-gakushu.html",
+                },
+            ],
         },
-    ],
+    },
 }
 
 
 def _write_directory_fixture(directory: Path) -> None:
-    (directory / "chiyoda-facility-directory.json").write_text(
-        json.dumps(FACILITY_DIRECTORY_FIXTURE, ensure_ascii=False), encoding="utf-8"
+    (directory / "ward-geocoding-directory.json").write_text(
+        json.dumps(WARD_DIRECTORY_FIXTURE, ensure_ascii=False), encoding="utf-8"
+    )
+    (directory / "venue-address-directory.json").write_text(
+        json.dumps({"schemaVersion": "1.0", "addresses": {}}, ensure_ascii=False), encoding="utf-8"
     )
     row = {column: "" for column in HEADER}
     row.update(

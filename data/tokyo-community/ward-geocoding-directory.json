@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1.0",
+  "note": "住所は各区公式サイトの区役所所在地。座標は国土地理院 住所検索API（https://msearch.gsi.go.jp/address-search/AddressSearch）でジオコーディング。千代田区だけはcommunities.csvのvenue_nameから施設単位（九段生涯学習館・千代田区立スポーツセンター）へさらに解決できるため、その2施設をanchorsに持つ。他の22区はvenue_name側の表記が区ごとに異なり未解析のため、区役所1点へ集約するcatch-all(anchorsが空でwardOfficeのみ)としている。TypeScript（frontend/lib/osekkai/community-directory.ts）とPython（agents-OpenClaw/scripts/osekkai_community_directory.py）の両方がこの1ファイルを読む。",
+  "wards": {
+    "千代田区": {
+      "wardOffice": { "key": "chiyoda-office", "name": "千代田区役所", "address": "東京都千代田区九段南1-6-11", "latitude": 35.694138, "longitude": 139.752228, "sourceUrl": "https://www.city.chiyoda.lg.jp/" },
+      "anchors": [
+        { "key": "kudan", "match": "九段", "name": "九段生涯学習館", "address": "東京都千代田区九段南1-5-10", "latitude": 35.695339, "longitude": 139.751984, "sourceUrl": "https://www.city.chiyoda.lg.jp/shisetsu/bunka/kudan-gakushu.html" },
+        { "key": "sports-center", "match": "スポーツセンター", "name": "千代田区立スポーツセンター", "address": "東京都千代田区内神田2-1-8", "latitude": 35.689342, "longitude": 139.767685, "sourceUrl": "https://www.city.chiyoda.lg.jp/shisetsu/bunka/sportscenter.html" }
+      ]
+    },
+    "中央区": { "wardOffice": { "key": "chuo-office", "name": "中央区役所", "address": "東京都中央区築地1-1-1", "latitude": 35.670841, "longitude": 139.771927, "sourceUrl": "https://www.city.chuo.lg.jp/" }, "anchors": [] },
+    "港区": { "wardOffice": { "key": "minato-office", "name": "港区役所", "address": "東京都港区芝公園1-5-25", "latitude": 35.658531, "longitude": 139.751541, "sourceUrl": "https://www.city.minato.tokyo.jp/" }, "anchors": [] },
+    "新宿区": { "wardOffice": { "key": "shinjuku-office", "name": "新宿区役所", "address": "東京都新宿区歌舞伎町1-4-1", "latitude": 35.693535, "longitude": 139.703476, "sourceUrl": "https://www.city.shinjuku.lg.jp/" }, "anchors": [] },
+    "文京区": { "wardOffice": { "key": "bunkyo-office", "name": "文京区役所", "address": "東京都文京区春日1-16-21", "latitude": 35.708336, "longitude": 139.752411, "sourceUrl": "https://www.city.bunkyo.lg.jp/" }, "anchors": [] },
+    "台東区": { "wardOffice": { "key": "taito-office", "name": "台東区役所", "address": "東京都台東区東上野4-5-6", "latitude": 35.712452, "longitude": 139.77977, "sourceUrl": "https://www.city.taito.lg.jp/" }, "anchors": [] },
+    "墨田区": { "wardOffice": { "key": "sumida-office", "name": "墨田区役所", "address": "東京都墨田区吾妻橋1-23-20", "latitude": 35.710602, "longitude": 139.801895, "sourceUrl": "https://www.city.sumida.lg.jp/" }, "anchors": [] },
+    "江東区": { "wardOffice": { "key": "koto-office", "name": "江東区役所", "address": "東京都江東区東陽4-11-28", "latitude": 35.672993, "longitude": 139.81636, "sourceUrl": "https://www.city.koto.lg.jp/" }, "anchors": [] },
+    "品川区": { "wardOffice": { "key": "shinagawa-office", "name": "品川区役所", "address": "東京都品川区広町2-1-36", "latitude": 35.608822, "longitude": 139.729767, "sourceUrl": "https://www.city.shinagawa.tokyo.jp/" }, "anchors": [] },
+    "目黒区": { "wardOffice": { "key": "meguro-office", "name": "目黒区役所", "address": "東京都目黒区上目黒2-19-15", "latitude": 35.640465, "longitude": 139.6987, "sourceUrl": "https://www.city.meguro.tokyo.jp/" }, "anchors": [] },
+    "大田区": { "wardOffice": { "key": "ota-office", "name": "大田区役所", "address": "東京都大田区蒲田5-13-14", "latitude": 35.561337, "longitude": 139.716293, "sourceUrl": "https://www.city.ota.tokyo.jp/" }, "anchors": [] },
+    "世田谷区": { "wardOffice": { "key": "setagaya-office", "name": "世田谷区役所", "address": "東京都世田谷区世田谷4-21-27", "latitude": 35.646297, "longitude": 139.653458, "sourceUrl": "https://www.city.setagaya.lg.jp/" }, "anchors": [] },
+    "渋谷区": { "wardOffice": { "key": "shibuya-office", "name": "渋谷区役所", "address": "東京都渋谷区宇田川町1-1", "latitude": 35.663475, "longitude": 139.697189, "sourceUrl": "https://www.city.shibuya.tokyo.jp/" }, "anchors": [] },
+    "中野区": { "wardOffice": { "key": "nakano-office", "name": "中野区役所", "address": "東京都中野区中野4-8-1", "latitude": 35.707546, "longitude": 139.663818, "sourceUrl": "https://www.city.tokyo-nakano.lg.jp/" }, "anchors": [] },
+    "杉並区": { "wardOffice": { "key": "suginami-office", "name": "杉並区役所", "address": "東京都杉並区阿佐谷南1-15-1", "latitude": 35.699203, "longitude": 139.636505, "sourceUrl": "https://www.city.suginami.tokyo.jp/" }, "anchors": [] },
+    "豊島区": { "wardOffice": { "key": "toshima-office", "name": "豊島区役所", "address": "東京都豊島区東池袋1-18-1", "latitude": 35.732368, "longitude": 139.715897, "sourceUrl": "https://www.city.toshima.lg.jp/" }, "anchors": [] },
+    "北区": { "wardOffice": { "key": "kita-office", "name": "北区役所", "address": "東京都北区王子本町1-15-22", "latitude": 35.753197, "longitude": 139.734283, "sourceUrl": "https://www.city.kita.tokyo.jp/" }, "anchors": [] },
+    "荒川区": { "wardOffice": { "key": "arakawa-office", "name": "荒川区役所", "address": "東京都荒川区荒川2-2-3", "latitude": 35.73513, "longitude": 139.783615, "sourceUrl": "https://www.city.arakawa.tokyo.jp/" }, "anchors": [] },
+    "板橋区": { "wardOffice": { "key": "itabashi-office", "name": "板橋区役所", "address": "東京都板橋区板橋2-66-1", "latitude": 35.750694, "longitude": 139.709503, "sourceUrl": "https://www.city.itabashi.tokyo.jp/" }, "anchors": [] },
+    "練馬区": { "wardOffice": { "key": "nerima-office", "name": "練馬区役所", "address": "東京都練馬区豊玉北6-12-1", "latitude": 35.73571, "longitude": 139.651672, "sourceUrl": "https://www.city.nerima.tokyo.jp/" }, "anchors": [] },
+    "足立区": { "wardOffice": { "key": "adachi-office", "name": "足立区役所", "address": "東京都足立区中央本町1-17-1", "latitude": 35.775124, "longitude": 139.805023, "sourceUrl": "https://www.city.adachi.tokyo.jp/" }, "anchors": [] },
+    "葛飾区": { "wardOffice": { "key": "katsushika-office", "name": "葛飾区役所", "address": "東京都葛飾区立石5-13-1", "latitude": 35.743164, "longitude": 139.84729, "sourceUrl": "https://www.city.katsushika.lg.jp/" }, "anchors": [] },
+    "江戸川区": { "wardOffice": { "key": "edogawa-office", "name": "江戸川区役所", "address": "東京都江戸川区中央1-4-1", "latitude": 35.706589, "longitude": 139.86792, "sourceUrl": "https://www.city.edogawa.tokyo.jp/" }, "anchors": [] }
+  }
+}

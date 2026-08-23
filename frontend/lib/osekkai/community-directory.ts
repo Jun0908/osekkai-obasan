@@ -4,24 +4,29 @@ import path from 'path';
 import type {
   CommunityDirectoryEntry,
   CommunityDirectoryResult,
-  CommunityFacility,
+  CommunityFacilityDetail,
+  CommunityFacilitySummary,
 } from './community-directory-types';
 
 /**
  * `data/tokyo-community/communities.csv` carries almost no usable address or
- * coordinate data (venue_address is populated for a tiny minority of rows).
- * Within the Chiyoda scope the map already targets, `venue_name` only ever
- * names two real public facilities, so those are geocoded once (via the
- * Geospatial Information Authority of Japan address-search API) and stored
- * in `data/tokyo-community/chiyoda-facility-directory.json`, which this
- * loader and the Python-side `osekkai_community_directory.py` both read, so
- * the coordinates never drift out of sync between the two languages. This is
- * intentionally coarser than a per-community address and is labelled as such
- * in the API response.
+ * coordinate data (venue_address is populated for only ~1.3% of rows, mostly
+ * in 渋谷区). Each community is placed on the map by trying, in order:
+ *   1. its own `venue_address`, if that exact string was geocoded into
+ *      `data/tokyo-community/venue-address-directory.json` (real, per-row
+ *      precision — the closest this data gets to an actual building);
+ *   2. for 千代田区, a `venue_name` match against one of two real facilities;
+ *   3. otherwise the ward office, so every community still lands somewhere
+ *      real rather than being dropped.
+ * All of these are geocoded once via the Geospatial Information Authority of
+ * Japan address-search API and stored in
+ * `data/tokyo-community/{ward-geocoding-directory,venue-address-directory}.json`,
+ * which this loader and the Python-side `osekkai_community_directory.py`
+ * both read, so coordinates never drift apart between the two languages.
  */
 type FacilityDefinition = {
   key: string;
-  match: string;
+  match?: string;
   name: string;
   address: string;
   latitude: number;
@@ -29,11 +34,41 @@ type FacilityDefinition = {
   sourceUrl: string;
 };
 
-function resolveFacility(venueName: string, facilities: FacilityDefinition[]): FacilityDefinition | null {
-  for (const facility of facilities) {
-    if (venueName.includes(facility.match)) return facility;
+type WardDefinition = {
+  wardOffice: FacilityDefinition;
+  anchors: FacilityDefinition[];
+};
+
+type VenueAddressEntry = { ward: string; latitude: number; longitude: number };
+
+function addressFacility(address: string, entry: VenueAddressEntry): FacilityDefinition {
+  return {
+    key: `addr:${address}`,
+    name: address.replace(/^東京都/, ''),
+    address,
+    latitude: entry.latitude,
+    longitude: entry.longitude,
+    sourceUrl: '',
+  };
+}
+
+function resolveFacility(
+  ward: string,
+  venueName: string,
+  venueAddress: string,
+  wards: Map<string, WardDefinition>,
+  addresses: Map<string, VenueAddressEntry>,
+): FacilityDefinition | null {
+  if (venueAddress) {
+    const known = addresses.get(venueAddress);
+    if (known && known.ward === ward) return addressFacility(venueAddress, known);
   }
-  return null;
+  const definition = wards.get(ward);
+  if (!definition) return null;
+  for (const anchor of definition.anchors) {
+    if (anchor.match && venueName.includes(anchor.match)) return anchor;
+  }
+  return definition.wardOffice;
 }
 
 function parseCsv(text: string): string[][] {
@@ -110,37 +145,71 @@ async function readCommunitiesCsv(): Promise<string> {
   return text;
 }
 
-let facilityCache: { path: string; mtimeMs: number; facilities: FacilityDefinition[] } | null = null;
+function asFacilityDefinition(value: unknown, context: string): FacilityDefinition {
+  if (typeof value !== 'object' || value === null) throw new Error(`${context} is malformed`);
+  const record = value as Record<string, unknown>;
+  if (
+    typeof record.key !== 'string' ||
+    typeof record.name !== 'string' ||
+    typeof record.address !== 'string' ||
+    typeof record.latitude !== 'number' ||
+    typeof record.longitude !== 'number' ||
+    typeof record.sourceUrl !== 'string' ||
+    (record.match !== undefined && typeof record.match !== 'string')
+  ) {
+    throw new Error(`${context} is malformed`);
+  }
+  return record as FacilityDefinition;
+}
 
-async function readFacilityDirectory(): Promise<FacilityDefinition[]> {
-  const filePath = path.join(resolveDataRoot(), 'chiyoda-facility-directory.json');
+let wardCache: { path: string; mtimeMs: number; wards: Map<string, WardDefinition> } | null = null;
+
+async function readWardGeocodingDirectory(): Promise<Map<string, WardDefinition>> {
+  const filePath = path.join(resolveDataRoot(), 'ward-geocoding-directory.json');
   const stat = await fs.stat(filePath);
-  if (facilityCache && facilityCache.path === filePath && facilityCache.mtimeMs === stat.mtimeMs) {
-    return facilityCache.facilities;
-  }
+  if (wardCache && wardCache.path === filePath && wardCache.mtimeMs === stat.mtimeMs) return wardCache.wards;
   const raw = await fs.readFile(filePath, 'utf-8');
-  const parsed = JSON.parse(raw) as { facilities?: unknown };
-  if (!Array.isArray(parsed.facilities)) {
-    throw new Error('chiyoda-facility-directory.json is missing a facilities array');
+  const parsed = JSON.parse(raw) as { wards?: unknown };
+  if (typeof parsed.wards !== 'object' || parsed.wards === null) {
+    throw new Error('ward-geocoding-directory.json is missing a wards object');
   }
-  const facilities = parsed.facilities.map((value, index) => {
-    if (
-      typeof value !== 'object' ||
-      value === null ||
-      typeof (value as Record<string, unknown>).key !== 'string' ||
-      typeof (value as Record<string, unknown>).match !== 'string' ||
-      typeof (value as Record<string, unknown>).name !== 'string' ||
-      typeof (value as Record<string, unknown>).address !== 'string' ||
-      typeof (value as Record<string, unknown>).latitude !== 'number' ||
-      typeof (value as Record<string, unknown>).longitude !== 'number' ||
-      typeof (value as Record<string, unknown>).sourceUrl !== 'string'
-    ) {
-      throw new Error(`chiyoda-facility-directory.json facilities[${index}] is malformed`);
+  const wards = new Map<string, WardDefinition>();
+  for (const [wardName, value] of Object.entries(parsed.wards as Record<string, unknown>)) {
+    if (typeof value !== 'object' || value === null) throw new Error(`ward-geocoding-directory.json wards.${wardName} is malformed`);
+    const record = value as Record<string, unknown>;
+    const wardOffice = asFacilityDefinition(record.wardOffice, `ward-geocoding-directory.json wards.${wardName}.wardOffice`);
+    if (!Array.isArray(record.anchors)) throw new Error(`ward-geocoding-directory.json wards.${wardName}.anchors must be an array`);
+    const anchors = record.anchors.map((anchor, index) =>
+      asFacilityDefinition(anchor, `ward-geocoding-directory.json wards.${wardName}.anchors[${index}]`),
+    );
+    wards.set(wardName, { wardOffice, anchors });
+  }
+  wardCache = { path: filePath, mtimeMs: stat.mtimeMs, wards };
+  return wards;
+}
+
+let addressCache: { path: string; mtimeMs: number; addresses: Map<string, VenueAddressEntry> } | null = null;
+
+async function readVenueAddressDirectory(): Promise<Map<string, VenueAddressEntry>> {
+  const filePath = path.join(resolveDataRoot(), 'venue-address-directory.json');
+  const stat = await fs.stat(filePath);
+  if (addressCache && addressCache.path === filePath && addressCache.mtimeMs === stat.mtimeMs) return addressCache.addresses;
+  const raw = await fs.readFile(filePath, 'utf-8');
+  const parsed = JSON.parse(raw) as { addresses?: unknown };
+  if (typeof parsed.addresses !== 'object' || parsed.addresses === null) {
+    throw new Error('venue-address-directory.json is missing an addresses object');
+  }
+  const addresses = new Map<string, VenueAddressEntry>();
+  for (const [address, value] of Object.entries(parsed.addresses as Record<string, unknown>)) {
+    if (typeof value !== 'object' || value === null) throw new Error(`venue-address-directory.json addresses.${address} is malformed`);
+    const record = value as Record<string, unknown>;
+    if (typeof record.ward !== 'string' || typeof record.latitude !== 'number' || typeof record.longitude !== 'number') {
+      throw new Error(`venue-address-directory.json addresses.${address} is malformed`);
     }
-    return value as FacilityDefinition;
-  });
-  facilityCache = { path: filePath, mtimeMs: stat.mtimeMs, facilities };
-  return facilities;
+    addresses.set(address, { ward: record.ward, latitude: record.latitude, longitude: record.longitude });
+  }
+  addressCache = { path: filePath, mtimeMs: stat.mtimeMs, addresses };
+  return addresses;
 }
 
 const REQUIRED_COLUMNS = [
@@ -158,11 +227,13 @@ const REQUIRED_COLUMNS = [
   'fetched_at',
 ] as const;
 
-export async function loadCommunityDirectory(ward = '千代田区'): Promise<CommunityDirectoryResult> {
-  const [raw, facilityDefinitions] = await Promise.all([readCommunitiesCsv(), readFacilityDirectory()]);
+const DATA_SOURCE_NOTE =
+  '区が公開する地域コミュニティ一覧（Open Data CSV）を地図へ表示しています。活動場所の住所が記載されている行はその住所（主に渋谷区）、千代田区は施設名から特定できた拠点（九段生涯学習館・千代田区立スポーツセンター）、それ以外は区役所単位の目安地点です。個々の開催日時・現在の活動有無は確認していません。';
+
+async function readRows(): Promise<{ header: string[]; columnAt: (column: (typeof REQUIRED_COLUMNS)[number]) => number; rows: string[][] }> {
+  const raw = await readCommunitiesCsv();
   const rows = parseCsv(raw.replace(/^﻿/, ''));
   if (rows.length === 0) throw new Error('communities.csv is empty');
-
   const header = rows[0].map((value) => value.trim());
   const columnIndex = new Map<string, number>();
   for (const column of REQUIRED_COLUMNS) {
@@ -170,29 +241,94 @@ export async function loadCommunityDirectory(ward = '千代田区'): Promise<Com
     if (at === -1) throw new Error(`communities.csv is missing expected column: ${column}`);
     columnIndex.set(column, at);
   }
-  const at = (column: (typeof REQUIRED_COLUMNS)[number]) => columnIndex.get(column) as number;
+  return { header, columnAt: (column) => columnIndex.get(column) as number, rows: rows.slice(1) };
+}
 
-  const facilitiesByKey = new Map<string, CommunityFacility>();
-  let totalInWard = 0;
-  let withKnownVenue = 0;
-  let withoutKnownVenue = 0;
+export async function loadCommunityDirectorySummary(): Promise<CommunityDirectoryResult> {
+  const [{ header, columnAt, rows }, wards, addresses] = await Promise.all([
+    readRows(),
+    readWardGeocodingDirectory(),
+    readVenueAddressDirectory(),
+  ]);
+  const at = columnAt;
 
-  for (const row of rows.slice(1)) {
+  const counts = new Map<string, { facility: FacilityDefinition; ward: string; count: number }>();
+  let total = 0;
+  let withVenueAddress = 0;
+  let withKnownFacility = 0;
+  let withWardOfficeFallback = 0;
+
+  for (const row of rows) {
     if (row.length < header.length) continue;
-    if ((row[at('ward_name')] ?? '').trim() !== ward) continue;
-    totalInWard += 1;
+    const ward = (row[at('ward_name')] ?? '').trim();
+    const id = (row[at('community_id')] ?? '').trim();
+    const name = (row[at('name')] ?? '').trim();
+    if (!ward || !id || !name) continue;
+    const venueName = (row[at('venue_name')] ?? '').trim();
+    const venueAddress = (row[at('venue_address')] ?? '').trim();
+    const facility = resolveFacility(ward, venueName, venueAddress, wards, addresses);
+    if (!facility) continue;
+    total += 1;
+    if (facility.key.startsWith('addr:')) withVenueAddress += 1;
+    else if (facility.match) withKnownFacility += 1;
+    else withWardOfficeFallback += 1;
+    const entry = counts.get(facility.key);
+    if (entry) entry.count += 1;
+    else counts.set(facility.key, { facility, ward, count: 1 });
+  }
 
-    const venueNameRaw = (row[at('venue_name')] ?? '').trim();
-    const facility = resolveFacility(venueNameRaw, facilityDefinitions);
-    if (!facility) {
-      withoutKnownVenue += 1;
-      continue;
-    }
-    withKnownVenue += 1;
+  const facilities: CommunityFacilitySummary[] = Array.from(counts.values())
+    .map(({ facility, ward, count }) => ({
+      key: facility.key,
+      ward,
+      name: facility.name,
+      address: facility.address,
+      latitude: facility.latitude,
+      longitude: facility.longitude,
+      sourceUrl: facility.sourceUrl,
+      count,
+    }))
+    .sort((left, right) => right.count - left.count);
 
-    const entry: CommunityDirectoryEntry = {
-      id: (row[at('community_id')] ?? '').trim(),
-      name: (row[at('name')] ?? '').trim(),
+  return {
+    generatedAt: new Date().toISOString(),
+    dataSource: {
+      file: 'data/tokyo-community/communities.csv',
+      classification: 'raw_open_data_unverified',
+      note: DATA_SOURCE_NOTE,
+    },
+    counts: { total, withVenueAddress, withKnownFacility, withWardOfficeFallback },
+    facilities,
+  };
+}
+
+export async function loadCommunityFacilityDetail(facilityKey: string): Promise<CommunityFacilityDetail | null> {
+  const [{ header, columnAt, rows }, wards, addresses] = await Promise.all([
+    readRows(),
+    readWardGeocodingDirectory(),
+    readVenueAddressDirectory(),
+  ]);
+  const at = columnAt;
+
+  let matchedFacility: FacilityDefinition | null = null;
+  let matchedWard: string | null = null;
+  const communities: CommunityDirectoryEntry[] = [];
+
+  for (const row of rows) {
+    if (row.length < header.length) continue;
+    const ward = (row[at('ward_name')] ?? '').trim();
+    const id = (row[at('community_id')] ?? '').trim();
+    const name = (row[at('name')] ?? '').trim();
+    if (!ward || !id || !name) continue;
+    const venueName = (row[at('venue_name')] ?? '').trim();
+    const venueAddress = (row[at('venue_address')] ?? '').trim();
+    const facility = resolveFacility(ward, venueName, venueAddress, wards, addresses);
+    if (!facility || facility.key !== facilityKey) continue;
+    matchedFacility = facility;
+    matchedWard = ward;
+    communities.push({
+      id,
+      name,
       nameKana: (row[at('name_kana')] ?? '').trim() || null,
       category: (row[at('description')] ?? '').trim() || null,
       venueName: facility.name,
@@ -204,42 +340,21 @@ export async function loadCommunityDirectory(ward = '千代田区'): Promise<Com
       onlineParticipation: (row[at('online_participation')] ?? '').trim() || null,
       sourceUpdatedAt: (row[at('source_updated_at')] ?? '').trim() || null,
       fetchedAt: (row[at('fetched_at')] ?? '').trim() || null,
-    };
-    if (!entry.id || !entry.name) continue;
-
-    let bucket = facilitiesByKey.get(facility.key);
-    if (!bucket) {
-      bucket = {
-        key: facility.key,
-        name: facility.name,
-        address: facility.address,
-        latitude: facility.latitude,
-        longitude: facility.longitude,
-        sourceUrl: facility.sourceUrl,
-        communities: [],
-      };
-      facilitiesByKey.set(facility.key, bucket);
-    }
-    bucket.communities.push(entry);
+    });
   }
 
-  const facilities = Array.from(facilitiesByKey.values())
-    .map((facility) => ({
-      ...facility,
-      communities: [...facility.communities].sort((left, right) => left.name.localeCompare(right.name, 'ja')),
-    }))
-    .sort((left, right) => right.communities.length - left.communities.length);
+  if (!matchedFacility || !matchedWard) return null;
+  communities.sort((left, right) => left.name.localeCompare(right.name, 'ja'));
 
   return {
-    generatedAt: new Date().toISOString(),
-    ward,
-    dataSource: {
-      file: 'data/tokyo-community/communities.csv',
-      classification: 'raw_open_data_unverified',
-      note:
-        '区が公開する地域コミュニティ一覧（Open Data CSV）を、施設名から特定できた拠点（九段生涯学習館・千代田区立スポーツセンター）単位の目安地点として表示しています。個々の開催日時・現在の活動有無は確認していません。',
-    },
-    counts: { totalInWard, withKnownVenue, withoutKnownVenue },
-    facilities,
+    key: matchedFacility.key,
+    ward: matchedWard,
+    name: matchedFacility.name,
+    address: matchedFacility.address,
+    latitude: matchedFacility.latitude,
+    longitude: matchedFacility.longitude,
+    sourceUrl: matchedFacility.sourceUrl,
+    count: communities.length,
+    communities,
   };
 }

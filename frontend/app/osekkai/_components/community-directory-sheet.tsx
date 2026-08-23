@@ -1,4 +1,4 @@
-import type { CommunityFacility } from '@/lib/osekkai/community-directory-types';
+import type { CommunityFacilityDetail } from '@/lib/osekkai/community-directory-types';
 import styles from '../osekkai.module.css';
 
 export default function CommunityDirectorySheet({
@@ -6,7 +6,7 @@ export default function CommunityDirectorySheet({
   note,
   onClose,
 }: {
-  facility: CommunityFacility;
+  facility: CommunityFacilityDetail;
   note: string;
   onClose: () => void;
 }) {
@@ -15,6 +15,7 @@ export default function CommunityDirectorySheet({
       <button className={styles.mapSheetClose} type="button" onClick={onClose} aria-label="地域コミュニティ一覧を閉じる">×</button>
       <div className={styles.mapSheetLabels}>
         <span>Open Data</span>
+        <span>{facility.ward}</span>
         <span>{facility.communities.length}件</span>
       </div>
       <h2>{facility.name}</h2>
@@ -28,10 +29,12 @@ export default function CommunityDirectorySheet({
           </li>
         ))}
       </ul>
-      <div className={styles.mapSheetSources}>
-        <strong>Source</strong>
-        <a href={facility.sourceUrl} target="_blank" rel="noreferrer">千代田区公式ページ ↗</a>
-      </div>
+      {facility.sourceUrl ? (
+        <div className={styles.mapSheetSources}>
+          <strong>Source</strong>
+          <a href={facility.sourceUrl} target="_blank" rel="noreferrer">{facility.ward}公式ページ ↗</a>
+        </div>
+      ) : null}
     </aside>
   );
 }

@@ -2,11 +2,11 @@
 
 **Current Version — Three-Distance Judge Demo + LLM Memory + Chiyoda Fast Map + 自作Community Open Data Build 2026-08-23**
 
-[スライドを見る](https://canva.link/uro4qx4tm4llm9n) · [PVを見る](https://www.youtube.com/watch?v=me60PvZPABQ)
+[Demoを見る](https://www.youtube.com/watch?v=Ttxw2MQRpzY) · [スライドを見る](https://canva.link/uro4qx4tm4llm9n) · [PVを見る](https://www.youtube.com/watch?v=me60PvZPABQ)
 
 東京都の孤独課題に対して、利用者を「人とつながる可能性のある実在の場」へ一歩だけ後押しするプロアクティブAIです。
 
-話した好みと反応を覚え、Calendar、移動時間、料金、対人負荷に収まる実在Eventを、選びやすい複数候補へ絞ります。利用者自身は、推薦対象に限らず、現在のDemo対象である千代田区の取得Eventを地図で探せます。
+話した好みと反応を覚え、Calendar、移動時間、料金、対人負荷に収まる実在Eventを、選びやすい複数候補へ絞ります。利用者自身は、推薦対象に限らず、現在のDemo対象であるEventを地図で探せます。
 
 ## 解決したいこと
 
@@ -202,7 +202,7 @@ python scripts/osekkai_cli.py events --json
 python scripts/osekkai_cli.py opportunities --live --json
 ```
 
-Webを起動したら、審査用Storyはそのまま`/osekkai/demo`で再生できます。実接続は`/osekkai/settings`でGoogle Calendarを接続し、`/osekkai/chat`から会話を始めます。Mapは`/osekkai/map`を開くと麹町から先に表示され、必要な時だけ`千代田区Eventを更新`を押します。
+Webを起動したら、審査用Storyはそのまま`/osekkai/demo`で再生できます。実接続は`/osekkai/settings`でGoogle Calendarを接続し、`/osekkai/chat`から会話を始めます。Mapは`/osekkai/map`を開くと麹町から先に表示され、必要な時だけ`Eventを更新`を押します。
 
 Schedulerは上の`source-sync`を各Sourceのrefresh間隔より短い外部cron/Task Schedulerから呼べます。内部でinterval判定、Source lock、bounded retry/backoffを行うため、1 Sourceの停止で他Sourceを止めません。PUSH直前にも選ばれたEventだけを再検証し、stale、取消、満席、検証不能なら推薦から外します。
 

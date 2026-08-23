@@ -566,6 +566,10 @@ frontend/.env.example
     - 新規テスト: `test_osekkai_community_directory.py`（5件、実リポジトリCSVとの突き合わせを含む）、`test_osekkai_dialogue_plan.py`（4件、新規ファイル）、`test_osekkai_chat_community_directory.py`（2件、キーワード該当/非該当の両方を`process_chat_unlocked`経由でEnd-to-End検証）
     - 検証結果: Python 182 tests / contract 35 schemas・22 instances 成功。Frontend 98 tests / typecheck / lint / production build 成功。実行中のdev serverで`/api/osekkai/community-directory`が改修後も同じ実データを返すことを確認
     - 残課題: `COMMUNITY_INQUIRY_MARKERS`はキーワード一致のみで、LLM Understandingの`intent`（`ask_question`等）は使っていない。誤検知・見逃しが目立つ場合はLLM intentとの併用を検討
+  - 追記（2026-08-23、Mapの東京23区拡張に伴う変更）:
+    - 共有ジオコーディングファイルを`chiyoda-facility-directory.json`（千代田区専用）から`data/tokyo-community/ward-geocoding-directory.json`（23区、区ごとに`wardOffice`＋`anchors`）へ置き換えた。千代田区は従来通り九段生涯学習館／千代田区立スポーツセンターへ解決し、他22区は区役所へフォールバックする
+    - `osekkai_community_directory.py`・`frontend/lib/osekkai/community-directory.ts`とも新形式に追従済み。Python側の`load_community_directory(ward)`は引き続き単一区スコープ（Chat Groundingは1区分のFactで十分なため）、TypeScript側はMap向けに23区サマリー＋施設単位オンデマンド詳細（`loadCommunityDirectorySummary`/`loadCommunityFacilityDetail`）へ分離
+    - 検証: `test_osekkai_community_directory.py`（6件、実リポジトリの23区分クロスチェック含む）、`test_osekkai_chat_community_directory.py`（2件）を新形式で更新して成功
 
 ### Gate 11 — Google Calendar接続がCloudflare Tunnel経由で失敗する（運用上の既知事象・コード修正なしで解決）
 

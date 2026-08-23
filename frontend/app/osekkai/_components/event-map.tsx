@@ -108,7 +108,7 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
   const [facilityLoading, setFacilityLoading] = useState(false);
   const [facilityError, setFacilityError] = useState('');
   const [wardChoice, setWardChoice] = useState(DEFAULT_WARD);
-  const [excludeAgeUnrelated, setExcludeAgeUnrelated] = useState(false);
+  const [excludeAgeUnrelated, setExcludeAgeUnrelated] = useState(true);
   const [onlySports, setOnlySports] = useState(false);
   const [filter, setFilter] = useState<Filter>('all');
   const [origin, setOrigin] = useState<Coordinates | null>(null);
@@ -338,7 +338,7 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
           onClick={() => setExcludeAgeUnrelated((value) => !value)}
           title="町会・自治会・シニア向けクラブなどを除いて表示します"
         >
-          20〜30代向けのみ
+          18〜39
         </button>
         <button
           type="button"

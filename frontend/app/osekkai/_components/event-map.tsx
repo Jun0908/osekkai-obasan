@@ -294,12 +294,6 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
     }, () => setLocationState('現在地を使わず、地図のEventを見られます'), { enableHighAccuracy: false, timeout: 8000, maximumAge: 60_000 });
   };
 
-  const resetToKojimachi = () => {
-    setWardChoice(DEFAULT_WARD);
-    map.current?.setCenter({ lat: KOJIMACHI.latitude, lng: KOJIMACHI.longitude });
-    map.current?.setZoom(INITIAL_ZOOM);
-  };
-
   const jumpToWard = (ward: string) => {
     setWardChoice(ward);
     if (ward === ALL_WARDS_VALUE) {
@@ -334,7 +328,6 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
     <div className={styles.eventMapLayout}>
       <div className={styles.mapToolbar}>
         <button type="button" onClick={locate}>◎ 現在地を移動時間に使う</button>
-        <button type="button" onClick={resetToKojimachi}>麹町へ戻る</button>
         <button type="button" data-active={showCommunities} onClick={() => setShowCommunities((value) => !value)}>
           ⌂ 地域コミュニティ{showCommunities ? 'を隠す' : 'を表示'}
         </button>

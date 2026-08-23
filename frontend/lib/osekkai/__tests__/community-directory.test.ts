@@ -40,12 +40,21 @@ const VENUE_ADDRESS_DIRECTORY_FIXTURE = {
   },
 };
 
-function writeCommunitiesCsv(rows: string[][], addressFixture: Record<string, unknown> = VENUE_ADDRESS_DIRECTORY_FIXTURE): void {
+function writeCommunitiesCsv(
+  rows: string[][],
+  addressFixture: Record<string, unknown> = VENUE_ADDRESS_DIRECTORY_FIXTURE,
+  youngAdultRows?: Array<{ ward_name: string; title: string }>,
+): void {
   const dir = mkdtempSync(path.join(tmpdir(), 'osekkai-community-'));
   const lines = [HEADER, ...rows].map((row) => row.map((value) => `"${value.replace(/"/g, '""')}"`).join(','));
   writeFileSync(path.join(dir, 'communities.csv'), `﻿${lines.join('\n')}\n`, 'utf-8');
   writeFileSync(path.join(dir, 'ward-geocoding-directory.json'), JSON.stringify(WARD_DIRECTORY_FIXTURE, null, 2), 'utf-8');
   writeFileSync(path.join(dir, 'venue-address-directory.json'), JSON.stringify(addressFixture, null, 2), 'utf-8');
+  if (youngAdultRows) {
+    const youngAdultLines = [['ward_name', 'title'], ...youngAdultRows.map((entry) => [entry.ward_name, entry.title])]
+      .map((cells) => cells.map((value) => `"${value.replace(/"/g, '""')}"`).join(','));
+    writeFileSync(path.join(dir, 'young_adult_opportunities.csv'), `﻿${youngAdultLines.join('\n')}\n`, 'utf-8');
+  }
   process.env.OSEKKAI_COMMUNITY_DATA_ROOT = dir;
 }
 
@@ -162,6 +171,36 @@ describe('loadCommunityDirectorySummary', () => {
     const result = await loadCommunityDirectorySummary({ onlySports: true });
 
     expect(result.counts).toEqual({ total: 1, withVenueAddress: 0, withKnownFacility: 1, withAreaLocation: 0, withWardOfficeFallback: 0 });
+    expect(result.facilities.find((facility) => facility.key === 'sports-center')).toMatchObject({ count: 1 });
+    expect(result.facilities.find((facility) => facility.key === 'kudan')).toBeUndefined();
+  });
+
+  it('uses the young-adult allowlist when present, keeping only listed rows', async () => {
+    writeCommunitiesCsv(
+      [
+        row({ community_id: 'community_1', ward_name: '千代田区', name: '卓球クラブ', description: 'スポーツ', venue_name: 'スポーツセンター' }),
+        row({ community_id: 'community_2', ward_name: '千代田区', name: '読書会さくら', description: '読書', venue_name: '九段' }),
+      ],
+      VENUE_ADDRESS_DIRECTORY_FIXTURE,
+      [{ ward_name: '千代田区', title: '卓球クラブ' }],
+    );
+
+    const result = await loadCommunityDirectorySummary({ excludeAgeUnrelated: true });
+
+    expect(result.counts.total).toBe(1);
+    expect(result.facilities.find((facility) => facility.key === 'sports-center')).toMatchObject({ count: 1 });
+    expect(result.facilities.find((facility) => facility.key === 'kudan')).toBeUndefined();
+  });
+
+  it('falls back to keyword-only exclusion when the allowlist file is absent', async () => {
+    writeCommunitiesCsv([
+      row({ community_id: 'community_1', ward_name: '千代田区', name: '卓球クラブ', description: 'スポーツ', venue_name: 'スポーツセンター' }),
+      row({ community_id: 'community_2', ward_name: '千代田区', name: '九段町会', category: '町会・自治会', venue_name: '九段' }),
+    ]);
+
+    const result = await loadCommunityDirectorySummary({ excludeAgeUnrelated: true });
+
+    expect(result.counts.total).toBe(1);
     expect(result.facilities.find((facility) => facility.key === 'sports-center')).toMatchObject({ count: 1 });
     expect(result.facilities.find((facility) => facility.key === 'kudan')).toBeUndefined();
   });

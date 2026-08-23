@@ -261,6 +261,52 @@ async function readVenueAddressDirectory(): Promise<Map<string, VenueAddressEntr
   return addresses;
 }
 
+// young_adult_opportunities.csv is a ward-official-sourced allowlist of
+// community listings already screened for general-adult/young-adult
+// participation. 96.8% of its rows match an existing communities.csv row by
+// exact (ward_name, name) text, so it is used as the primary signal for the
+// "18〜39" map toggle instead of a category/description keyword guess. The
+// remaining ~3% are genuinely new listings, but none carry a venue address or
+// coordinates, so they cannot be placed on the map and are not surfaced here.
+function youngAdultKey(ward: string, name: string): string {
+  return `${ward}::${name}`;
+}
+
+let youngAdultCache: { path: string; mtimeMs: number; keys: Set<string> } | null = null;
+
+// Returns null (rather than throwing) when the file is absent, so callers can
+// fall back to the keyword-only classification instead of failing the whole
+// community-directory request.
+async function readYoungAdultAllowlist(): Promise<Set<string> | null> {
+  const filePath = path.join(resolveDataRoot(), 'young_adult_opportunities.csv');
+  let stat;
+  try {
+    stat = await fs.stat(filePath);
+  } catch {
+    return null;
+  }
+  if (youngAdultCache && youngAdultCache.path === filePath && youngAdultCache.mtimeMs === stat.mtimeMs) {
+    return youngAdultCache.keys;
+  }
+  const raw = await fs.readFile(filePath, 'utf-8');
+  const rows = parseCsv(raw.replace(/^﻿/, ''));
+  const keys = new Set<string>();
+  if (rows.length > 0) {
+    const header = rows[0].map((value) => value.trim());
+    const wardAt = header.indexOf('ward_name');
+    const titleAt = header.indexOf('title');
+    if (wardAt !== -1 && titleAt !== -1) {
+      for (const row of rows.slice(1)) {
+        const ward = (row[wardAt] ?? '').trim();
+        const title = (row[titleAt] ?? '').trim();
+        if (ward && title) keys.add(youngAdultKey(ward, title));
+      }
+    }
+  }
+  youngAdultCache = { path: filePath, mtimeMs: stat.mtimeMs, keys };
+  return keys;
+}
+
 const REQUIRED_COLUMNS = [
   'community_id',
   'ward_name',
@@ -295,6 +341,21 @@ const AGE_UNRELATED_KEYWORDS = ['町会', '自治会', '住区住民会議', '�
 function isAgeUnrelatedCommunity(category: string, description: string): boolean {
   const text = `${category} ${description}`;
   return AGE_UNRELATED_KEYWORDS.some((keyword) => text.includes(keyword));
+}
+
+// A row counts as "18〜39" material only if the curated young-adult allowlist
+// includes it AND it does not still carry a town-association/senior keyword
+// (a small residual the source data did not fully screen out).
+function isYoungAdultRelevant(
+  ward: string,
+  name: string,
+  category: string,
+  description: string,
+  allowlist: Set<string> | null,
+): boolean {
+  if (isAgeUnrelatedCommunity(category, description)) return false;
+  if (!allowlist) return true;
+  return allowlist.has(youngAdultKey(ward, name));
 }
 
 // Keywords covering the ball sports, martial arts, dance, and health-exercise
@@ -351,10 +412,11 @@ export async function loadCommunityDirectorySummary(
 ): Promise<CommunityDirectoryResult> {
   const excludeAgeUnrelated = options?.excludeAgeUnrelated ?? false;
   const onlySports = options?.onlySports ?? false;
-  const [{ header, columnAt, rows }, wards, addresses] = await Promise.all([
+  const [{ header, columnAt, rows }, wards, addresses, youngAdultAllowlist] = await Promise.all([
     readRows(),
     readWardGeocodingDirectory(),
     readVenueAddressDirectory(),
+    excludeAgeUnrelated ? readYoungAdultAllowlist() : Promise.resolve(null),
   ]);
   const at = columnAt;
 
@@ -371,7 +433,10 @@ export async function loadCommunityDirectorySummary(
     const id = (row[at('community_id')] ?? '').trim();
     const name = (row[at('name')] ?? '').trim();
     if (!ward || !id || !name) continue;
-    if (excludeAgeUnrelated && isAgeUnrelatedCommunity(row[at('category')] ?? '', row[at('description')] ?? '')) continue;
+    if (
+      excludeAgeUnrelated &&
+      !isYoungAdultRelevant(ward, name, row[at('category')] ?? '', row[at('description')] ?? '', youngAdultAllowlist)
+    ) continue;
     if (onlySports && !isSportsCommunity(row[at('category')] ?? '', row[at('description')] ?? '')) continue;
     const venueName = (row[at('venue_name')] ?? '').trim();
     const venueAddress = (row[at('venue_address')] ?? '').trim();
@@ -420,10 +485,11 @@ export async function loadCommunityFacilityDetail(
 ): Promise<CommunityFacilityDetail | null> {
   const excludeAgeUnrelated = options?.excludeAgeUnrelated ?? false;
   const onlySports = options?.onlySports ?? false;
-  const [{ header, columnAt, rows }, wards, addresses] = await Promise.all([
+  const [{ header, columnAt, rows }, wards, addresses, youngAdultAllowlist] = await Promise.all([
     readRows(),
     readWardGeocodingDirectory(),
     readVenueAddressDirectory(),
+    excludeAgeUnrelated ? readYoungAdultAllowlist() : Promise.resolve(null),
   ]);
   const at = columnAt;
 
@@ -437,7 +503,10 @@ export async function loadCommunityFacilityDetail(
     const id = (row[at('community_id')] ?? '').trim();
     const name = (row[at('name')] ?? '').trim();
     if (!ward || !id || !name) continue;
-    if (excludeAgeUnrelated && isAgeUnrelatedCommunity(row[at('category')] ?? '', row[at('description')] ?? '')) continue;
+    if (
+      excludeAgeUnrelated &&
+      !isYoungAdultRelevant(ward, name, row[at('category')] ?? '', row[at('description')] ?? '', youngAdultAllowlist)
+    ) continue;
     if (onlySports && !isSportsCommunity(row[at('category')] ?? '', row[at('description')] ?? '')) continue;
     const venueName = (row[at('venue_name')] ?? '').trim();
     const venueAddress = (row[at('venue_address')] ?? '').trim();

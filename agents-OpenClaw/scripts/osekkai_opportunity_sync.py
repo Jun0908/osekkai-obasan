@@ -17,6 +17,18 @@ from osekkai_freebusy import ProviderError
 from osekkai_store import JsonStore
 
 
+OPPORTUNITY_DESCRIPTION_LIMIT = 3000
+TRUNCATED_DESCRIPTION_SUFFIX = "\n\n［説明は一部省略。全文はSourceを確認］"
+
+
+def _bounded_description(value: Any) -> str:
+    description = str(value or "")
+    if len(description) <= OPPORTUNITY_DESCRIPTION_LIMIT:
+        return description
+    prefix_limit = OPPORTUNITY_DESCRIPTION_LIMIT - len(TRUNCATED_DESCRIPTION_SUFFIX)
+    return description[:prefix_limit].rstrip() + TRUNCATED_DESCRIPTION_SUFFIX
+
+
 def fixture_root() -> Path:
     configured = os.environ.get("OSEKKAI_FIXTURE_ROOT")
     if configured:
@@ -223,7 +235,7 @@ def events_to_opportunities(
             "communityId": event.get("communityId"),
             "seriesId": event.get("seriesId"),
             "title": event["title"],
-            "description": event.get("description", ""),
+            "description": _bounded_description(event.get("description")),
             "startsAt": event["startsAt"],
             "endsAt": event["endsAt"],
             "address": str(address),
@@ -279,6 +291,12 @@ def events_to_opportunities(
             "connectionEvidence": copy.deepcopy(connection),
             "travelEstimate": route_value,
         }
-        validate_opportunity(opportunity)
+        try:
+            validate_opportunity(opportunity)
+        except ContractError:
+            # A malformed provider record must fail closed without preventing
+            # unrelated verified Events from being materialized.
+            excluded.append({"eventId": event_id, "reasons": ["OPPORTUNITY_CONTRACT_INVALID"]})
+            continue
         opportunities.append(opportunity)
     return opportunities, excluded

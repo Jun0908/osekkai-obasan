@@ -14,7 +14,7 @@ import { withOsekkaiBridgePermit } from './osekkai-resource-guards';
 import { validateOsekkaiCommandData } from './osekkai-response-validation';
 import { isValidOsekkaiUserId } from './osekkai-user';
 
-const DEFAULT_TIMEOUT_MS = 15_000;
+const DEFAULT_TIMEOUT_MS = 25_000;
 const MAX_TIMEOUT_MS = 120_000;
 // The complete live Event Mesh intentionally includes non-recommended,
 // canceled, sold-out, and evidence-unknown events for the map. JsonStore
@@ -123,6 +123,14 @@ const CHILD_ENV_KEYS = [
   'OSEKKAI_LIVE_ORIGIN_LONGITUDE',
   'OSEKKAI_MAX_ROUTE_CANDIDATES',
   'OSEKKAI_ROUTES_TIMEOUT_SECONDS',
+  'OSEKKAI_LLM_ENABLED',
+  'OSEKKAI_LLM_PROVIDER',
+  'OSEKKAI_LLM_MODEL',
+  'OSEKKAI_LLM_TIMEOUT_SECONDS',
+  'OPENAI_API_KEY',
+  'OPENAI_BASE_URL',
+  'OSEKKAI_VAULT_ROOT',
+  'OSEKKAI_MEMORY_SEMANTIC_SEARCH',
 ] as const;
 
 function readEnvCaseInsensitive(source: NodeJS.ProcessEnv, key: string): string | undefined {

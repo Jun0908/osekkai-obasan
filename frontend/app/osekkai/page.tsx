@@ -105,7 +105,7 @@ export default function OsekkaiHomePage() {
             <div className={styles.featureGlyph} aria-hidden="true">◎</div>
             <h3>交流が続く候補を、複数提案</h3>
             <p>本人にはまりそうな候補を、継続性と交流の根拠が強い順に伝えます。</p>
-            <Link href="/osekkai/map">東京の全Eventを見る <span aria-hidden="true">→</span></Link>
+            <Link href="/osekkai/map">Event地図を見る <span aria-hidden="true">→</span></Link>
           </article>
         </div>
       </section>

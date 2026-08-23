@@ -6,6 +6,7 @@ import {
   validateDemoResetRequest,
   validateFeedbackRequest,
   validateInterventionRecordRequest,
+  validateMapEventsQuery,
   validateProfileDeleteRequest,
   validateProfileUpdateRequest,
 } from '@/lib/osekkai/validators.generated';
@@ -151,5 +152,17 @@ describe('Node/Python request validation boundary', () => {
     expect(() =>
       validateOsekkaiCommandPayload(OSEKKAI_COMMANDS.demoSeed, { seeded: true }),
     ).toThrowError(expect.objectContaining({ code: 'VALIDATION_ERROR', status: 400 }));
+  });
+
+  it('bounds the Chiyoda map feed before it reaches Python', () => {
+    const query = { scope: 'chiyoda_kojimachi', offset: 0, limit: 250 };
+    expect(validateMapEventsQuery(query).valid).toBe(true);
+    expect(validateOsekkaiCommandPayload(OSEKKAI_COMMANDS.mapEvents, query)).toEqual(query);
+    expect(validateMapEventsQuery({ ...query, limit: 251 }).valid).toBe(false);
+    expect(validateMapEventsQuery({ ...query, scope: 'tokyo_all' }).valid).toBe(false);
+    expect(() => validateOsekkaiCommandPayload(OSEKKAI_COMMANDS.mapEvents, {
+      ...query,
+      unknown: true,
+    })).toThrowError(expect.objectContaining({ code: 'VALIDATION_ERROR', status: 400 }));
   });
 });

@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/conversation-understanding.schema.json",
+  "title": "ConversationUnderstanding",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "intent", "attractions", "categoryHints", "participationFrictions",
+    "explicitness", "confidence", "needsClarification", "suggestedMemoryReferences",
+    "doNotRemember", "doNotPush"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "intent": {
+      "type": "string",
+      "enum": [
+        "share_interest", "share_friction", "reject", "accept", "check_in",
+        "pause", "do_not_remember", "ask_question", "general"
+      ]
+    },
+    "attractions": {
+      "type": "array",
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 80 }
+    },
+    "categoryHints": {
+      "type": "array",
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "ダンス・健康", "趣味・実用", "音楽・演劇", "文学・歴史",
+          "国際理解・語学", "区民参加・ボランティア"
+        ]
+      }
+    },
+    "participationFrictions": {
+      "type": "array",
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "search_fatigue", "first_time_anxiety", "stranger_anxiety", "group_size",
+          "conversation_load", "travel_effort", "time_commitment", "cost",
+          "low_social_energy", "push_aversion", "not_today"
+        ]
+      }
+    },
+    "explicitness": { "type": "string", "enum": ["explicit", "inferred", "unknown"] },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "needsClarification": { "type": "boolean" },
+    "suggestedMemoryReferences": {
+      "type": "array",
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/uuid" }
+    },
+    "doNotRemember": { "type": "boolean" },
+    "doNotPush": { "type": "boolean" }
+  }
+}

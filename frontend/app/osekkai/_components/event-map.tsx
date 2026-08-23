@@ -2,11 +2,15 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { osekkaiApi } from '@/lib/osekkai/api';
-import type { ConnectionEvidence, EventRouteResult, LiveEvent, Opportunity, RankedOpportunity } from '@/lib/osekkai/types.generated';
 import { friendlyApiError } from '@/components/osekkai/api-client';
+import { osekkaiApi } from '@/lib/osekkai/api';
+import type { CommunityDirectoryResult, CommunityFacility } from '@/lib/osekkai/community-directory-types';
+import type { EventRouteResult, MapEventSummary, MapEventsResult, RankedOpportunity } from '@/lib/osekkai/types.generated';
+import CommunityDirectorySheet from './community-directory-sheet';
 import MapEventSheet from './map-event-sheet';
 import styles from '../osekkai.module.css';
+
+const CHIYODA_WARD = '千代田区';
 
 type Coordinates = { latitude: number; longitude: number };
 type MapLike = {
@@ -20,7 +24,6 @@ type MarkerLike = { setMap(value: MapLike | null): void; addListener(name: strin
 type MapsApi = {
   Map: new (node: HTMLElement, options: Record<string, unknown>) => MapLike;
   Marker: new (options: Record<string, unknown>) => MarkerLike;
-  Geocoder: new () => { geocode(request: Record<string, unknown>): Promise<{ results: Array<{ geometry: { location: { lat(): number; lng(): number } } }> }> };
   SymbolPath: { CIRCLE: unknown };
 };
 
@@ -28,15 +31,41 @@ declare global {
   interface Window { google?: { maps: MapsApi } }
 }
 
+const KOJIMACHI = { latitude: 35.6840, longitude: 139.7373 };
+const INITIAL_ZOOM = 14;
+const INITIAL_LIST_LIMIT = 40;
+
 let mapsPromise: Promise<MapsApi> | null = null;
+function isConstructor(value: unknown): value is new (...args: never[]) => unknown {
+  if (typeof value !== 'function') return false;
+  try {
+    Reflect.construct(String, [], value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function readyMaps(api: MapsApi): Promise<MapsApi> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    if (isConstructor(api.Map) && isConstructor(api.Marker) && api.SymbolPath) return api;
+    await new Promise((resolve) => window.setTimeout(resolve, 25));
+  }
+  throw new Error('Maps APIを読み込めませんでした。');
+}
+
 function loadMaps(key: string): Promise<MapsApi> {
-  if (window.google?.maps) return Promise.resolve(window.google.maps);
+  if (window.google?.maps) return readyMaps(window.google.maps);
   if (mapsPromise) return mapsPromise;
   mapsPromise = new Promise((resolve, reject) => {
     const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&language=ja&region=JP&loading=async`;
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&language=ja&region=JP&libraries=marker&loading=async`;
     script.async = true;
-    script.onload = () => window.google?.maps ? resolve(window.google.maps) : reject(new Error('Maps APIを読み込めませんでした。'));
+    script.onload = () => {
+      const api = window.google?.maps;
+      if (!api) { reject(new Error('Maps APIを読み込めませんでした。')); return; }
+      void readyMaps(api).then(resolve, reject);
+    };
     script.onerror = () => reject(new Error('Maps APIを読み込めませんでした。'));
     document.head.appendChild(script);
   });
@@ -50,56 +79,52 @@ const filters: Array<[Filter, string]> = [
   ['meal', 'みんなで食事'], ['recommended', 'おすすめのみ'],
 ];
 
-function markerColor(event: LiveEvent, evidence: ConnectionEvidence | undefined, recommended: boolean) {
+function markerColor(event: MapEventSummary, recommended: boolean) {
   if (event.status === 'canceled' || event.status === 'ended') return '#6b7280';
   if (event.status === 'sold_out' || event.registrationStatus === 'closed') return '#9e2f2f';
   if (recommended) return '#a64728';
-  if (!evidence) return '#d4a647';
-  if (evidence.connectionLevel < 2) return '#65736b';
+  if (!event.connectionEvidence) return '#d4a647';
+  if (event.connectionEvidence.connectionLevel < 2) return '#65736b';
   return '#285643';
 }
 
-export default function EventMap({
-  events,
-  opportunities,
-  evidence,
-  ranking,
-}: {
-  events: LiveEvent[];
-  opportunities: Opportunity[];
-  evidence: ConnectionEvidence[];
+export default function EventMap({ events, ranking, counts, loading, loadingMore }: {
+  events: MapEventSummary[];
   ranking: RankedOpportunity[];
+  counts: MapEventsResult['counts'];
+  loading: boolean;
+  loadingMore: boolean;
 }) {
   const mapNode = useRef<HTMLDivElement>(null);
   const map = useRef<MapLike | null>(null);
   const markers = useRef<MarkerLike[]>([]);
-  const maps = useRef<MapsApi | null>(null);
-  const [positions, setPositions] = useState<Record<string, Coordinates>>({});
-  const [selected, setSelected] = useState<LiveEvent | null>(null);
+  const communityMarkers = useRef<MarkerLike[]>([]);
+  const [selected, setSelected] = useState<MapEventSummary | null>(null);
+  const [communities, setCommunities] = useState<CommunityDirectoryResult | null>(null);
+  const [showCommunities, setShowCommunities] = useState(true);
+  const [selectedFacility, setSelectedFacility] = useState<CommunityFacility | null>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [origin, setOrigin] = useState<Coordinates | null>(null);
-  const [region, setRegion] = useState('');
-  const [locationState, setLocationState] = useState('現在地は保存しません');
+  const [locationState, setLocationState] = useState('地図は麹町中心・現在地は保存しません');
   const [mapError, setMapError] = useState('');
   const [routeError, setRouteError] = useState('');
   const [routeBusy, setRouteBusy] = useState(false);
   const [routes, setRoutes] = useState<Record<string, EventRouteResult>>({});
   const [mapRevision, setMapRevision] = useState(0);
+  const [listLimit, setListLimit] = useState(INITIAL_LIST_LIMIT);
 
-  const evidenceById = useMemo(() => new Map(evidence.map((item) => [item.eventId, item])), [evidence]);
   const rankingByOpportunity = useMemo(() => new Map(ranking.map((item) => [item.opportunityId, item])), [ranking]);
-  const opportunityByEvent = useMemo(() => new Map(opportunities.flatMap((item) => item.eventId ? [[item.eventId, item] as const] : [])), [opportunities]);
-  const rankingByEvent = useMemo(() => new Map(Array.from(opportunityByEvent).flatMap(([eventId, opportunity]) => {
-    const item = rankingByOpportunity.get(opportunity.id);
-    return item ? [[eventId, item] as const] : [];
-  })), [opportunityByEvent, rankingByOpportunity]);
+  const rankingByEvent = useMemo(() => new Map(events.flatMap((event) => {
+    const item = event.opportunityId ? rankingByOpportunity.get(event.opportunityId) : undefined;
+    return item ? [[event.id, item] as const] : [];
+  })), [events, rankingByOpportunity]);
 
   const filtered = useMemo(() => {
     const now = new Date();
     const today = now.toDateString();
     const weekendEnd = new Date(now); weekendEnd.setDate(now.getDate() + ((7 - now.getDay()) % 7) + 1);
     return events.filter((event) => {
-      const fact = evidenceById.get(event.id);
+      const fact = event.connectionEvidence;
       const start = new Date(event.startsAt);
       if (filter === 'today') return start.toDateString() === today;
       if (filter === 'weekend') return [0, 6].includes(start.getDay()) && start <= weekendEnd;
@@ -108,94 +133,118 @@ export default function EventMap({
       if (filter === 'networking') return event.categories.some((value) => /network|交流|コミュニティ/i.test(value));
       if (filter === 'meal') return fact?.sharedMeal === 'yes';
       if (filter === 'recommended') return rankingByEvent.has(event.id);
-      if (filter === 'nearby') return (routes[event.id]?.minutes ?? opportunityByEvent.get(event.id)?.travelEstimate.minutes ?? 999) <= 30;
+      if (filter === 'nearby') return (routes[event.id]?.minutes ?? event.travelMinutes ?? 999) <= 30;
       return true;
     });
-  }, [events, evidenceById, filter, opportunityByEvent, rankingByEvent, routes]);
+  }, [events, filter, rankingByEvent, routes]);
 
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
     if (!key || !mapNode.current) {
-      setMapError('Google Maps API keyが未設定のため、同じ全Eventを一覧で表示しています。');
+      setMapError('Google Maps API keyが未設定のため、Eventを一覧で表示しています。');
       return;
     }
     let cancelled = false;
-    void loadMaps(key).then(async (api) => {
+    void loadMaps(key).then((api) => {
       if (cancelled || !mapNode.current) return;
-      maps.current = api;
       map.current = new api.Map(mapNode.current, {
-        center: { lat: 35.6812, lng: 139.7671 }, zoom: 11, mapTypeControl: false, streetViewControl: false,
+        center: { lat: KOJIMACHI.latitude, lng: KOJIMACHI.longitude },
+        zoom: INITIAL_ZOOM,
+        mapTypeControl: false,
+        streetViewControl: false,
       });
       map.current.addListener('idle', () => setMapRevision((value) => value + 1));
-      const direct: Record<string, Coordinates> = {};
-      events.forEach((event) => {
-        if (event.latitude !== null && event.longitude !== null) direct[event.id] = { latitude: event.latitude, longitude: event.longitude };
-      });
-      setPositions(direct);
-      const geocoder = new api.Geocoder();
-      for (const event of events.filter((item) => !direct[item.id] && (item.address || item.venueName)).slice(0, 100)) {
-        if (cancelled) break;
-        try {
-          const response = await geocoder.geocode({ address: event.address || event.venueName, region: 'JP' });
-          const point = response.results[0]?.geometry.location;
-          if (point) setPositions((current) => ({ ...current, [event.id]: { latitude: point.lat(), longitude: point.lng() } }));
-        } catch { /* Unresolved events stay visible in the complete fallback list. */ }
-      }
     }).catch((reason) => !cancelled && setMapError(friendlyApiError(reason)));
-    return () => { cancelled = true; markers.current.forEach((marker) => marker.setMap(null)); };
-  }, [events]);
+    return () => {
+      cancelled = true;
+      markers.current.forEach((marker) => marker.setMap(null));
+    };
+  }, []);
 
   useEffect(() => {
-    const api = maps.current;
+    let cancelled = false;
+    void fetch(`/api/osekkai/community-directory?ward=${encodeURIComponent(CHIYODA_WARD)}`)
+      .then((response) => (response.ok ? (response.json() as Promise<CommunityDirectoryResult>) : null))
+      .then((data) => { if (!cancelled && data) setCommunities(data); })
+      .catch(() => {
+        // Community directory pins are enhancement-only and never block the Event map.
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    const api = window.google?.maps;
+    const activeMap = map.current;
+    if (!api || !activeMap) return;
+    communityMarkers.current.forEach((marker) => marker.setMap(null));
+    if (!showCommunities || !communities) { communityMarkers.current = []; return; }
+    communityMarkers.current = communities.facilities.map((facility) => {
+      const marker = new api.Marker({
+        map: activeMap,
+        position: { lat: facility.latitude, lng: facility.longitude },
+        title: `${facility.name} · 地域コミュニティ${facility.communities.length}件（Open Data・目安地点）`,
+        label: { text: String(facility.communities.length), color: '#fff', fontWeight: '700' },
+      });
+      marker.addListener('click', () => { setSelected(null); setSelectedFacility(facility); });
+      return marker;
+    });
+  }, [communities, showCommunities, mapRevision]);
+
+  useEffect(() => {
+    const api = window.google?.maps;
     const activeMap = map.current;
     if (!api || !activeMap) return;
     markers.current.forEach((marker) => marker.setMap(null));
-    const zoom = activeMap.getZoom() ?? 11;
+    const zoom = activeMap.getZoom() ?? INITIAL_ZOOM;
     const grid = zoom < 11 ? 0.08 : zoom < 13 ? 0.03 : 0.008;
     const bounds = activeMap.getBounds();
-    const groups = new Map<string, LiveEvent[]>();
+    const groups = new Map<string, MapEventSummary[]>();
     filtered.forEach((event) => {
-      const point = positions[event.id];
-      if (!point || (bounds && !bounds.contains({ lat: point.latitude, lng: point.longitude }))) return;
-      const key = `${Math.round(point.latitude / grid)}:${Math.round(point.longitude / grid)}`;
+      if (bounds && !bounds.contains({ lat: event.latitude, lng: event.longitude })) return;
+      const key = `${Math.round(event.latitude / grid)}:${Math.round(event.longitude / grid)}`;
       groups.set(key, [...(groups.get(key) ?? []), event]);
     });
     markers.current = Array.from(groups.values()).map((group) => {
-      const points = group.map((event) => positions[event.id]);
-      const center = { lat: points.reduce((sum, point) => sum + point.latitude, 0) / points.length, lng: points.reduce((sum, point) => sum + point.longitude, 0) / points.length };
+      const center = {
+        lat: group.reduce((sum, event) => sum + event.latitude, 0) / group.length,
+        lng: group.reduce((sum, event) => sum + event.longitude, 0) / group.length,
+      };
       const single = group.length === 1 ? group[0] : null;
       const marker = new api.Marker({
-        map: activeMap, position: center, title: single?.title ?? `${group.length}件のEvent`,
+        map: activeMap,
+        position: center,
+        title: single?.title ?? `${group.length}件のEvent`,
         label: group.length > 1 ? { text: String(group.length), color: '#fff', fontWeight: '700' } : undefined,
-        icon: { path: api.SymbolPath.CIRCLE, scale: group.length > 1 ? 18 : 11, fillColor: single ? markerColor(single, evidenceById.get(single.id), rankingByEvent.has(single.id)) : '#20332b', fillOpacity: 0.94, strokeColor: '#fffdf8', strokeWeight: 3 },
+        icon: {
+          path: api.SymbolPath.CIRCLE,
+          scale: group.length > 1 ? 18 : 11,
+          fillColor: single ? markerColor(single, rankingByEvent.has(single.id)) : '#20332b',
+          fillOpacity: 0.94,
+          strokeColor: '#fffdf8',
+          strokeWeight: 3,
+        },
       });
       marker.addListener('click', () => {
+        setSelectedFacility(null);
         if (single) setSelected(single);
         else { activeMap.setCenter(center); activeMap.setZoom(Math.min(17, zoom + 2)); }
       });
       return marker;
     });
-  }, [evidenceById, filtered, mapRevision, positions, rankingByEvent]);
+  }, [filtered, mapRevision, rankingByEvent]);
 
   const locate = () => {
     if (!navigator.geolocation) { setLocationState('このBrowserでは現在地を利用できません'); return; }
     setLocationState('現在地を確認中…');
     navigator.geolocation.getCurrentPosition((position) => {
-      const value = { latitude: position.coords.latitude, longitude: position.coords.longitude };
-      setOrigin(value); setLocationState('現在地を一時利用中（保存しません）');
-      map.current?.setCenter({ lat: value.latitude, lng: value.longitude }); map.current?.setZoom(13);
-    }, () => setLocationState('現在地を使わず、地域名で探せます'), { enableHighAccuracy: false, timeout: 8000, maximumAge: 60_000 });
+      setOrigin({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+      setLocationState('現在地を移動時間だけに利用中（保存しません）');
+    }, () => setLocationState('現在地を使わず、地図のEventを見られます'), { enableHighAccuracy: false, timeout: 8000, maximumAge: 60_000 });
   };
 
-  const searchRegion = async () => {
-    if (!region.trim() || !maps.current) return;
-    try {
-      const response = await new maps.current.Geocoder().geocode({ address: `${region} 東京都`, region: 'JP' });
-      const point = response.results[0]?.geometry.location;
-      if (!point) return;
-      const value = { latitude: point.lat(), longitude: point.lng() };
-      setOrigin(value); setLocationState(`${region}から検索中`); map.current?.setCenter({ lat: value.latitude, lng: value.longitude }); map.current?.setZoom(13);
-    } catch { setLocationState('地域を見つけられませんでした'); }
+  const resetToKojimachi = () => {
+    map.current?.setCenter({ lat: KOJIMACHI.latitude, lng: KOJIMACHI.longitude });
+    map.current?.setZoom(INITIAL_ZOOM);
   };
 
   const loadRoute = async () => {
@@ -208,31 +257,50 @@ export default function EventMap({
     finally { setRouteBusy(false); }
   };
 
+  const visibleList = filtered.slice(0, listLimit);
+
   return (
     <div className={styles.eventMapLayout}>
       <div className={styles.mapToolbar}>
-        <button type="button" onClick={locate}>◎ 現在地から探す</button>
-        <div><input value={region} onChange={(event) => setRegion(event.target.value)} placeholder="駅名・地域名" aria-label="駅名または地域名" /><button type="button" onClick={searchRegion}>移動</button></div>
+        <button type="button" onClick={locate}>◎ 現在地を移動時間に使う</button>
+        <button type="button" onClick={resetToKojimachi}>麹町へ戻る</button>
+        <button type="button" data-active={showCommunities} onClick={() => setShowCommunities((value) => !value)}>
+          ⌂ 地域コミュニティ{showCommunities ? 'を隠す' : 'を表示'}
+        </button>
         <span aria-live="polite">{locationState}</span>
       </div>
       <div className={styles.mapFilters} aria-label="Event絞り込み">
-        {filters.map(([value, label]) => <button type="button" data-active={filter === value} aria-pressed={filter === value} onClick={() => setFilter(value)} key={value}>{label}</button>)}
+        {filters.map(([value, label]) => <button type="button" data-active={filter === value} aria-pressed={filter === value} onClick={() => { setFilter(value); setListLimit(INITIAL_LIST_LIMIT); }} key={value}>{label}</button>)}
       </div>
-      {mapError ? <p className={styles.mapFallbackNotice}>{mapError}</p> : null}
-      <div className={styles.mapCanvas} ref={mapNode} aria-label="現在地周辺の全Event地図">
-        {mapError ? <div className={styles.mapPlaceholder}><strong>Google Maps接続待ち</strong><span>Eventは欠落させず、下の一覧に全件表示しています。</span></div> : null}
+      <div className={styles.mapCanvasWrap}>
+        <div className={styles.mapCanvas} ref={mapNode} aria-label="麹町を中心に表示するEvent地図" />
+        {loading ? <div className={styles.mapLoadingBadge}>地図を先に表示中 · Eventを取得しています</div> : null}
+        {loadingMore ? <div className={styles.mapLoadingBadge}>追加Eventを地図へ載せています</div> : null}
+        {mapError ? <div className={styles.mapPlaceholder}><strong>Google Maps接続待ち</strong><span>{mapError}</span></div> : null}
       </div>
-      <p className={styles.mapCount}>{filtered.length}件中、位置確認済み{filtered.filter((event) => positions[event.id]).length}件を表示。重複EventはSource統合済みです。</p>
+      <p className={styles.mapCount}>
+        全{counts.totalInMesh.toLocaleString()}件から千代田区{counts.inWard.toLocaleString()}件に限定。座標確認済み{events.length.toLocaleString()}件を表示{counts.missingCoordinates > 0 ? `、住所のみ${counts.missingCoordinates.toLocaleString()}件は地図描画待ち` : ''}。
+      </p>
+      {communities ? (
+        <p className={styles.mapCount}>
+          地域コミュニティ{communities.counts.withKnownVenue.toLocaleString()}件を{communities.facilities.length.toLocaleString()}拠点にまとめて表示（Open Data・開催日時未確認）
+          {communities.counts.withoutKnownVenue > 0 ? `、拠点未特定${communities.counts.withoutKnownVenue.toLocaleString()}件は非表示` : ''}。
+        </p>
+      ) : null}
       {routeError ? <p className={styles.mapRouteError} role="alert">{routeError}</p> : null}
       <section className={styles.mapFallbackList} aria-labelledby="all-events-heading">
-        <div><h2 id="all-events-heading">取得した全Event</h2><span>{filtered.length}件</span></div>
-        <ul>{filtered.map((event) => (
+        <div><h2 id="all-events-heading">Event一覧</h2><span>{filtered.length}件</span></div>
+        {visibleList.length > 0 ? <ul>{visibleList.map((event) => (
           <li key={event.id} data-status={event.status}>
-            <button type="button" onClick={() => setSelected(event)}><strong>{event.title}</strong><span>{event.venueName || event.address || '場所未確認'} · {event.status}</span></button>
+            <button type="button" onClick={() => { setSelectedFacility(null); setSelected(event); }}><strong>{event.title}</strong><span>{event.venueName || event.address || '場所未確認'} · {event.status}</span></button>
           </li>
-        ))}</ul>
+        ))}</ul> : <p className={styles.mapEmptyState}>{loading ? 'Eventは地図の後から読み込まれます。' : 'この条件のEventはありません。'}</p>}
+        {visibleList.length < filtered.length ? <button className={styles.mapListMore} type="button" onClick={() => setListLimit((value) => value + INITIAL_LIST_LIMIT)}>続きを表示</button> : null}
       </section>
-      {selected ? <MapEventSheet event={selected} evidence={evidenceById.get(selected.id)} ranking={rankingByEvent.get(selected.id)} route={routes[selected.id]} routeBusy={routeBusy} canRoute={Boolean(origin)} onRoute={loadRoute} onClose={() => setSelected(null)} /> : null}
+      {selected ? <MapEventSheet event={selected} evidence={selected.connectionEvidence ?? undefined} ranking={rankingByEvent.get(selected.id)} route={routes[selected.id]} routeBusy={routeBusy} canRoute={Boolean(origin)} onRoute={loadRoute} onClose={() => setSelected(null)} /> : null}
+      {selectedFacility && communities ? (
+        <CommunityDirectorySheet facility={selectedFacility} note={communities.dataSource.note} onClose={() => setSelectedFacility(null)} />
+      ) : null}
     </div>
   );
 }

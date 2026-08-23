@@ -1,6 +1,6 @@
 # Plan2 — OpenClawで東京の「続く出会い」を見つけるDemo実装計画
 
-- 更新日: 2026-08-22
+- 更新日: 2026-08-23
 - 対象: 東京都「都知事杯オープンデータ・ハッカソン 2026」
 - プロダクト名: **おせっかいおばさん**
 - タグライン: **近づきすぎず、離れすぎず。あなたが一歩動ける瞬間だけ、東京がおせっかいする。**
@@ -15,7 +15,7 @@
 
 - 江東区を固定パイロットにしない
 - 図書館や公園へ行くだけの提案を主役にしない
-- 「今日はPUSHしない」SceneにDemo時間を使わない
+- Calendarの空きだけから「家にいる」「元気がある」と決めつけない
 - 大型イベント、展示、講演等を、開催中というだけで提案しない
 - 古いOpen Data snapshotを最新イベントのように見せない
 - PeatixやLu.maを無断で全面クロールできる前提にしない
@@ -451,7 +451,17 @@ Mapでは既に、本人が`現在地から探す`を押した時だけBrowser G
 - 2019年イベント
 - データ同期の細かいログを延々見せること
 
-PUSHしない機能は安全上残しますが、2分Demoの主役にはしません。
+Live Demoの主経路は複数候補と学習ですが、Backend非依存Judge Demoでは、押すだけのAppではないことを短時間で示すため「疲れている日は引く」を独立した短いStoryとして扱います。
+
+### Googleログイン不要の3 Story Judge Demo
+
+`/osekkai/demo`はGoogle Calendarへ未接続でも最後まで再生できます。Calendarの空きは予定内容を含まない`synthetic_demo`、Eventは取得日時を持つ`recorded_source_snapshot`、Routesは記録できたものだけ`recorded_live`として明示します。3 Storyは次の役割に分けます。
+
+1. **誘う** — 合成FreeBusyの空きをきっかけに、`ボルダリング / ヨガ / 音楽`を一問だけ聞き、趣味・交流根拠・移動を合わせた実Event 3件を提示する
+2. **引く** — 本人が`今日は疲れた`と話したら、Calendarが空いていてもEventを0件のままにし、返事を要求せず、次に聞く回数も本人と決める
+3. **続ける** — 参加後の`同じ人にまた会える方がいい`を覚え、単発Eventより全6回講座を上げ、次回の再会へつなぐ
+
+Story 1の「あんた、最近家ばっかり」は、おばさんの仮説として言い切りません。直後に「Calendarで分かるのは空きだけ」と訂正し、予定タイトル、場所、在宅推定を使わないことを同じ画面で示します。Story 2は長いno-PUSH説明ではなく2操作で終え、Story 3で孤独課題を一回の外出ではなく継続接点として扱います。
 
 ### 60秒Live Demo
 
@@ -1095,6 +1105,31 @@ Demoでは時間を進め、Event終了後の`check_in_due`を表示します。
     - Component testと1440x900/390x844 Browserで169件、詳細、閉じる、位置拒否fallback、横overflowなしを確認
     - BillingとMaps JavaScript/Routes/Geocoding keyを設定し、実Google Mapの読込とEvent表示を確認。deprecated Marker警告は非blockingで、移行は最終Gateを止めない
 
+- [x] **TASK-145B: 麹町中心・千代田区限定の高速Mapへ置き換える**
+  - 依存: TASK-145
+  - 最新指示による範囲変更:
+    - Demoでは東京都全域を最初から描画せず、開発場所の麹町を中心とする千代田区だけを対象にする
+    - Source同期自体は東京都全域のまま維持し、Map transportと描画だけを区単位に限定する
+  - 作業:
+    - Google Map canvasをEvent、推薦履歴、Routesの応答より先にmountする
+    - 住所に`千代田区`を明記したEventだけをServerで抽出し、会場名から区を推測しない
+    - 座標確認済みEventだけをMarker feedへ入れ、座標欠損は件数として可視化する
+    - Browser Geocoderと全件一括送信を廃止し、専用`map-events` Contract/APIから最大250件ずつ段階取得する
+    - viewport内だけを簡易cluster化し、一覧は最初の40件から段階表示する
+    - Event API、推薦履歴のどちらが失敗しても地図本体を止めない
+  - 完了条件:
+    - 2,000件を含むfixtureでも1 responseは250件以下かつ512 KiB未満
+    - 地図がEvent取得前に描画され、千代田区外のEventはBrowserへ送られない
+    - 会場名が麹町でも住所が千代田区外なら除外される
+    - 既定中心は麹町、zoom 14で、現在地は明示操作時のRoutes計算だけに使う
+  - 完了記録（2026-08-23）:
+    - `map-events-query/result` Schema、Python抽出・compact化・pagination、Next API、生成TypeScript validatorを実装
+    - 2,005件fixtureで千代田区2,000件、座標欠損100件を検証し、250件page、次offset、区外除外、512 KiB未満を確認
+    - UIを麹町先行描画、段階Marker、viewport clustering、40件ずつの一覧、API障害時の地図維持へ変更
+    - 実BrowserでGoogle Map描画、239件から千代田区9件への限定、`events/opportunities`全件APIを呼ばないことを確認
+    - `map-events`を強制停止しても地図本体が残ること、390x844で横overflowがないことを確認
+    - Python 171 tests、35 schemas / 22 instances、Frontend 19 files / 94 tests、typecheck、lint、production build成功
+
 - [x] **TASK-150: 複数候補のPUSHで完走するLive Demo画面を実装する**
   - 依存: TASK-140、TASK-145
   - 対象:
@@ -1122,6 +1157,32 @@ Demoでは時間を進め、Event終了後の`check_in_due`を表示します。
     - 料金未確認を無料と誤認させず候補へ残し、公開title/descriptionから導出したカテゴリは`ai_derived` provenanceを保持。Schema上限を超える遠距離経路は同期全体を止めず除外
     - Chatの明示CTAで記憶同意とPUSH同意を設定し、未保存だった直前の好みを保存してLive Demoへ遷移する導線を追加
     - 審査Browser sessionで本人同意を含めて操作する最終リハーサルは`TASK-LIVE-DEMO-GATE`で別管理
+
+- [x] **TASK-150B: Googleログイン不要の3 Story Judge Demoを実装する**
+  - 依存: TASK-150、TASK-159
+  - 対象:
+    - `contracts/osekkai/judge-demo-scenario.schema.json`
+    - `agents-OpenClaw/fixtures/osekkai/judge-demo-scenario.json`
+    - `agents-OpenClaw/scripts/osekkai_judge_demo.py`
+    - `frontend/components/osekkai/judge-demo-client.tsx`
+    - `frontend/app/osekkai/demo/page.tsx`
+  - 作業:
+    - 1本固定の再現を`誘う / 引く / 続ける`の選択式3 Storyへ変更
+    - Story 1で一問の趣味回答から実Event 3件を提示し、参加理由と不参加理由を分けて記憶
+    - Story 2で`今日は疲れた`をCalendarの空きより優先し、候補0件・通知停止・一回だけ再確認を再現
+    - Story 3で参加後の継続希望から全6回の自治体公式講座へ順位を変更
+    - Googleログイン、Provider API、Python Backendを呼ばず、Event / Routes / Calendarのデータ分類を画面に明示
+  - 完了条件:
+    - 各Storyを独立して最初から最後まで操作できる
+    - Story 2はEventを1件も生成せず、Story 3は継続性による順位変更を表示する
+    - 実Eventにないボルダリング候補を捏造せず、未記録Routesを未記録と表示する
+    - Runtime API requestとGoogle OAuthなしで動く
+  - 完了記録（2026-08-23）:
+    - 3 Story Contract、実Event 4件の共有snapshot、Story分岐、選択・Memory再現を実装
+    - Calendarを`synthetic_demo`、Eventを`recorded_source_snapshot`、Routesを`recorded_live / 未記録`として分離
+    - Component testで全3 Story、候補0件、順位変更、API request 0件を確認
+    - BrowserでDesktop / 390px幅、error overlayなし、横overflowなし、Google login誘導なしを確認
+    - Python 171 tests、35 schemas / 22 instances、Frontend 20 files / 98 tests、typecheck、lint、production build成功
 
 - [x] **TASK-155: 好み起点の短いOnboardingと学習UIへ修正する**
   - 依存: TASK-090、TASK-140、TASK-150

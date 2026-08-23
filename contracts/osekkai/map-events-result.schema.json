@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/map-events-result.schema.json",
+  "title": "Map events result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "dataMode", "generatedAt", "scope", "events", "counts", "nextOffset"],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "dataMode": { "type": "string", "const": "live" },
+    "generatedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "ward", "center", "zoom"],
+      "properties": {
+        "id": { "type": "string", "const": "chiyoda_kojimachi" },
+        "ward": { "type": "string", "const": "千代田区" },
+        "center": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["latitude", "longitude"],
+          "properties": {
+            "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+            "longitude": { "type": "number", "minimum": -180, "maximum": 180 }
+          }
+        },
+        "zoom": { "type": "integer", "minimum": 1, "maximum": 22 }
+      }
+    },
+    "events": {
+      "type": "array",
+      "maxItems": 250,
+      "items": { "$ref": "#/$defs/mapEvent" }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["totalInMesh", "inWard", "withCoordinates", "missingCoordinates", "returned"],
+      "properties": {
+        "totalInMesh": { "type": "integer", "minimum": 0 },
+        "inWard": { "type": "integer", "minimum": 0 },
+        "withCoordinates": { "type": "integer", "minimum": 0 },
+        "missingCoordinates": { "type": "integer", "minimum": 0 },
+        "returned": { "type": "integer", "minimum": 0, "maximum": 250 }
+      }
+    },
+    "nextOffset": {
+      "oneOf": [
+        { "type": "integer", "minimum": 1, "maximum": 10000 },
+        { "type": "null" }
+      ]
+    }
+  },
+  "$defs": {
+    "mapEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id", "title", "startsAt", "endsAt", "venueName", "address", "latitude", "longitude",
+        "status", "registrationStatus", "capacity", "participants", "priceYen", "categories",
+        "provider", "sourceUrl", "sourceClassification", "revalidatedAt", "seriesId",
+        "opportunityId", "travelMinutes", "connectionEvidence"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "title": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "startsAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "endsAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "venueName": { "type": ["string", "null"], "maxLength": 240 },
+        "address": { "type": ["string", "null"], "maxLength": 400 },
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
+        "status": { "$ref": "common.schema.json#/$defs/eventStatus" },
+        "registrationStatus": { "$ref": "common.schema.json#/$defs/registrationStatus" },
+        "capacity": { "type": ["integer", "null"], "minimum": 0 },
+        "participants": { "type": ["integer", "null"], "minimum": 0 },
+        "priceYen": { "type": ["integer", "null"], "minimum": 0 },
+        "categories": { "type": "array", "uniqueItems": true, "items": { "type": "string", "maxLength": 80 } },
+        "provider": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "sourceUrl": { "type": "string", "format": "uri" },
+        "sourceClassification": { "$ref": "common.schema.json#/$defs/sourceClassification" },
+        "revalidatedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+        "seriesId": { "type": ["string", "null"], "maxLength": 200 },
+        "opportunityId": { "type": ["string", "null"], "maxLength": 160 },
+        "travelMinutes": { "type": ["integer", "null"], "minimum": 0, "maximum": 360 },
+        "connectionEvidence": {
+          "oneOf": [
+            { "$ref": "connection-evidence.schema.json" },
+            { "type": "null" }
+          ]
+        }
+      }
+    }
+  }
+}

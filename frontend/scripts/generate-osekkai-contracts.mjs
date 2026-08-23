@@ -22,6 +22,11 @@ const contractFiles = [
   "conversation.schema.json",
   "conversation-episode.schema.json",
   "conversation-context.schema.json",
+  "conversation-understanding.schema.json",
+  "dialogue-plan.schema.json",
+  "generated-reply.schema.json",
+  "memory-note.schema.json",
+  "memory-retrieval-result.schema.json",
   "chat-result.schema.json",
   "freebusy.schema.json",
   "event.schema.json",
@@ -43,6 +48,9 @@ const contractFiles = [
   "calendar-callback-request.schema.json",
   "event-route-request.schema.json",
   "event-route-result.schema.json",
+  "judge-demo-scenario.schema.json",
+  "map-events-query.schema.json",
+  "map-events-result.schema.json",
 ];
 
 const typeRoots = [
@@ -51,6 +59,11 @@ const typeRoots = [
   ["conversation.schema.json", "ConversationTurn"],
   ["conversation-episode.schema.json", "ConversationEpisode"],
   ["conversation-context.schema.json", "ConversationContext"],
+  ["conversation-understanding.schema.json", "ConversationUnderstanding"],
+  ["dialogue-plan.schema.json", "DialoguePlan"],
+  ["generated-reply.schema.json", "GeneratedReply"],
+  ["memory-note.schema.json", "MemoryNote"],
+  ["memory-retrieval-result.schema.json", "MemoryRetrievalResult"],
   ["chat-result.schema.json", "ChatResult"],
   ["freebusy.schema.json", "FreeBusyResult"],
   ["event.schema.json", "LiveEvent"],
@@ -72,6 +85,9 @@ const typeRoots = [
   ["calendar-callback-request.schema.json", "CalendarCallbackRequest"],
   ["event-route-request.schema.json", "EventRouteRequest"],
   ["event-route-result.schema.json", "EventRouteResult"],
+  ["judge-demo-scenario.schema.json", "JudgeDemoScenario"],
+  ["map-events-query.schema.json", "MapEventsQuery"],
+  ["map-events-result.schema.json", "MapEventsResult"],
 ];
 
 const validatorRoots = {
@@ -80,6 +96,11 @@ const validatorRoots = {
   rawValidateConversationTurn: "conversation.schema.json",
   rawValidateConversationEpisode: "conversation-episode.schema.json",
   rawValidateConversationContext: "conversation-context.schema.json",
+  rawValidateConversationUnderstanding: "conversation-understanding.schema.json",
+  rawValidateDialoguePlan: "dialogue-plan.schema.json",
+  rawValidateGeneratedReply: "generated-reply.schema.json",
+  rawValidateMemoryNote: "memory-note.schema.json",
+  rawValidateMemoryRetrievalResult: "memory-retrieval-result.schema.json",
   rawValidateChatResult: "chat-result.schema.json",
   rawValidateFreeBusyResult: "freebusy.schema.json",
   rawValidateLiveEvent: "event.schema.json",
@@ -101,6 +122,8 @@ const validatorRoots = {
   rawValidateCalendarCallbackRequest: "calendar-callback-request.schema.json",
   rawValidateEventRouteRequest: "event-route-request.schema.json",
   rawValidateEventRouteResult: "event-route-result.schema.json",
+  rawValidateMapEventsQuery: "map-events-query.schema.json",
+  rawValidateMapEventsResult: "map-events-result.schema.json",
 };
 
 const schemas = new Map();
@@ -131,7 +154,12 @@ const dependencySchema = {
   title: "OsekkaiContractDependencies",
   type: "object",
   additionalProperties: false,
-  required: ["inferredPreference", "fieldProvenance", "freeWindow", "evidence", "source", "rankedOpportunity"],
+  required: [
+    "inferredPreference", "fieldProvenance", "freeWindow", "evidence", "source",
+    "rankedOpportunity", "mapEvent", "judgeDemoPersona", "judgeDemoFreeWindow",
+    "judgeDemoStoryChoice", "judgeDemoStoryStep", "judgeDemoStory", "judgeDemoEvent",
+    "judgeDemoDataNote",
+  ],
   properties: {
     inferredPreference: { $ref: "common.schema.json#/$defs/inferredPreference" },
     fieldProvenance: { $ref: "common.schema.json#/$defs/fieldProvenance" },
@@ -139,6 +167,14 @@ const dependencySchema = {
     evidence: { $ref: "common.schema.json#/$defs/evidence" },
     source: { $ref: "source-registry.schema.json#/$defs/source" },
     rankedOpportunity: { $ref: "decision.schema.json#/$defs/rankedOpportunity" },
+    mapEvent: { $ref: "map-events-result.schema.json#/$defs/mapEvent" },
+    judgeDemoPersona: { $ref: "judge-demo-scenario.schema.json#/$defs/persona" },
+    judgeDemoFreeWindow: { $ref: "judge-demo-scenario.schema.json#/$defs/freeWindow" },
+    judgeDemoStoryChoice: { $ref: "judge-demo-scenario.schema.json#/$defs/storyChoice" },
+    judgeDemoStoryStep: { $ref: "judge-demo-scenario.schema.json#/$defs/storyStep" },
+    judgeDemoStory: { $ref: "judge-demo-scenario.schema.json#/$defs/story" },
+    judgeDemoEvent: { $ref: "judge-demo-scenario.schema.json#/$defs/demoEvent" },
+    judgeDemoDataNote: { $ref: "judge-demo-scenario.schema.json#/$defs/dataNote" },
   },
 };
 const dependencyTypes = await compile(dependencySchema, "OsekkaiContractDependencies", {
@@ -200,6 +236,7 @@ export type EpisodeNotification = NonNullable<InterventionEpisode['notification'
 export type SelectedFreeWindow = NonNullable<InterventionEpisode['freeWindowSnapshot']>;
 export type Metric = MetricsResult['metrics'][number];
 export type UnverifiedMetric = MetricsResult['unverifiedMetrics'][number];
+export type MapEventSummary = MapEventsResult['events'][number];
 `;
 const types = `/* Generated from /contracts/osekkai by scripts/generate-osekkai-contracts.mjs. Do not edit. */\n\n${generatedTypeBlocks.join("\n\n")}\n${compatibilityTypes}`;
 
@@ -242,6 +279,16 @@ export const validateConversationEpisode = (value: unknown) =>
   validateWith<import('./types.generated').ConversationEpisode>('ConversationEpisode', rawValidateConversationEpisode, value);
 export const validateConversationContext = (value: unknown) =>
   validateWith<import('./types.generated').ConversationContext>('ConversationContext', rawValidateConversationContext, value);
+export const validateConversationUnderstanding = (value: unknown) =>
+  validateWith<import('./types.generated').ConversationUnderstanding>('ConversationUnderstanding', rawValidateConversationUnderstanding, value);
+export const validateDialoguePlan = (value: unknown) =>
+  validateWith<import('./types.generated').DialoguePlan>('DialoguePlan', rawValidateDialoguePlan, value);
+export const validateGeneratedReply = (value: unknown) =>
+  validateWith<import('./types.generated').GeneratedReply>('GeneratedReply', rawValidateGeneratedReply, value);
+export const validateMemoryNote = (value: unknown) =>
+  validateWith<import('./types.generated').MemoryNote>('MemoryNote', rawValidateMemoryNote, value);
+export const validateMemoryRetrievalResult = (value: unknown) =>
+  validateWith<import('./types.generated').MemoryRetrievalResult>('MemoryRetrievalResult', rawValidateMemoryRetrievalResult, value);
 export const validateChatResult = (value: unknown) =>
   validateWith<import('./types.generated').ChatResult>('ChatResult', rawValidateChatResult, value);
 export const validateFreeBusyResult = (value: unknown) =>
@@ -294,6 +341,10 @@ export const validateEventRouteRequest = (value: unknown) =>
   validateWith<import('./types.generated').EventRouteRequest>('EventRouteRequest', rawValidateEventRouteRequest, value);
 export const validateEventRouteResult = (value: unknown) =>
   validateWith<import('./types.generated').EventRouteResult>('EventRouteResult', rawValidateEventRouteResult, value);
+export const validateMapEventsQuery = (value: unknown) =>
+  validateWith<import('./types.generated').MapEventsQuery>('MapEventsQuery', rawValidateMapEventsQuery, value);
+export const validateMapEventsResult = (value: unknown) =>
+  validateWith<import('./types.generated').MapEventsResult>('MapEventsResult', rawValidateMapEventsResult, value);
 
 type JsonRecord = Record<string, unknown>;
 const isRecord = (value: unknown): value is JsonRecord =>

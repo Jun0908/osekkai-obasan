@@ -1,5 +1,5 @@
 /* Generated from /contracts/osekkai. Do not edit. */
-export const OSEKKAI_CONTRACT_HASH = "c4167c1cef50847ca4eb867ceb72266b3cc9c596286cd8ea6a9d4f1828407fa7" as const;
+export const OSEKKAI_CONTRACT_HASH = "f33a4cfbdd3975e7b95005ae5749f9829b4792e004334e5d6d587d83a00798f5" as const;
 export const OSEKKAI_CONTRACTS = [
   {
     "file": "contracts/osekkai/common.schema.json",
@@ -30,6 +30,31 @@ export const OSEKKAI_CONTRACTS = [
     "file": "contracts/osekkai/conversation-context.schema.json",
     "id": "https://osekkai.local/contracts/conversation-context.schema.json",
     "sha256": "cb39e2bc34b1c9ad67dcc897572d186546514c47fa14b43e42c0a43fedd43509"
+  },
+  {
+    "file": "contracts/osekkai/conversation-understanding.schema.json",
+    "id": "https://osekkai.local/contracts/conversation-understanding.schema.json",
+    "sha256": "00de1636db49550de2ff497590a4fd65416d9b85c0d33f197876d5e48ac4b2dc"
+  },
+  {
+    "file": "contracts/osekkai/dialogue-plan.schema.json",
+    "id": "https://osekkai.local/contracts/dialogue-plan.schema.json",
+    "sha256": "8b0c94ffdd269e439eb094e5154182f75b3c3d46e3f018f60465981b0a2bedab"
+  },
+  {
+    "file": "contracts/osekkai/generated-reply.schema.json",
+    "id": "https://osekkai.local/contracts/generated-reply.schema.json",
+    "sha256": "57f1c432a2659cb34ff08d67d3b1e54f8ef84eef8698f19457d09e836eee47dc"
+  },
+  {
+    "file": "contracts/osekkai/memory-note.schema.json",
+    "id": "https://osekkai.local/contracts/memory-note.schema.json",
+    "sha256": "fcd9db4226d1dc3c54f6f469787c52aa596dde3dffcb86ec786eb8e5c437e47a"
+  },
+  {
+    "file": "contracts/osekkai/memory-retrieval-result.schema.json",
+    "id": "https://osekkai.local/contracts/memory-retrieval-result.schema.json",
+    "sha256": "758e5b0ff68c4d016a81a2bca18feef62e90b55a1d5c5981d7da90105f6f86e0"
   },
   {
     "file": "contracts/osekkai/chat-result.schema.json",
@@ -135,5 +160,20 @@ export const OSEKKAI_CONTRACTS = [
     "file": "contracts/osekkai/event-route-result.schema.json",
     "id": "https://osekkai.local/contracts/event-route-result.schema.json",
     "sha256": "fd32ecd3bbc0ea96a6a3b045672989a92f878bd671292a5d337846cdf66273a4"
+  },
+  {
+    "file": "contracts/osekkai/judge-demo-scenario.schema.json",
+    "id": "https://osekkai.local/contracts/judge-demo-scenario.schema.json",
+    "sha256": "69edd1ccc2450c8b8db8d9f10c370b1843881f0bafce5ef3abd37020bcaad7e5"
+  },
+  {
+    "file": "contracts/osekkai/map-events-query.schema.json",
+    "id": "https://osekkai.local/contracts/map-events-query.schema.json",
+    "sha256": "11416c8c606fd9b1045d140b9033009200dc509159929639f37f6f9f69d38a50"
+  },
+  {
+    "file": "contracts/osekkai/map-events-result.schema.json",
+    "id": "https://osekkai.local/contracts/map-events-result.schema.json",
+    "sha256": "a304613f0069248d4536b076586ef06b97f4c23ae0dc2c44a8218cc28d9067e3"
   }
 ] as const;

@@ -24,6 +24,7 @@ export const OSEKKAI_COMMANDS = {
   sourcesSync: 'sources-sync',
   sourcesStatus: 'sources-status',
   events: 'events',
+  mapEvents: 'map-events',
   eventRoute: 'event-route',
 } as const;
 

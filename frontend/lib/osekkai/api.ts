@@ -15,6 +15,7 @@ import type {
   FreeBusyResult,
   MetricsResult,
   EventRouteResult,
+  MapEventsResult,
 } from './types.generated';
 import type {
   DecideResponse,
@@ -64,6 +65,8 @@ export const osekkaiApi = {
       body: { eventId, origin: { latitude, longitude } },
     }),
   events: () => osekkaiRequest<EventMeshResult>('/events'),
+  mapEvents: (offset = 0, limit = 250) =>
+    osekkaiRequest<MapEventsResult>(`/map-events?offset=${offset}&limit=${limit}`),
   sources: () => osekkaiRequest<SourceStatusResult>('/sources'),
   syncSources: (force = false) =>
     osekkaiRequest<SourceStatusResult>('/sources', {

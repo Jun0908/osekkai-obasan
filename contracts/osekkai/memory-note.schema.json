@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/memory-note.schema.json",
+  "title": "MemoryNote",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "id", "kind", "userId", "origin", "referenceType", "referenceId", "evidenceIds",
+    "summary", "keywords", "confidence", "observedAt", "lastConfirmedAt", "retentionUntil"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "kind": { "type": "string", "enum": ["preference", "friction", "episode", "feedback", "community"] },
+    "userId": { "$ref": "common.schema.json#/$defs/uuid" },
+    "origin": { "type": "string", "enum": ["explicit", "inferred"] },
+    "referenceType": { "type": "string", "enum": ["conversation", "feedback", "attendance", "setting"] },
+    "referenceId": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "evidenceIds": {
+      "type": "array", "maxItems": 20, "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/uuid" }
+    },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 280 },
+    "keywords": {
+      "type": "array", "maxItems": 16, "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 80 }
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "observedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "lastConfirmedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "retentionUntil": { "$ref": "common.schema.json#/$defs/dateTime" }
+  }
+}

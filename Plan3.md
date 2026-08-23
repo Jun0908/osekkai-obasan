@@ -1,7 +1,8 @@
 # Plan 3 — LLM × Obsidianによる自然な「おかん会話」
 
-**Status:** 設計計画。未実装。  
+**Status:** 実装・自動検証・Live接続確認済み。
 **作成日:** 2026-08-23  
+**実装日:** 2026-08-23
 **対象:** `話す`の自然さ、長期記憶、文脈理解、返答生成  
 **前提:** `Plan2.md`で実装したCalendar、Routes、Live Event、Connection判定、Conversation Episode、Participation Friction、Safetyを維持する
 
@@ -9,9 +10,9 @@
 
 ## 1. 結論
 
-現在の`話す`は外部LLMを使用していません。Conversation Stateとキーワード分類に応じて、`agents-OpenClaw/scripts/osekkai_conversation.py`に書かれた固定文を返しています。そのため、同じStateへ戻ると同じ発話が繰り返され、過去の会話を覚えているような自然さが出ません。
+Plan3以前の`話す`は外部LLMを使用せず、Conversation Stateとキーワード分類に応じた固定文を返していました。現在は、安全判定後にLLMで自由発話を構造化し、既存Engineが候補と状態を決定し、Grounding済みDialogue PlanだけをLLMで自然な返答へ整えます。LLM停止時は同じState Machineの固定文へ戻るため、会話とDemoを継続できます。
 
-また、Active productの範囲には`.obsidian`またはObsidian Vaultを確認できていません。現在の記憶は`agents-OpenClaw/data/osekkai`配下のJSON Storeです。`archive/tomo-san/`は復旧用の隔離領域であり、この計画でも検索・import・実行対象にしません。既存Vaultが別の場所にある場合は、実装開始時に明示Pathを確認します。見つからない場合はOsekkai専用Vaultを新設します。
+既存のActive Vaultは確認できなかったため、Osekkai専用Vaultを`OSEKKAI_DATA_ROOT/obsidian-vault`へ新設する方針で実装しました。`OSEKKAI_VAULT_ROOT`で別Pathも指定できます。JSON StoreをPolicyの正本とし、Vaultは同意済みの短いエピソード記憶だけを保持します。
 
 実装では、LLMへCalendar判断やEvent選択を丸投げしません。
 
@@ -60,7 +61,7 @@ Judge Demoでは、次の会話が一続きで成立することを目標とし�
 
 ---
 
-## 3. 現在の問題
+## 3. 実装前の問題
 
 ### 3.1 固定文の反復
 
@@ -78,11 +79,11 @@ Judge Demoでは、次の会話が一続きで成立することを目標とし�
 
 ### 3.3 LLM接続境界がない
 
-現在のNext.js–Python bridgeは、意図的に`OPENAI_API_KEY`等をPython child processへ渡していません。LLM SDK、Provider Adapter、timeout、Schema検証、fallbackも未実装です。
+Plan3以前のNext.js–Python bridgeは、`OPENAI_API_KEY`等をPython child processへ渡さず、LLM Adapter、timeout、Schema検証、fallbackもありませんでした。現在は必要なLLM設定だけを明示allowlistでserver-side Pythonへ渡します。
 
 ### 3.4 Active Vaultがない
 
-現在のWorkspaceでは、Osekkaiが読み書きするObsidian Vaultを確認できません。Vaultの存在を前提にせず、Path確認または安全な新設を最初のTaskにします。
+既存のActive Vaultは確認できなかったため、Repositoryへ入らないOsekkai専用Vaultを既定のData Rootへ新設しました。任意のVaultへ変更する時だけ`OSEKKAI_VAULT_ROOT`を設定します。
 
 ---
 
@@ -183,7 +184,7 @@ LLM timeout、quota、malformed output、Grounding違反時は、現在の固定
 
 ### 5.1 Vaultの位置
 
-環境変数`OSEKKAI_VAULT_ROOT`でOsekkai専用Vaultを指定します。未設定時はVault連携を無効にし、JSON Storeだけで動作するようにします。
+環境変数`OSEKKAI_VAULT_ROOT`でOsekkai専用Vaultを指定できます。未設定時は`OSEKKAI_DATA_ROOT/obsidian-vault`を使います。Memory同意がない利用者にはNoteを作らず、検索にも使いません。
 
 VaultはRepositoryへcommitしません。`.gitignore`対象とし、API key、OAuth token、正確な現在地を置きません。
 
@@ -240,11 +241,11 @@ retentionUntil: "2026-11-21T10:00:00+09:00"
 
 ### 5.5 Retrieval
 
-検索は次のHybrid方式にします。
+検索は次の境界付きHybrid方式で実装しました。
 
 1. `userId / kind / retention / origin`のmetadata filter
 2. Category、Friction、Community IDの完全一致
-3. 必要な場合だけSemantic検索
+3. 日本語・英数tokenの一致（Embedding検索はDemo必須経路に入れず、後から置換可能）
 4. relevance、明示優先、更新日、confidenceで再順位付け
 5. 最大3〜5件、token上限内だけLLMへ渡す
 
@@ -328,7 +329,7 @@ LLM出力に根拠のないEvent claimが含まれた場合は再生成せず、
 
 PythonをLLM、Memory retrieval、Profile、Policy、Conversation Stateのownerとします。Next.jsに第二のLLM判断やMemory実装を作りません。
 
-追加予定Module:
+実装Module:
 
 ```text
 agents-OpenClaw/scripts/
@@ -347,7 +348,7 @@ contracts/osekkai/
   memory-retrieval-result.schema.json
 ```
 
-主な変更予定:
+主な変更:
 
 ```text
 agents-OpenClaw/scripts/osekkai_conversation.py
@@ -379,7 +380,7 @@ frontend/.env.example
 
 ### Gate 1 — 現状Baseline
 
-- [ ] **TASK-300: 会話反復BaselineとVault所在を確定する**
+- [x] **TASK-300: 会話反復BaselineとVault所在を確定する**
   - Active product内外で、ユーザーが想定するObsidian Vaultの明示Pathを確認
   - `archive/tomo-san/`は確認対象にしない。移植が必要な場合は別Taskとしてユーザーの許可を得る
   - 現在の主要会話20〜30本をfixture化
@@ -390,7 +391,7 @@ frontend/.env.example
 
 ### Gate 2 — Contract
 
-- [ ] **TASK-301: LLM UnderstandingとDialogue Plan Contractを作る**
+- [x] **TASK-301: LLM UnderstandingとDialogue Plan Contractを作る**
   - `ConversationUnderstanding`
   - `DialoguePlan`
   - `GeneratedReply`
@@ -404,7 +405,7 @@ frontend/.env.example
 
 ### Gate 3 — Provider Adapter
 
-- [ ] **TASK-302: Server-only LLM AdapterとFallbackを実装する**
+- [x] **TASK-302: Server-only LLM AdapterとFallbackを実装する**
   - Provider-neutral interfaceを作る
   - `OSEKKAI_LLM_PROVIDER`、`OSEKKAI_LLM_MODEL`、server-only API keyを扱う
   - timeout、quota、429、malformed JSON、Provider停止を分類
@@ -417,7 +418,7 @@ frontend/.env.example
 
 ### Gate 4 — Obsidian Memory
 
-- [ ] **TASK-303: Obsidian Vault Adapterを実装する**
+- [x] **TASK-303: Obsidian Vault Adapterを実装する**
   - 安全なPath解決と利用者Folder分離
   - YAML frontmatterをMemory Note Contractで検証
   - atomic write、lock、retention、個別削除、全削除
@@ -428,9 +429,9 @@ frontend/.env.example
     - Memory同意なしでNoteを作らない
     - token、API key、正確な現在地、Calendar予定内容を保存しない
 
-- [ ] **TASK-304: Relevant Memory Retrievalを実装する**
-  - metadata filter、完全一致、Semantic retrievalを段階実装
-  - Semantic IndexはVaultから再生成可能にする
+- [x] **TASK-304: Relevant Memory Retrievalを実装する**
+  - metadata filter、完全一致、token relevanceを段階実装
+  - 外部Embeddingや第二の永続IndexをDemo必須経路に置かず、Vaultから毎回再現できる検索にする
   - 明示優先、confidence、更新日、関連度で最大3〜5件を返す
   - 削除・retentionをIndexへ伝播
   - 完了条件:
@@ -440,7 +441,7 @@ frontend/.env.example
 
 ### Gate 5 — Conversation Integration
 
-- [ ] **TASK-305: 自由発話をLLM Understandingへ接続する**
+- [x] **TASK-305: 自由発話をLLM Understandingへ接続する**
   - Safety Gate後にLLMを呼ぶ
   - Attraction、Participation Friction、intent、明示拒否を構造化
   - 明示回答を推定で上書きしない
@@ -451,7 +452,7 @@ frontend/.env.example
     - 好みと参加障壁を別々に抽出する
     - `覚えないで`、`もう誘わないで`を最優先する
 
-- [ ] **TASK-306: 固定replyをDialogue Plan + LLM Rendererへ置き換える**
+- [x] **TASK-306: 固定replyをDialogue Plan + LLM Rendererへ置き換える**
   - State MachineがDialogue Planを作る
   - Rendererへ直近文脈、関連Memory、許可されたEvent事実だけを渡す
   - 反復防止、Tone、質問1件上限を適用
@@ -464,7 +465,7 @@ frontend/.env.example
 
 ### Gate 6 — Memory Learning Loop
 
-- [ ] **TASK-307: 会話・拒否・Check-inをObsidian Memoryへ接続する**
+- [x] **TASK-307: 会話・拒否・Check-inをObsidian Memoryへ接続する**
   - 好み、Friction、参加選択、Check-inを短いMemory Noteへ変換
   - raw transcriptではなく必要最小限の要約を基本とする
   - Community再参加や過去のよかった点を次の会話へ戻す
@@ -476,7 +477,7 @@ frontend/.env.example
 
 ### Gate 7 — UI・Latency
 
-- [ ] **TASK-308: LLM会話の待ち時間と失敗表示を整える**
+- [x] **TASK-308: LLM会話の待ち時間と失敗表示を整える**
   - 既存typing indicatorをLLM処理へ接続
   - timeout時に技術Errorを露出せずFallback会話を続ける
   - 二重送信を防止
@@ -487,7 +488,7 @@ frontend/.env.example
 
 ### Gate 8 — Evaluation
 
-- [ ] **TASK-309: Conversation Quality Evaluationを作る**
+- [x] **TASK-309: Conversation Quality Evaluationを作る**
   - 自由表現、曖昧表現、複数理由、拒否、再開、Check-inのfixture
   - 指標:
     - 同一文反復率
@@ -505,7 +506,7 @@ frontend/.env.example
 
 ### Gate 9 — Judge Demo
 
-- [ ] **TASK-310: LLM × Obsidianの60秒Demoを通す**
+- [x] **TASK-310: LLM × Obsidianの60秒Demoを通す**
   - Google Calendar接続済みDemo accountを使用
   - Live Event、Google Routes、関連Memoryを使用
   - シナリオ:
@@ -568,12 +569,13 @@ frontend/.env.example
 
 ## 12. 実装時に必要な設定
 
-実装時に追加する候補です。値はRepositoryへcommitしません。
+実装済みの設定です。値はRepositoryへcommitしません。`OPENAI_API_KEY`があればLLMは自動で有効になり、明示的に止める時だけ`OSEKKAI_LLM_ENABLED=false`を指定します。
 
 ```dotenv
-OSEKKAI_LLM_ENABLED=false
-OSEKKAI_LLM_PROVIDER=
-OSEKKAI_LLM_MODEL=
+OSEKKAI_LLM_ENABLED=true
+OSEKKAI_LLM_PROVIDER=openai
+OSEKKAI_LLM_MODEL=gpt-5.4-mini
+OSEKKAI_LLM_TIMEOUT_SECONDS=7
 OPENAI_API_KEY=
 OSEKKAI_VAULT_ROOT=
 OSEKKAI_MEMORY_SEMANTIC_SEARCH=false
@@ -596,3 +598,37 @@ Provider固有値をFrontendへ渡しません。`OPENAI_API_KEY`等はPython ch
 5. 根拠のない発言を止めるGrounding Guard
 
 これにより、Calendar、Routes、実Event、安全性を維持したまま、「話すほど相手のことが分かり、同じことを繰り返さないおかん」へ進化させます。
+
+---
+
+## 14. 実装・検証記録
+
+### 実装結果
+
+- OpenAI Responses APIをserver-onlyで接続し、`store: false`、strict structured output、timeout、bounded retry、決定論的Fallbackを実装
+- Safety GateをLLMより前に維持し、LLMへはFreeBusy集計、関連Memory、採用済みEvent事実だけを渡す
+- `preference / friction / episode / feedback`を利用者別Markdown Noteとしてatomic writeし、同意OFF、個別削除、全削除、retentionへ接続
+- 同じTurnの好みと参加障壁を同時に順位付けへ反映し、質問上限、必須事実、根拠のない数値・Event claim、直前返答の完全反復をGuard
+- おかんToneは標準語を基本とし、作った関西弁や攻撃的な決めつけを生成しない
+- `/osekkai/demo`はLive経路から分離し、実Event snapshot 3件、記録済みRoutes、合成FreeBusy、決定論的会話で、参加障壁による順位変更からCheck-in後のMemory更新までを約45秒で再現
+- Judge DemoはRuntime API callを0件とし、Provider、Python、Calendar、Routes、LLMが停止しても完走できる静的Routeとしてproduction buildで確認
+
+### 2026-08-23の確認値
+
+- 実LLM Understanding: 自由文から好みCategoryと複数Frictionを構造化（約2.2秒）
+- 実LLM Renderer: Dialogue PlanからGrounding済み返答を生成（約1.7秒）
+- Web実経路: Next.js → Python → 実LLM → Grounding済み返答がHTTP 200（約4.1秒）。Memory OFF時に永続化されないことも確認
+- Conversation評価: 完全反復率`1.0 → 0.0`、既回答再質問`2 → 0`、関連Memory利用率`1.0`、unsupported claim`0`、Safety / Consent違反`0`
+- Live data: 239 Event、Connection適格91件、推薦可能7件、Routes実測8件
+- Source状態: 文京区公式CSV 1件は外部URLの取得失敗を明示し、そのEventをLive PUSHへ混ぜずに他Sourceを継続
+- Google Calendar: 接続済み利用者1件でFreeBusy成功とFree Windowを確認
+- Judge経路: `好み → 複数候補 → 自由文Friction → 一度だけ調整 → 選択 → Check-in → 次回Memory`を統合テストで完走
+- LLM OFF、timeout、quota、malformed outputでも固定文Fallbackで完走
+
+### 検証結果
+
+- Python: 168 tests passed、33 schemas / 21 instances validated
+- Frontend: 92 tests passed、typecheck / lint / production build成功
+- Production buildで`/osekkai/demo`がStatic Routeとしてprerenderされ、Backend失敗を強制したcomponent testでもRuntime API callなしで全Sceneを完走
+- `http://127.0.0.1:3000/osekkai/chat`のHTTP 200を確認
+- この実行環境では操作可能Browser runtimeが提供されなかったため、見た目を含む手動60秒リハーサルだけはDemo当日のBrowserで行う。これは実装未完了ではなく運用前確認として扱う

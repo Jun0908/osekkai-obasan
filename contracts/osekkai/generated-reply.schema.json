@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/generated-reply.schema.json",
+  "title": "GeneratedReply",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "text", "usedEventIds", "usedMemoryIds", "questionCount"],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "text": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "usedEventIds": {
+      "type": "array", "maxItems": 3, "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+    },
+    "usedMemoryIds": {
+      "type": "array", "maxItems": 5, "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/uuid" }
+    },
+    "questionCount": { "type": "integer", "minimum": 0, "maximum": 1 }
+  }
+}

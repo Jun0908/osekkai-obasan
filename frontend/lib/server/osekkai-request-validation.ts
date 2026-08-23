@@ -4,6 +4,7 @@ import {
   validateCalendarCallbackRequest,
   validateDecideRequest,
   validateEventRouteRequest,
+  validateMapEventsQuery,
   validateDemoResetRequest,
   validateFeedbackRequest,
   validateInterventionRecordRequest,
@@ -99,6 +100,8 @@ export function validateOsekkaiCommandPayload(
       return acceptGenerated(validateCalendarCallbackRequest(payload), payload, requestId);
     case OSEKKAI_COMMANDS.eventRoute:
       return acceptGenerated(validateEventRouteRequest(payload), payload, requestId);
+    case OSEKKAI_COMMANDS.mapEvents:
+      return acceptGenerated(validateMapEventsQuery(payload), payload, requestId);
     case OSEKKAI_COMMANDS.sourcesSync: {
       const keys = Object.keys(payload);
       const validKeys = keys.every((key) => key === 'force' || key === 'sourceIds');

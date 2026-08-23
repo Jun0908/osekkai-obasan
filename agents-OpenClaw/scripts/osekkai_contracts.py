@@ -42,6 +42,7 @@ COMMANDS = {
     "sources-sync",
     "sources-status",
     "events",
+    "map-events",
     "event-route",
 }
 
@@ -225,6 +226,7 @@ def validate_command_payload(command: str, payload: dict[str, Any]) -> dict[str,
         "demo-reset": "demo-reset-request.schema.json",
         "calendar-callback": "calendar-callback-request.schema.json",
         "event-route": "event-route-request.schema.json",
+        "map-events": "map-events-query.schema.json",
     }
     schema_name = schema_by_command.get(command)
     if command == "interventions" and payload.get("action") == "record":
@@ -563,6 +565,8 @@ def validate_runtime_result(command: str, data: Any) -> Any:
         for event in obj["events"]:
             validate_schema(event, "event.schema.json")
         return data
+    if command == "map-events":
+        return validate_schema(data, "map-events-result.schema.json")
     if command == "event-route":
         return validate_schema(data, "event-route-result.schema.json")
     return data
@@ -610,6 +614,22 @@ def _validate_all() -> dict[str, int]:
     validate_decision(live_fixture["decision"])
     validate_episode(live_fixture["episode"])
     validated += 2
+    judge_demo_path = Path(__file__).resolve().parents[1] / "fixtures" / "osekkai" / "judge-demo-scenario.json"
+    judge_demo = json.loads(judge_demo_path.read_text(encoding="utf-8"))
+    validate_schema(judge_demo, "judge-demo-scenario.schema.json")
+    validated += 1
+    from osekkai_map_events import build_map_events_result
+    map_result = build_map_events_result(
+        {
+            "generatedAt": live_fixture["events"][0]["fetchedAt"],
+            "events": live_fixture["events"],
+            "connectionEvidence": live_fixture["connectionEvidence"],
+        },
+        {"scope": "chiyoda_kojimachi", "offset": 0, "limit": 250},
+        opportunities={"opportunities": live_fixture["opportunities"]},
+    )
+    validate_schema(map_result, "map-events-result.schema.json")
+    validated += 1
     with tempfile.TemporaryDirectory() as directory:
         store = JsonStore(directory)
         with store.user_lock(user_id):

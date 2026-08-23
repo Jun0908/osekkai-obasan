@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/dialogue-plan.schema.json",
+  "title": "DialoguePlan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "dialogueAct", "goal", "mustMention", "allowedEventIds",
+    "allowedEventFacts", "relevantMemoryIds", "prohibitedClaims", "questionBudget",
+    "tone", "fallbackReply"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "dialogueAct": {
+      "type": "string",
+      "enum": [
+        "learn_preference", "clarify", "present_shortlist", "probe_friction",
+        "present_adjusted_shortlist", "confirm_selection", "check_in", "cooldown",
+        "safety_handoff", "continue_conversation"
+      ]
+    },
+    "goal": { "type": "string", "minLength": 1, "maxLength": 240 },
+    "mustMention": {
+      "type": "array", "maxItems": 6, "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 240 }
+    },
+    "allowedEventIds": {
+      "type": "array", "maxItems": 3, "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+    },
+    "allowedEventFacts": {
+      "type": "array", "maxItems": 30, "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 300 }
+    },
+    "relevantMemoryIds": {
+      "type": "array", "maxItems": 5, "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/uuid" }
+    },
+    "prohibitedClaims": {
+      "type": "array", "maxItems": 12, "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 120 }
+    },
+    "questionBudget": { "type": "integer", "minimum": 0, "maximum": 1 },
+    "tone": { "type": "string", "enum": ["casual_gentle", "quiet", "direct_gentle"] },
+    "fallbackReply": { "type": "string", "minLength": 1, "maxLength": 2000 }
+  }
+}

@@ -12,6 +12,7 @@ import {
   validateFreeBusyResult,
   validateInterventionsResult,
   validateMetricsResult,
+  validateMapEventsResult,
   validateOpportunitiesResult,
   validateProfileDeleteResponse,
   validateRecordOutcomeResponse,
@@ -114,35 +115,38 @@ function assertValid<T>(result: ValidationResult<T>): T {
 }
 
 function validatePayload<T>(path: string, method: string, value: unknown): T {
+  const routePath = path.split('?', 1)[0];
   let result: ValidationResult<unknown> | undefined;
-  if (path === '/profile') {
+  if (routePath === '/profile') {
     result = method === 'DELETE' ? validateProfileDeleteResponse(value) : validateDistanceProfile(value);
-  } else if (path === '/chat' && method === 'POST') {
+  } else if (routePath === '/chat' && method === 'POST') {
     result = validateChatResult(value);
-  } else if (path === '/freebusy') {
+  } else if (routePath === '/freebusy') {
     result = validateFreeBusyResult(value);
-  } else if (path === '/opportunities') {
+  } else if (routePath === '/opportunities') {
     result = validateOpportunitiesResult(value);
-  } else if (path === '/decide') {
+  } else if (routePath === '/decide') {
     result = validateDecideResponse(value);
-  } else if (path === '/interventions') {
+  } else if (routePath === '/interventions') {
     result = method === 'GET' ? validateInterventionsResult(value) : validateRecordOutcomeResponse(value);
-  } else if (path === '/feedback') {
+  } else if (routePath === '/feedback') {
     result = validateFeedbackResponse(value);
-  } else if (path === '/metrics') {
+  } else if (routePath === '/metrics') {
     result = validateMetricsResult(value);
-  } else if (path === '/demo/reset') {
+  } else if (routePath === '/demo/reset') {
     result = validateDemoResetResponse(value);
-  } else if (path === '/sources') {
+  } else if (routePath === '/sources') {
     const valid = isObject(value) && value.schemaVersion === '1.0' && value.dataMode === 'live' &&
       typeof value.generatedAt === 'string' && Array.isArray(value.sources) && isObject(value.counts);
     if (!valid) throw invalidResponse();
-  } else if (path === '/events') {
+  } else if (routePath === '/events') {
     const valid = isObject(value) && value.schemaVersion === '1.0' && value.dataMode === 'live' &&
       typeof value.generatedAt === 'string' && Array.isArray(value.events) &&
       value.events.every((event) => validateLiveEvent(event).valid);
     if (!valid) throw invalidResponse();
-  } else if (path === '/routes') {
+  } else if (routePath === '/map-events') {
+    result = validateMapEventsResult(value);
+  } else if (routePath === '/routes') {
     result = validateEventRouteResult(value);
   }
   return result ? (assertValid(result) as T) : (value as T);

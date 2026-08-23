@@ -1,0 +1,38 @@
+{
+  "scenarioCoverage": [
+    "free_expression",
+    "ambiguous_expression",
+    "multiple_frictions",
+    "rejection",
+    "reopen_after_cooldown",
+    "check_in"
+  ],
+  "baselineTurns": [
+    {"role": "assistant", "text": "あんた、何が好きなのよ。最近やってみたいこと、ひとつ教えて。", "questionKey": "interest"},
+    {"role": "user", "text": "ボルダリングが好き", "answeredQuestionKeys": ["interest"]},
+    {"role": "assistant", "text": "あんた、何が好きなのよ。最近やってみたいこと、ひとつ教えて。", "questionKey": "interest"},
+    {"role": "assistant", "text": "あんた、何が好きなのよ。最近やってみたいこと、ひとつ教えて。", "questionKey": "interest"}
+  ],
+  "candidateTurns": [
+    {"role": "assistant", "text": "最近やってみたいこと、ひとつ聞かせて。", "questionKey": "interest"},
+    {"role": "user", "text": "ボルダリングが好き", "answeredQuestionKeys": ["interest"]},
+    {
+      "role": "assistant",
+      "text": "ボルダリングの話、覚えてるよ。初参加で何がいちばん気になる？",
+      "questionKey": "first_time_friction",
+      "allowedMemoryIds": ["33333333-3333-4333-8333-333333333333"],
+      "expectedMemoryIds": ["33333333-3333-4333-8333-333333333333"],
+      "usedMemoryIds": ["33333333-3333-4333-8333-333333333333"],
+      "unsupportedClaims": []
+    },
+    {"role": "user", "text": "常連ばかりの大人数だと入りにくい", "answeredQuestionKeys": ["first_time_friction"]},
+    {
+      "role": "assistant",
+      "text": "大人数がひっかかるんだね。少人数の根拠が確認できる候補だけ見直すよ。",
+      "allowedMemoryIds": [],
+      "expectedMemoryIds": [],
+      "usedMemoryIds": [],
+      "unsupportedClaims": []
+    }
+  ]
+}

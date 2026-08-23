@@ -11,6 +11,7 @@ import {
   validateInterventionEpisode,
   validateInterventionsResult,
   validateMetricsResult,
+  validateMapEventsResult,
   validateOpportunitiesResult,
   validateProfileDeleteResponse,
   validateRecordOutcomeResponse,
@@ -172,6 +173,8 @@ function resultForCommand(
       return validateSourceStatusResult(value);
     case OSEKKAI_COMMANDS.events:
       return validateEventMeshResult(value);
+    case OSEKKAI_COMMANDS.mapEvents:
+      return validateMapEventsResult(value);
     case OSEKKAI_COMMANDS.eventRoute:
       return validateEventRouteResult(value);
   }

@@ -114,6 +114,13 @@ export function getOsekkaiEvents<T = unknown>(userId: string): Promise<OsekkaiCo
   return invokeOsekkaiCommand<T>({ command: OSEKKAI_COMMANDS.events, userId });
 }
 
+export function getOsekkaiMapEvents<T = unknown>(
+  userId: string,
+  payload: JsonObject,
+): Promise<OsekkaiCommandResult<T>> {
+  return invokeOsekkaiCommand<T>({ command: OSEKKAI_COMMANDS.mapEvents, userId, payload });
+}
+
 export function getOsekkaiEventRoute<T = unknown>(
   userId: string,
   payload: JsonObject,

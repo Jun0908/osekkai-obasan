@@ -23,6 +23,7 @@ import {
   disconnectGoogleCalendar,
   getOsekkaiFreebusy,
   getOsekkaiEvents,
+  getOsekkaiMapEvents,
   getOsekkaiEventRoute,
   getOsekkaiInterventions,
   getOsekkaiOpportunities,
@@ -341,6 +342,28 @@ export function eventsGet(request: Request) {
     assertSafeGetRequest(request);
     const session = await getOrCreateOsekkaiSession();
     const result = await getOsekkaiEvents(session.userId);
+    return osekkaiSuccess(result.data, result.requestId);
+  });
+}
+
+export function mapEventsGet(request: Request) {
+  return withOsekkaiErrors(async () => {
+    assertSafeGetRequest(request);
+    const params = new URL(request.url).searchParams;
+    if (Array.from(params.keys()).some((key) => key !== 'offset' && key !== 'limit')) {
+      throw new OsekkaiHttpError('VALIDATION_ERROR', '地図の取得条件を確認してください。', 400);
+    }
+    const offsetText = params.get('offset') ?? '0';
+    const limitText = params.get('limit') ?? '250';
+    if (!/^\d{1,5}$/.test(offsetText) || !/^\d{1,3}$/.test(limitText)) {
+      throw new OsekkaiHttpError('VALIDATION_ERROR', '地図の取得条件を確認してください。', 400);
+    }
+    const session = await getOrCreateOsekkaiSession();
+    const result = await getOsekkaiMapEvents(session.userId, {
+      scope: 'chiyoda_kojimachi',
+      offset: Number(offsetText),
+      limit: Number(limitText),
+    });
     return osekkaiSuccess(result.data, result.requestId);
   });
 }

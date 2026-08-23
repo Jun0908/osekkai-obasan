@@ -7,6 +7,14 @@ freeWindow: FreeWindow
 evidence: Evidence
 source: Source
 rankedOpportunity: RankedOpportunity
+mapEvent: MapEvent
+judgeDemoPersona: Persona
+judgeDemoFreeWindow: FreeWindow1
+judgeDemoStoryChoice: StoryChoice
+judgeDemoStoryStep: StoryStep
+judgeDemoStory: Story
+judgeDemoEvent: DemoEvent
+judgeDemoDataNote: DataNote
 }
 export interface InferredPreference {
 value: any
@@ -75,6 +83,142 @@ code: ("connection" | "continuity" | "solo_friendly" | "personal_fit" | "adjacen
 text: string
 evidenceUrl: (string | null)
 classification: ("raw_open_data" | "live_provider" | "ai_derived" | "organizer_verified" | "private_user_data" | "synthetic_demo")
+}
+export interface MapEvent {
+id: string
+title: string
+startsAt: string
+endsAt: string
+venueName: (string | null)
+address: (string | null)
+latitude: number
+longitude: number
+status: ("scheduled" | "canceled" | "sold_out" | "registration_closed" | "ended" | "unknown")
+registrationStatus: ("open" | "waitlist" | "sold_out" | "closed" | "not_required" | "unknown")
+capacity: (number | null)
+participants: (number | null)
+priceYen: (number | null)
+categories: string[]
+provider: string
+sourceUrl: string
+sourceClassification: ("raw_open_data" | "live_provider" | "ai_derived" | "organizer_verified" | "private_user_data" | "synthetic_demo")
+revalidatedAt: string
+seriesId: (string | null)
+opportunityId: (string | null)
+travelMinutes: (number | null)
+connectionEvidence: (ConnectionEvidence | null)
+}
+export interface ConnectionEvidence {
+schemaVersion: "1.0"
+eventId: string
+connectionLevel: number
+soloFriendly: ("yes" | "no" | "unknown")
+beginnerFriendly: ("yes" | "no" | "unknown")
+recurring: ("yes" | "no" | "unknown")
+structuredConversation: ("yes" | "no" | "unknown")
+sharedMeal: ("yes" | "no" | "unknown")
+groupWork: ("yes" | "no" | "unknown")
+roleAvailable: ("yes" | "no" | "unknown")
+futureOccurrenceCount: number
+solicitationRisk: ("low" | "medium" | "high" | "unknown")
+/**
+ * @minItems 1
+ */
+evidence: [Evidence, ...(Evidence)[]]
+model: {
+method: ("rules" | "ai" | "organizer_verified")
+version: string
+confidence: number
+}
+evaluatedAt: string
+}
+export interface Persona {
+/**
+ * @minItems 1
+ * @maxItems 5
+ */
+rememberedPreferences: [string]|[string, string]|[string, string, string]|[string, string, string, string]|[string, string, string, string, string]
+memorySummary: string
+}
+export interface FreeWindow1 {
+label: string
+start: string
+end: string
+classification: "synthetic_demo"
+}
+export interface StoryChoice {
+id: string
+label: string
+userMessage: (string | null)
+agentReply: string
+understandingLabel: (string | null)
+/**
+ * @maxItems 3
+ */
+eventOrder: []|[string]|[string, string]|[string, string, string]
+selectFirstEvent: boolean
+timeJumpLabel: (string | null)
+memoryOutcome: (string | null)
+}
+export interface StoryStep {
+id: string
+/**
+ * @minItems 1
+ * @maxItems 3
+ */
+choices: [StoryChoice]|[StoryChoice, StoryChoice]|[StoryChoice, StoryChoice, StoryChoice]
+}
+export interface Story {
+id: string
+storyNumber: number
+kind: ("preference_discovery" | "respectful_hold" | "continuity_followup")
+kicker: string
+title: string
+summary: string
+judgePoint: string
+calendarLabel: string
+persona: Persona
+/**
+ * @minItems 1
+ * @maxItems 3
+ */
+freeWindows: [FreeWindow1]|[FreeWindow1, FreeWindow1]|[FreeWindow1, FreeWindow1, FreeWindow1]
+openingReply: string
+/**
+ * @minItems 2
+ * @maxItems 5
+ */
+steps: [StoryStep, StoryStep]|[StoryStep, StoryStep, StoryStep]|[StoryStep, StoryStep, StoryStep, StoryStep]|[StoryStep, StoryStep, StoryStep, StoryStep, StoryStep]
+candidateTitle: string
+candidateEmptyTitle: string
+candidateEmptyDetail: string
+closingLine: string
+}
+export interface DemoEvent {
+id: string
+title: string
+startsAt: string
+endsAt: string
+providerLabel: string
+sourceUrl: string
+sourceCapturedAt: string
+areaLabel: string
+priceLabel: string
+fitReason: string
+adjustedReason: string
+connectionLabel: string
+connectionEvidence: string
+route: ({
+mode: ("walk" | "transit")
+minutes: number
+recordedAt: string
+classification: "recorded_live"
+} | null)
+}
+export interface DataNote {
+label: string
+classification: ("recorded_source_snapshot" | "recorded_live" | "synthetic_demo" | "deterministic_replay")
+detail: string
 }
 
 export interface DistanceProfile {
@@ -273,6 +417,109 @@ selectedOpportunityId: (string | null)
 checkInDueAt: (string | null)
 canSendMessage: boolean
 notice: (string | null)
+}
+
+export interface ConversationUnderstanding {
+schemaVersion: "1.0"
+intent: ("share_interest" | "share_friction" | "reject" | "accept" | "check_in" | "pause" | "do_not_remember" | "ask_question" | "general")
+/**
+ * @maxItems 8
+ */
+attractions: []|[string]|[string, string]|[string, string, string]|[string, string, string, string]|[string, string, string, string, string]|[string, string, string, string, string, string]|[string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string]
+/**
+ * @maxItems 6
+ */
+categoryHints: []|[("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア")]|[("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア"), ("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア")]|[("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア"), ("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア"), ("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア")]|[("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア"), ("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア"), ("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア"), ("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア")]|[("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア"), ("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア"), ("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア"), ("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア"), ("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア")]|[("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア"), ("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア"), ("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア"), ("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア"), ("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア"), ("ダンス・健康" | "趣味・実用" | "音楽・演劇" | "文学・歴史" | "国際理解・語学" | "区民参加・ボランティア")]
+/**
+ * @maxItems 6
+ */
+participationFrictions: []|[("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today")]|[("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today"), ("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today")]|[("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today"), ("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today"), ("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today")]|[("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today"), ("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today"), ("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today"), ("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today")]|[("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today"), ("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today"), ("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today"), ("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today"), ("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today")]|[("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today"), ("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today"), ("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today"), ("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today"), ("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today"), ("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today")]
+explicitness: ("explicit" | "inferred" | "unknown")
+confidence: number
+needsClarification: boolean
+/**
+ * @maxItems 5
+ */
+suggestedMemoryReferences: []|[string]|[string, string]|[string, string, string]|[string, string, string, string]|[string, string, string, string, string]
+doNotRemember: boolean
+doNotPush: boolean
+}
+
+export interface DialoguePlan {
+schemaVersion: "1.0"
+dialogueAct: ("learn_preference" | "clarify" | "present_shortlist" | "probe_friction" | "present_adjusted_shortlist" | "confirm_selection" | "check_in" | "cooldown" | "safety_handoff" | "continue_conversation")
+goal: string
+/**
+ * @maxItems 6
+ */
+mustMention: []|[string]|[string, string]|[string, string, string]|[string, string, string, string]|[string, string, string, string, string]|[string, string, string, string, string, string]
+/**
+ * @maxItems 3
+ */
+allowedEventIds: []|[string]|[string, string]|[string, string, string]
+/**
+ * @maxItems 30
+ */
+allowedEventFacts: string[]
+/**
+ * @maxItems 5
+ */
+relevantMemoryIds: []|[string]|[string, string]|[string, string, string]|[string, string, string, string]|[string, string, string, string, string]
+/**
+ * @maxItems 12
+ */
+prohibitedClaims: []|[string]|[string, string]|[string, string, string]|[string, string, string, string]|[string, string, string, string, string]|[string, string, string, string, string, string]|[string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string]
+questionBudget: number
+tone: ("casual_gentle" | "quiet" | "direct_gentle")
+fallbackReply: string
+}
+
+export interface GeneratedReply {
+schemaVersion: "1.0"
+text: string
+/**
+ * @maxItems 3
+ */
+usedEventIds: []|[string]|[string, string]|[string, string, string]
+/**
+ * @maxItems 5
+ */
+usedMemoryIds: []|[string]|[string, string]|[string, string, string]|[string, string, string, string]|[string, string, string, string, string]
+questionCount: number
+}
+
+export interface MemoryNote {
+schemaVersion: "1.0"
+id: string
+kind: ("preference" | "friction" | "episode" | "feedback" | "community")
+userId: string
+origin: ("explicit" | "inferred")
+referenceType: ("conversation" | "feedback" | "attendance" | "setting")
+referenceId: string
+/**
+ * @maxItems 20
+ */
+evidenceIds: []|[string]|[string, string]|[string, string, string]|[string, string, string, string]|[string, string, string, string, string]|[string, string, string, string, string, string]|[string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]
+summary: string
+/**
+ * @maxItems 16
+ */
+keywords: []|[string]|[string, string]|[string, string, string]|[string, string, string, string]|[string, string, string, string, string]|[string, string, string, string, string, string]|[string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]|[string, string, string, string, string, string, string, string, string, string, string, string, string, string, string, string]
+confidence: number
+observedAt: string
+lastConfirmedAt: string
+retentionUntil: string
+}
+
+export interface MemoryRetrievalResult {
+schemaVersion: "1.0"
+userId: string
+query: string
+/**
+ * @maxItems 5
+ */
+notes: []|[MemoryNote]|[MemoryNote, MemoryNote]|[MemoryNote, MemoryNote, MemoryNote]|[MemoryNote, MemoryNote, MemoryNote, MemoryNote]|[MemoryNote, MemoryNote, MemoryNote, MemoryNote, MemoryNote]
+generatedAt: string
 }
 
 export interface ChatResult {
@@ -676,6 +923,61 @@ latitude: number
 longitude: number
 }
 
+export interface JudgeDemoScenario {
+schemaVersion: "1.0"
+scenarioSetId: string
+capturedAt: string
+snapshotNotice: string
+/**
+ * @minItems 4
+ * @maxItems 8
+ */
+events: [DemoEvent, DemoEvent, DemoEvent, DemoEvent]|[DemoEvent, DemoEvent, DemoEvent, DemoEvent, DemoEvent]|[DemoEvent, DemoEvent, DemoEvent, DemoEvent, DemoEvent, DemoEvent]|[DemoEvent, DemoEvent, DemoEvent, DemoEvent, DemoEvent, DemoEvent, DemoEvent]|[DemoEvent, DemoEvent, DemoEvent, DemoEvent, DemoEvent, DemoEvent, DemoEvent, DemoEvent]
+/**
+ * @minItems 3
+ * @maxItems 3
+ */
+stories: [Story, Story, Story]
+/**
+ * @minItems 4
+ * @maxItems 6
+ */
+dataNotes: [DataNote, DataNote, DataNote, DataNote]|[DataNote, DataNote, DataNote, DataNote, DataNote]|[DataNote, DataNote, DataNote, DataNote, DataNote, DataNote]
+}
+
+export interface MapEventsQuery {
+scope: "chiyoda_kojimachi"
+offset: number
+limit: number
+}
+
+export interface MapEventsResult {
+schemaVersion: "1.0"
+dataMode: "live"
+generatedAt: string
+scope: {
+id: "chiyoda_kojimachi"
+ward: "千代田区"
+center: {
+latitude: number
+longitude: number
+}
+zoom: number
+}
+/**
+ * @maxItems 250
+ */
+events: MapEvent[]
+counts: {
+totalInMesh: number
+inWard: number
+withCoordinates: number
+missingCoordinates: number
+returned: number
+}
+nextOffset: (number | null)
+}
+
 export type SchemaVersion = "1.0";
 export type DataMode = "demo" | "live";
 export type MetricClassification = "measured" | "reference_estimate" | "demo" | "unverified";
@@ -699,3 +1001,4 @@ export type EpisodeNotification = NonNullable<InterventionEpisode['notification'
 export type SelectedFreeWindow = NonNullable<InterventionEpisode['freeWindowSnapshot']>;
 export type Metric = MetricsResult['metrics'][number];
 export type UnverifiedMetric = MetricsResult['unverifiedMetrics'][number];
+export type MapEventSummary = MapEventsResult['events'][number];

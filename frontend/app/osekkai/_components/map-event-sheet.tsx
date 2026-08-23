@@ -1,4 +1,4 @@
-import type { ConnectionEvidence, EventRouteResult, LiveEvent, RankedOpportunity } from '@/lib/osekkai/types.generated';
+import type { ConnectionEvidence, EventRouteResult, MapEventSummary, RankedOpportunity } from '@/lib/osekkai/types.generated';
 import ConnectionEvidenceView from './connection-evidence';
 import styles from '../osekkai.module.css';
 
@@ -18,7 +18,7 @@ export default function MapEventSheet({
   onRoute,
   onClose,
 }: {
-  event: LiveEvent;
+  event: MapEventSummary;
   evidence?: ConnectionEvidence;
   ranking?: RankedOpportunity;
   route?: EventRouteResult;
@@ -63,9 +63,6 @@ export default function MapEventSheet({
       <div className={styles.mapSheetSources}>
         <strong>Source</strong>
         <a href={event.sourceUrl} target="_blank" rel="noreferrer">{event.provider} ↗</a>
-        {(event.sourceLinks ?? []).map((source) => (
-          <a href={source.sourceUrl} target="_blank" rel="noreferrer" key={`${source.provider}-${source.sourceRecordId}`}>{source.provider} ↗</a>
-        ))}
         <time dateTime={event.revalidatedAt}>最終確認 {dateLabel(event.revalidatedAt)}</time>
       </div>
       {disabled ? <button className={styles.mapDisabledCta} type="button" disabled>現在は申込できません</button> : <a className={styles.primaryCardAction} href={event.sourceUrl} target="_blank" rel="noreferrer">公式ページで確認 ↗</a>}

@@ -352,7 +352,7 @@ def start_user_episode_unlocked(
         )
     state = episode["state"]
     if state == "check_in_due":
-        reply = "この前のイベント、どうやった？ また行ってもええ感じやった？"
+        reply = "この前のイベント、どうだった？ また行ってもよさそうだった？"
         return {
             "episode": episode,
             "reply": reply,
@@ -362,7 +362,7 @@ def start_user_episode_unlocked(
         recommendations = _stored_recommendations(episode, data_mode)
         return {
             "episode": episode,
-            "reply": "さっきの候補、ここから続けられるわよ。どれなら行けそう？",
+            "reply": "さっきの候補は覚えてるよ。どれなら行けそう？",
             "context": _basic_context(
                 episode,
                 recommendations=recommendations,
@@ -378,13 +378,13 @@ def start_user_episode_unlocked(
     if state == "accepted":
         return {
             "episode": episode,
-            "reply": "よし。行ってみて、終わった頃に一言だけ聞くわね。",
+            "reply": "よし。行ってみて、終わった頃に一言だけ聞くね。",
             "context": _basic_context(episode),
         }
     if state == "cooldown":
         return {
             "episode": episode,
-            "reply": "今日はここまででええよ。次に話したくなった時に呼んで。",
+            "reply": "今日はここまでで大丈夫。次に話したくなった時に呼んで。",
             "context": _basic_context(episode, quick_replies=[]),
         }
     if state == "safety_handoff":
@@ -395,9 +395,9 @@ def start_user_episode_unlocked(
         }
     known = profile.get("preferredCategories", [])
     if known:
-        reply = "前に話してた好み、覚えてるで。今日はどんな感じの集まりなら行けそう？"
+        reply = "前に話してた好み、覚えてるよ。今日はどんな集まりなら行けそう？"
     else:
-        reply = "あんた、何が好きなのよ。最近やってみたいこと、ひとつ教えて。"
+        reply = "まず、最近ちょっと気になってることを一つ聞かせて。"
     return {"episode": episode, "reply": reply, "context": _basic_context(episode)}
 
 
@@ -463,7 +463,7 @@ def start_calendar_sparse_episode_unlocked(
     )
     return {
         "episode": episode,
-        "reply": "来週、長めの空きがいくつかあるやろ。予定の中身は見てへんで。その時間に収まる集まり、ちゃんとSourceを確認して持ってきたわ。",
+        "reply": "来週、長めの空きがいくつかあるね。予定の中身は見てないよ。その時間に収まる集まりを、情報源まで確認して持ってきたよ。",
         "context": _basic_context(
             episode,
             recommendations=recommendations,
@@ -527,6 +527,10 @@ def handle_conversation_message_unlocked(
     *,
     remember: bool,
     attraction_changed: bool,
+    attraction_label: str | None = None,
+    understood_frictions: list[str] | None = None,
+    friction_origin: str = "explicit",
+    friction_confidence: float = 1.0,
 ) -> dict[str, Any]:
     episode = _latest_open_episode(store, user_id, now)
     if episode is None:
@@ -543,17 +547,28 @@ def handle_conversation_message_unlocked(
         )
     if episode["state"] == "check_in_due":
         return handle_check_in_unlocked(
-            store, user_id, profile, message, now, data_mode, remember=remember
+            store,
+            user_id,
+            profile,
+            message,
+            now,
+            data_mode,
+            remember=remember,
+            understood_frictions=understood_frictions,
+            friction_origin=friction_origin,
+            friction_confidence=friction_confidence,
         )
 
-    frictions = classify_participation_frictions(message)
+    frictions = list(
+        dict.fromkeys([*classify_participation_frictions(message), *(understood_frictions or [])])
+    )
     rejected = _contains(message, REJECTION_MARKERS) or bool(frictions)
     if episode["state"] == "cooldown":
         return {
             "episode": episode,
             "profile": profile,
             "frictionDelta": [],
-            "reply": "今日はここまで。しつこく追いかけへんから、また話したくなったら呼んで。",
+            "reply": "今日はここまで。しつこく追いかけないから、また話したくなったら呼んで。",
             "context": _basic_context(episode),
         }
     if episode["state"] == "accepted":
@@ -561,7 +576,7 @@ def handle_conversation_message_unlocked(
             "episode": episode,
             "profile": profile,
             "frictionDelta": [],
-            "reply": "選んだイベントは覚えてるで。終わった頃に一言だけ聞くわね。",
+            "reply": "選んだイベントは覚えてるよ。終わった頃に一言だけ聞くね。",
             "context": _basic_context(episode),
         }
     if episode["state"] in {"shortlist_shown", "adjusted_shortlist"} and rejected:
@@ -571,7 +586,7 @@ def handle_conversation_message_unlocked(
                 "episode": episode,
                 "profile": profile,
                 "frictionDelta": [],
-                "reply": "わかった。今日はもう出さんとく。断ったことを責めたりせえへんよ。",
+                "reply": "わかった。今日はもう出さないね。断ったことを責めたりしないよ。",
                 "context": _basic_context(episode),
             }
         episode = _save_episode(
@@ -584,7 +599,7 @@ def handle_conversation_message_unlocked(
                 "episode": episode,
                 "profile": profile,
                 "frictionDelta": [],
-                "reply": "何がひっかかった？ 初参加、人や会話、時間・距離・料金のどれに近い？ 一つだけでええよ。",
+                "reply": "何がひっかかった？ 初参加、人や会話、時間・距離・料金のどれに近い？ 一つだけでいいよ。",
                 "context": _basic_context(episode, quick_replies=FRICTION_QUICK_REPLIES),
             }
 
@@ -596,7 +611,7 @@ def handle_conversation_message_unlocked(
                 "episode": episode,
                 "profile": profile,
                 "frictionDelta": [],
-                "reply": "うまく言わんでええよ。一番近いのを一つだけ選んで。",
+                "reply": "うまく言えなくても大丈夫。一番近いものを一つだけ選んで。",
                 "context": _basic_context(episode, quick_replies=FRICTION_QUICK_REPLIES),
             }
         if set(frictions) & {"low_social_energy", "not_today", "push_aversion"}:
@@ -606,11 +621,11 @@ def handle_conversation_message_unlocked(
                 profile, evidence_ids = apply_participation_frictions(
                     profile,
                     frictions,
-                    origin="explicit",
+                    origin=friction_origin,
                     reference_type="message",
                     reference_id=str(uuid.uuid4()),
                     evidence_text="本人が参加をためらう理由を明示",
-                    confidence=1.0,
+                    confidence=friction_confidence,
                     now=now,
                 )
                 episode["frictionEvidenceIds"] = sorted(
@@ -622,7 +637,7 @@ def handle_conversation_message_unlocked(
                 "episode": episode,
                 "profile": profile,
                 "frictionDelta": frictions if remember else [],
-                "reply": "そっか。今日は候補を足さんとく。次に自分から話したくなった時でええよ。",
+                "reply": "そっか。今日は候補を足さないね。次に自分から話したくなった時で大丈夫。",
                 "context": _basic_context(episode),
             }
 
@@ -631,11 +646,11 @@ def handle_conversation_message_unlocked(
             profile, evidence_ids = apply_participation_frictions(
                 profile,
                 frictions,
-                origin="explicit",
+                origin=friction_origin,
                 reference_type="message",
                 reference_id=str(uuid.uuid4()),
                 evidence_text="本人が参加をためらう理由を明示",
-                confidence=1.0,
+                confidence=friction_confidence,
                 now=now,
             )
             store.save_profile_unlocked(user_id, profile)
@@ -653,7 +668,7 @@ def handle_conversation_message_unlocked(
                 "episode": episode,
                 "profile": profile,
                 "frictionDelta": frictions if remember else [],
-                "reply": "その条件で確認できる候補は今はなかったわ。無理に別のを作らんとく。",
+                "reply": "その条件で確認できる候補は今はなかったよ。無理に別の候補は作らないね。",
                 "context": _basic_context(episode, calendar_summary=calendar_summary, notice=notice),
             }
         episode["frictionEvidenceIds"] = sorted(
@@ -666,7 +681,7 @@ def handle_conversation_message_unlocked(
             "episode": episode,
             "profile": profile,
             "frictionDelta": frictions if remember else [],
-            "reply": "なるほど、そこが引っかかってたんやね。条件を変えて、一回だけ並べ直したで。どれなら行けそう？",
+            "reply": "なるほど、そこがひっかかってたんだね。条件を変えて、一度だけ並べ直したよ。どれなら行けそう？",
             "context": _basic_context(
                 episode,
                 recommendations=recommendations,
@@ -681,29 +696,51 @@ def handle_conversation_message_unlocked(
                 "episode": episode,
                 "profile": profile,
                 "frictionDelta": [],
-                "reply": "もうちょい具体的に聞かせて。ヨガ、料理、音楽みたいに、やってみたいことを一つだけ。",
+                "reply": "もう少し具体的に聞かせて。ヨガ、料理、音楽みたいに、やってみたいことを一つだけ。",
                 "context": _basic_context(episode),
             }
+        evidence_ids: list[str] = []
+        if remember and frictions:
+            profile, evidence_ids = apply_participation_frictions(
+                profile,
+                frictions,
+                origin=friction_origin,
+                reference_type="message",
+                reference_id=str(uuid.uuid4()),
+                evidence_text="本人が参加をためらう理由を明示",
+                confidence=friction_confidence,
+                now=now,
+            )
+            store.save_profile_unlocked(user_id, profile)
+            episode["frictionEvidenceIds"] = sorted(
+                set([*episode["frictionEvidenceIds"], *evidence_ids])
+            )
+            _save_episode(store, user_id, episode)
         recommendations, calendar_summary, notice = _calendar_and_recommendations(
-            store, user_id, profile, now, data_mode
+            store,
+            user_id,
+            profile,
+            now,
+            data_mode,
+            friction_types=set(frictions),
         )
         if not recommendations:
             return {
                 "episode": episode,
                 "profile": profile,
-                "frictionDelta": [],
-                "reply": "好みはわかった。でもCalendarと募集状態まで確認できる候補が今はないわ。架空のイベントは出さんとく。",
+                "frictionDelta": frictions if remember else [],
+                "reply": "好みはわかったよ。でも空き時間と募集状態まで確認できる候補は今はない。架空のイベントは出さないね。",
                 "context": _basic_context(episode, calendar_summary=calendar_summary, notice=notice),
             }
         episode = _present_recommendations(
             store, user_id, episode, recommendations, now, adjusted=False
         )
-        label = message.strip()[:40]
+        label = (attraction_label or message.strip())[:40]
         return {
             "episode": episode,
             "profile": profile,
-            "frictionDelta": [],
-            "reply": f"{label}ね。ええやん。空き時間と実際の移動まで見て、行った先で人と関われる候補を持ってきたで。",
+            "frictionDelta": frictions if remember else [],
+            "reply": f"{label}ね、いいじゃない。空き時間と実際の移動まで見て、行った先で人と関われる候補を持ってきたよ。",
             "context": _basic_context(
                 episode,
                 recommendations=recommendations,
@@ -783,7 +820,7 @@ def select_opportunity_unlocked(
         "episode": episode,
         "profile": profile,
         "frictionDelta": [],
-        "reply": f"{opportunity['title']}ね。よし、決まり。終わったあとに一言だけ聞くわ。",
+        "reply": f"{opportunity['title']}ね。よし、決まり。終わったあとに一言だけ聞くね。",
         "context": _basic_context(episode),
     }
 
@@ -828,6 +865,9 @@ def handle_check_in_unlocked(
     data_mode: str,
     *,
     remember: bool,
+    understood_frictions: list[str] | None = None,
+    friction_origin: str = "explicit",
+    friction_confidence: float = 1.0,
 ) -> dict[str, Any]:
     episode = _latest_open_episode(store, user_id, now)
     if episode is None or episode.get("state") != "check_in_due":
@@ -848,11 +888,13 @@ def handle_check_in_unlocked(
             "episode": episode,
             "profile": profile,
             "frictionDelta": [],
-            "reply": "中止・延期になってたんやね。参加できたことには数えへんよ。",
+            "reply": "中止・延期になってたんだね。参加できたことには数えないよ。",
             "context": _basic_context(episode),
         }
 
-    frictions = classify_participation_frictions(message)
+    frictions = list(
+        dict.fromkeys([*classify_participation_frictions(message), *(understood_frictions or [])])
+    )
     not_attended = _contains(message, NOT_ATTENDED_MARKERS)
     if (
         not_attended
@@ -863,7 +905,7 @@ def handle_check_in_unlocked(
             "episode": episode,
             "profile": profile,
             "frictionDelta": [],
-            "reply": "そっか、行けなかったんやね。理由は決めつけへんよ。予定、距離、気分や不安のどれか、一つだけ近いのある？",
+            "reply": "そっか、行けなかったんだね。理由は決めつけないよ。予定、距離、気分や不安のどれか、一つだけ近いものはある？",
             "context": _basic_context(episode, quick_replies=NOT_ATTENDED_QUICK_REPLIES),
         }
 
@@ -872,11 +914,11 @@ def handle_check_in_unlocked(
         profile, evidence_ids = apply_participation_frictions(
             profile,
             frictions,
-            origin="explicit",
+            origin=friction_origin,
             reference_type="feedback",
             reference_id=str(uuid.uuid4()),
             evidence_text="Event後の本人Feedback",
-            confidence=1.0,
+            confidence=friction_confidence,
             now=now,
         )
     if remember and _contains(message, POSITIVE_CHECK_IN_MARKERS):
@@ -905,11 +947,11 @@ def handle_check_in_unlocked(
     )
     _save_episode(store, user_id, episode)
     if not_attended:
-        reply = "教えてくれてありがとう。行けなかったことは失敗にせえへん。次はその負担を外して探すわ。"
+        reply = "教えてくれてありがとう。行けなかったことは失敗にしないよ。次はその負担を外して探すね。"
     elif frictions:
-        reply = "そこがしんどかったんやね。次は同じ負担が少ない候補を先にするわ。"
+        reply = "そこがしんどかったんだね。次は同じ負担が少ない候補を先にするよ。"
     else:
-        reply = "まあ、悪くなかったんやね。次に探す時、その感じをちゃんと使うわ。"
+        reply = "まあ、悪くなかったんだね。次に探す時、その感じをちゃんと使うよ。"
     return {
         "episode": episode,
         "profile": profile,

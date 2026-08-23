@@ -829,6 +829,14 @@ class JsonStore:
                         timeout=self.MAINTENANCE_USER_LOCK_TIMEOUT_SECONDS,
                     ):
                         removed = self.cleanup_unlocked(user_id, now, retention_days)
+                        try:
+                            from osekkai_memory_vault import ObsidianMemoryVault
+
+                            ObsidianMemoryVault(data_root=self.root).cleanup_expired(user_id, now)
+                        except (ImportError, ContractError, OSError):
+                            # JSON retention must continue even when the optional
+                            # Obsidian projection is unavailable or malformed.
+                            pass
                 except LockTimeout:
                     # One busy or corrupt namespace cannot make every API call
                     # fail. It is retried on the next daily cycle.

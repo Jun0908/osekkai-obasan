@@ -46,6 +46,41 @@ function minimalEpisode(userId: string) {
 }
 
 describe('Python response validation boundary', () => {
+  it('accepts only the bounded Chiyoda map result shape', () => {
+    const result = {
+      schemaVersion: '1.0',
+      dataMode: 'live',
+      generatedAt: '2026-08-23T10:00:00+09:00',
+      scope: {
+        id: 'chiyoda_kojimachi',
+        ward: '千代田区',
+        center: { latitude: 35.684, longitude: 139.7373 },
+        zoom: 14,
+      },
+      events: [],
+      counts: {
+        totalInMesh: 239,
+        inWard: 9,
+        withCoordinates: 9,
+        missingCoordinates: 0,
+        returned: 0,
+      },
+      nextOffset: null,
+    };
+    expect(validateOsekkaiCommandData(
+      OSEKKAI_COMMANDS.mapEvents,
+      { scope: 'chiyoda_kojimachi', offset: 0, limit: 250 },
+      result,
+      EXPECTED_USER_ID,
+    )).toEqual(result);
+    expect(() => validateOsekkaiCommandData(
+      OSEKKAI_COMMANDS.mapEvents,
+      { scope: 'chiyoda_kojimachi', offset: 0, limit: 250 },
+      { ...result, scope: { ...result.scope, ward: '新宿区' } },
+      EXPECTED_USER_ID,
+    )).toThrowError(expect.objectContaining({ code: 'PYTHON_INVALID_RESPONSE', status: 502 }));
+  });
+
   it('accepts a schema-valid profile owned by the authenticated user', () => {
     expect(
       validateOsekkaiCommandData(
@@ -135,7 +170,7 @@ describe('Python response validation boundary', () => {
 });
 
 describe('Python child environment allowlist', () => {
-  it('keeps required runtime values without leaking application secrets', () => {
+  it('keeps only Python-owned provider credentials and excludes unrelated application secrets', () => {
     const env = buildOsekkaiChildEnv({
       Path: 'C:\\safe-bin',
       SystemRoot: 'C:\\Windows',
@@ -150,6 +185,7 @@ describe('Python child environment allowlist', () => {
       OSEKKAI_SESSION_SECRET: 'must-not-leak',
       OSEKKAI_SESSION_SECRET_PREVIOUS: 'must-not-leak-either',
       OPENAI_API_KEY: 'must-not-leak',
+      OSEKKAI_LLM_MODEL: 'gpt-test',
       DATABASE_URL: 'must-not-leak',
     });
 
@@ -165,7 +201,8 @@ describe('Python child environment allowlist', () => {
     expect(env.OSEKKAI_DATA_ROOT).toBeTruthy();
     expect(env.OSEKKAI_SESSION_SECRET).toBeUndefined();
     expect(env.OSEKKAI_SESSION_SECRET_PREVIOUS).toBeUndefined();
-    expect(env.OPENAI_API_KEY).toBeUndefined();
+    expect(env.OPENAI_API_KEY).toBe('must-not-leak');
+    expect(env.OSEKKAI_LLM_MODEL).toBe('gpt-test');
     expect(env.DATABASE_URL).toBeUndefined();
   });
 });

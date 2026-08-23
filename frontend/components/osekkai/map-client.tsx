@@ -1,68 +1,107 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import EventMap from '@/app/osekkai/_components/event-map';
-import LiveSourceStrip from '@/app/osekkai/_components/live-source-strip';
 import styles from '@/app/osekkai/osekkai.module.css';
 import { osekkaiApi } from '@/lib/osekkai/api';
-import type { ConnectionEvidence, RankedOpportunity } from '@/lib/osekkai/types.generated';
-import type { EventMeshResult, OpportunitiesResult, SourceStatusResult } from '@/lib/osekkai/types';
+import type { MapEventSummary, MapEventsResult, RankedOpportunity } from '@/lib/osekkai/types.generated';
 import { friendlyApiError } from './api-client';
 
-function isConnectionEvidence(value: unknown): value is ConnectionEvidence {
-  return Boolean(value) && typeof value === 'object' && value !== null &&
-    'eventId' in value && 'connectionLevel' in value;
-}
+const EMPTY_COUNTS: MapEventsResult['counts'] = {
+  totalInMesh: 0,
+  inWard: 0,
+  withCoordinates: 0,
+  missingCoordinates: 0,
+  returned: 0,
+};
 
 export default function MapClient() {
-  const [mesh, setMesh] = useState<EventMeshResult | null>(null);
-  const [opportunities, setOpportunities] = useState<OpportunitiesResult | null>(null);
-  const [sources, setSources] = useState<SourceStatusResult | null>(null);
+  const [events, setEvents] = useState<MapEventSummary[]>([]);
+  const [counts, setCounts] = useState<MapEventsResult['counts']>(EMPTY_COUNTS);
   const [ranking, setRanking] = useState<RankedOpportunity[]>([]);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [syncing, setSyncing] = useState(false);
+  const loadVersion = useRef(0);
 
-  const load = async () => {
-    const [eventMesh, currentOpportunities, sourceStatus, interventions] = await Promise.all([
-      osekkaiApi.events(), osekkaiApi.opportunities(), osekkaiApi.sources(), osekkaiApi.interventions(),
-    ]);
-    setMesh(eventMesh); setOpportunities(currentOpportunities); setSources(sourceStatus);
-    const latest = [...interventions.interventions].sort((left, right) => right.sequence - left.sequence)[0];
-    setRanking((latest?.rankedOpportunities ?? []) as RankedOpportunity[]);
-  };
+  const loadMapPages = useCallback(async () => {
+    // Keep the mount Effect subscription-only; page state starts after the
+    // first microtask and never delays the Google Maps canvas mount.
+    await Promise.resolve();
+    const version = ++loadVersion.current;
+    setLoading(true);
+    setLoadingMore(false);
+    setError('');
+    let offset: number | null = 0;
+    let collected: MapEventSummary[] = [];
+    let firstPage = true;
 
-  useEffect(() => {
-    let active = true;
-    void Promise.all([
-      osekkaiApi.events(), osekkaiApi.opportunities(), osekkaiApi.sources(), osekkaiApi.interventions(),
-    ]).then(([eventMesh, currentOpportunities, sourceStatus, interventions]) => {
-      if (!active) return;
-      setMesh(eventMesh); setOpportunities(currentOpportunities); setSources(sourceStatus);
-      const latest = [...interventions.interventions].sort((left, right) => right.sequence - left.sequence)[0];
-      setRanking((latest?.rankedOpportunities ?? []) as RankedOpportunity[]);
-    }).catch((reason) => active && setError(friendlyApiError(reason)));
-    return () => { active = false; };
+    try {
+      while (offset !== null) {
+        const page = await osekkaiApi.mapEvents(offset, 250);
+        if (loadVersion.current !== version) return;
+        collected = [...collected, ...page.events];
+        setEvents(collected);
+        setCounts(page.counts);
+        offset = page.nextOffset;
+        if (firstPage) {
+          firstPage = false;
+          setLoading(false);
+        }
+        setLoadingMore(offset !== null);
+        if (offset !== null) await new Promise((resolve) => window.setTimeout(resolve, 0));
+      }
+    } catch (reason) {
+      if (loadVersion.current === version) setError(friendlyApiError(reason));
+    } finally {
+      if (loadVersion.current === version) {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    }
   }, []);
 
-  const refresh = async () => {
-    setSyncing(true); setError('');
-    try { await osekkaiApi.syncSources(true); await load(); }
-    catch (reason) { setError(friendlyApiError(reason)); }
-    finally { setSyncing(false); }
-  };
+  useEffect(() => {
+    const mapLoadTimer = window.setTimeout(() => { void loadMapPages(); }, 0);
+    void osekkaiApi.interventions().then((interventions) => {
+      const latest = [...interventions.interventions].sort((left, right) => right.sequence - left.sequence)[0];
+      setRanking((latest?.rankedOpportunities ?? []) as RankedOpportunity[]);
+    }).catch(() => {
+      // Recommendation history is enhancement-only and never blocks the map.
+    });
+    return () => {
+      window.clearTimeout(mapLoadTimer);
+      loadVersion.current += 1;
+    };
+  }, [loadMapPages]);
 
-  const evidence = useMemo(() => (mesh?.connectionEvidence ?? []).filter(isConnectionEvidence), [mesh]);
+  const refresh = async () => {
+    setSyncing(true);
+    setError('');
+    try {
+      await osekkaiApi.syncSources(true);
+      await loadMapPages();
+    } catch (reason) {
+      setError(friendlyApiError(reason));
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   return (
     <div className={styles.mapPage}>
       <section className={styles.mapPageIntro}>
-        <div><p className={styles.eyebrow}>TOKYO EVENT EXPLORER</p><h1>おばさんに任せず、自分でも全部見てええ。</h1><p>推薦対象外、交流根拠未確認、満席・中止も隠しません。現在地は押した時だけ使い、保存しません。</p></div>
-        <button type="button" disabled={syncing} onClick={refresh}>{syncing ? '最新Eventを更新中…' : 'OpenClawで最新に更新'}</button>
+        <div>
+          <p className={styles.eyebrow}>EVENT MAP</p>
+          <h1>自分でもイベント、探せるで</h1>
+          <p>最初に出てくる街は、今のところの目安なだけ。場所がちゃんと確認できたEventから、この地図にどんどん載せていくで。</p>
+        </div>
+        <button type="button" disabled={syncing} onClick={refresh}>{syncing ? 'Eventを更新中…' : 'Eventを更新'}</button>
       </section>
-      <LiveSourceStrip status={sources} />
-      {error ? <p className={styles.liveError} role="alert">{error}</p> : null}
-      {mesh ? <EventMap events={mesh.events} opportunities={opportunities?.opportunities ?? []} evidence={evidence} ranking={ranking} /> : <p className={styles.loadingPanel}>全Eventを読み込んでいます…</p>}
+      {error ? <p className={styles.liveError} role="alert">Eventを読み込めませんでした。地図はそのまま使えます。{error}</p> : null}
+      <EventMap events={events} ranking={ranking} counts={counts} loading={loading} loadingMore={loadingMore} />
     </div>
   );
 }

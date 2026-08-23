@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/map-events-query.schema.json",
+  "title": "Map events query",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scope", "offset", "limit"],
+  "properties": {
+    "scope": { "type": "string", "const": "chiyoda_kojimachi" },
+    "offset": { "type": "integer", "minimum": 0, "maximum": 10000 },
+    "limit": { "type": "integer", "minimum": 1, "maximum": 250 }
+  }
+}

@@ -1,0 +1,438 @@
+{
+  "schemaVersion": "1.0",
+  "scenarioSetId": "judge-demo-three-distances-2026-08-23",
+  "capturedAt": "2026-08-23T12:57:13.663185+09:00",
+  "snapshotNotice": "Googleログイン不要。実Eventと記録済みGoogle Routesを使い、Calendarの空きだけを合成したBackend非依存Demoです。",
+  "events": [
+    {
+      "id": "opportunity-event-luma-dd6dded95ccc550d816fb393",
+      "title": "BOOK SWAP：本×対話×交換の新しいブック体験",
+      "startsAt": "2026-08-30T09:45:00+09:00",
+      "endsAt": "2026-08-30T13:30:00+09:00",
+      "providerLabel": "Lu.ma Curated Calendar",
+      "sourceUrl": "https://api.luma.com/ics/get?entity=discover&id=discplace-9H7asQEvWiv6DA9",
+      "sourceCapturedAt": "2026-08-23T12:57:13.663185+09:00",
+      "areaLabel": "東京都内",
+      "priceLabel": "料金未確認",
+      "fitReason": "好きな本をきっかけに、参加者同士で言葉を交わせます。",
+      "adjustedReason": "対話から始まるため、活動を先にしたい時は順位を下げます。",
+      "connectionLabel": "本を介した対話と交換",
+      "connectionEvidence": "タイトルと主催者説明で、本を介した対話・交換の形式を確認しました。",
+      "route": {
+        "mode": "walk",
+        "minutes": 66,
+        "recordedAt": "2026-08-30T08:45:00+09:00",
+        "classification": "recorded_live"
+      }
+    },
+    {
+      "id": "opportunity-event-luma-0c6a6b61c0bf3bc9439d5f3c",
+      "title": "EF × PoS: Pilates & Chat ✨",
+      "startsAt": "2026-08-30T09:40:00+09:00",
+      "endsAt": "2026-08-30T12:00:00+09:00",
+      "providerLabel": "Lu.ma Curated Calendar",
+      "sourceUrl": "https://api.luma.com/ics/get?entity=discover&id=discplace-9H7asQEvWiv6DA9",
+      "sourceCapturedAt": "2026-08-23T12:57:13.663185+09:00",
+      "areaLabel": "渋谷",
+      "priceLabel": "料金未確認",
+      "fitReason": "軽い運動と参加者同士の会話が一つの体験になっています。",
+      "adjustedReason": "ヨガに近い身体活動ですが、記録済み経路が長いため移動負担も示します。",
+      "connectionLabel": "ピラティスと会話",
+      "connectionEvidence": "主催者説明で、体を動かしながら参加者同士で話せる形式を確認しました。",
+      "route": {
+        "mode": "walk",
+        "minutes": 106,
+        "recordedAt": "2026-08-30T08:40:00+09:00",
+        "classification": "recorded_live"
+      }
+    },
+    {
+      "id": "opportunity-event-luma-872e40d644c175190bbeacfb",
+      "title": "Night Run vol.7",
+      "startsAt": "2026-09-08T19:30:00+09:00",
+      "endsAt": "2026-09-08T21:30:00+09:00",
+      "providerLabel": "Lu.ma Curated Calendar",
+      "sourceUrl": "https://api.luma.com/ics/get?entity=discover&id=discplace-9H7asQEvWiv6DA9",
+      "sourceCapturedAt": "2026-08-23T12:57:13.663185+09:00",
+      "areaLabel": "皇居周辺",
+      "priceLabel": "料金未確認",
+      "fitReason": "運動の好みに近く、ランニング後にCafe timeがあります。",
+      "adjustedReason": "会話だけから始まらず、活動の後に交流へ入れるため順位を上げます。",
+      "connectionLabel": "ランニング後のCafe time",
+      "connectionEvidence": "主催者説明で、自己紹介・皇居ラン・Cafe timeの流れを確認しました。",
+      "route": {
+        "mode": "walk",
+        "minutes": 35,
+        "recordedAt": "2026-09-08T18:30:00+09:00",
+        "classification": "recorded_live"
+      }
+    },
+    {
+      "id": "event-kcf-3430-2026-10-09",
+      "title": "【区民企画講座】ヴォイストレーナーによる口笛演奏入門（第1回）",
+      "startsAt": "2026-10-09T09:20:00+09:00",
+      "endsAt": "2026-10-09T10:50:00+09:00",
+      "providerLabel": "江東区文化コミュニティ財団",
+      "sourceUrl": "https://www.kcf.or.jp/koto/koza/detail/?id=3430",
+      "sourceCapturedAt": "2026-08-23T13:13:00+09:00",
+      "areaLabel": "江東区・森下文化センター",
+      "priceLabel": "全6回 6,900円（Source記載）",
+      "fitReason": "音楽の好みから入り、同じ講座メンバーと複数回活動できます。",
+      "adjustedReason": "一回きりではなく全6回続くため、また会える関係を望む時に順位を上げます。",
+      "connectionLabel": "口笛を一緒に学ぶ全6回講座",
+      "connectionEvidence": "公式講座ページとSeries情報で、同じテーマを複数回学ぶ継続形式を確認しました。",
+      "route": null
+    }
+  ],
+  "stories": [
+    {
+      "id": "calendar-hobby-discovery",
+      "storyNumber": 1,
+      "kind": "preference_discovery",
+      "kicker": "誘うおせっかい",
+      "title": "予定が空いている。まず好みを聞く",
+      "summary": "Calendarの空きだけをきっかけに、本人の趣味を一つ聞いて、実在する交流Eventを複数提案します。",
+      "judgePoint": "空き時間・好み・交流根拠・移動時間を一つの推薦判断につなげる",
+      "calendarLabel": "今週末にまとまった空き（合成FreeBusy）",
+      "persona": {
+        "rememberedPreferences": ["好みはこれから聞く"],
+        "memorySummary": "初回Demoなので、好みを決めつけず一問だけ聞きます。"
+      },
+      "freeWindows": [
+        {
+          "label": "8月30日 午前〜昼",
+          "start": "2026-08-30T08:30:00+09:00",
+          "end": "2026-08-30T14:30:00+09:00",
+          "classification": "synthetic_demo"
+        },
+        {
+          "label": "9月8日 夜",
+          "start": "2026-09-08T18:30:00+09:00",
+          "end": "2026-09-08T22:30:00+09:00",
+          "classification": "synthetic_demo"
+        }
+      ],
+      "openingReply": "あんた、最近家ばっかり……って決めつけたら怒るな。Calendarで見えたのは、今週末が空いてることだけ。予定の中身は見てないよ。で、何が好きなのよ？",
+      "steps": [
+        {
+          "id": "pick-hobby",
+          "choices": [
+            {
+              "id": "bouldering",
+              "label": "ボルダリング",
+              "userMessage": "ボルダリングみたいに、体を動かすのが好き。",
+              "agentReply": "ボルダリングそのものは今回の取得分にないね。勝手に作らず、まず体を動かして、そのあと自然に話せるものを3つ並べたよ。",
+              "understandingLabel": "趣味：身体活動／会話だけから始まらない方が合いそう",
+              "eventOrder": [
+                "opportunity-event-luma-872e40d644c175190bbeacfb",
+                "opportunity-event-luma-0c6a6b61c0bf3bc9439d5f3c",
+                "event-kcf-3430-2026-10-09"
+              ],
+              "selectFirstEvent": false,
+              "timeJumpLabel": null,
+              "memoryOutcome": null
+            },
+            {
+              "id": "yoga",
+              "label": "ヨガ",
+              "userMessage": "ヨガみたいに、無理なく体を動かすのが好き。",
+              "agentReply": "それなら近いのはPilates & Chat。移動は長めだから隠さない。活動から入れる候補を3つに絞ったよ。",
+              "understandingLabel": "趣味：ヨガに近い軽い運動／移動負担も判断材料",
+              "eventOrder": [
+                "opportunity-event-luma-0c6a6b61c0bf3bc9439d5f3c",
+                "opportunity-event-luma-872e40d644c175190bbeacfb",
+                "event-kcf-3430-2026-10-09"
+              ],
+              "selectFirstEvent": false,
+              "timeJumpLabel": null,
+              "memoryOutcome": null
+            },
+            {
+              "id": "music",
+              "label": "音楽",
+              "userMessage": "音楽が好き。聴くだけじゃなく、やってみるのも気になる。",
+              "agentReply": "それなら口笛の全6回講座があるよ。同じ人と続けて会える音楽体験を先にして、入り口の違う3つを並べたよ。",
+              "understandingLabel": "趣味：音楽／鑑賞だけでなく共同活動にも関心",
+              "eventOrder": [
+                "event-kcf-3430-2026-10-09",
+                "opportunity-event-luma-dd6dded95ccc550d816fb393",
+                "opportunity-event-luma-0c6a6b61c0bf3bc9439d5f3c"
+              ],
+              "selectFirstEvent": false,
+              "timeJumpLabel": null,
+              "memoryOutcome": null
+            }
+          ]
+        },
+        {
+          "id": "share-friction",
+          "choices": [
+            {
+              "id": "activity-first",
+              "label": "最初から会話はちょっと…",
+              "userMessage": "知らない人と、最初から会話だけするのはちょっとしんどい。",
+              "agentReply": "そこがひっかかるのね。好みが違うんじゃなくて、入り方の問題か。何かを一緒にしてから話せる順で見るからね。",
+              "understandingLabel": "不参加理由：交流そのものではなく、会話から始まる負担",
+              "eventOrder": [],
+              "selectFirstEvent": false,
+              "timeJumpLabel": null,
+              "memoryOutcome": null
+            }
+          ]
+        },
+        {
+          "id": "select-event",
+          "choices": [
+            {
+              "id": "try-first",
+              "label": "1番目に行ってみる",
+              "userMessage": null,
+              "agentReply": "よし、まずはそれでいい。申込み前にはSourceの最新状態をもう一度確認するからね。",
+              "understandingLabel": null,
+              "eventOrder": [],
+              "selectFirstEvent": true,
+              "timeJumpLabel": null,
+              "memoryOutcome": null
+            }
+          ]
+        },
+        {
+          "id": "after-event",
+          "choices": [
+            {
+              "id": "jump-checkin",
+              "label": "Event後のCheck-inへ",
+              "userMessage": null,
+              "agentReply": "で、どうだった？ また同じ入り方なら行ってもいい？",
+              "understandingLabel": null,
+              "eventOrder": [],
+              "selectFirstEvent": false,
+              "timeJumpLabel": "EVENT後",
+              "memoryOutcome": null
+            }
+          ]
+        },
+        {
+          "id": "save-feedback",
+          "choices": [
+            {
+              "id": "easier-after-activity",
+              "label": "活動のあとなら話しやすかった",
+              "userMessage": "何かを一緒にしたあとだったから、思ったより話しやすかった。",
+              "agentReply": "なるほど。次からは『好きか』だけじゃなくて、活動から入れるかも先に見るよ。",
+              "understandingLabel": null,
+              "eventOrder": [],
+              "selectFirstEvent": false,
+              "timeJumpLabel": null,
+              "memoryOutcome": "会話だけより、共同活動の後に話せる場の方が入りやすい。"
+            }
+          ]
+        }
+      ],
+      "candidateTitle": "好みと入りやすさから選んだ3件",
+      "candidateEmptyTitle": "まず、好きなことを一つだけ教えて",
+      "candidateEmptyDetail": "初期設定を増やさず、この会話の答えから実Eventを探す流れを再現します。",
+      "closingLine": "好きなことを入口に、行かない理由まで聞いて、参加できる形へ近づける。"
+    },
+    {
+      "id": "respectful-fatigue-hold",
+      "storyNumber": 2,
+      "kind": "respectful_hold",
+      "kicker": "引くおせっかい",
+      "title": "今日は疲れている。だから引く",
+      "summary": "空き時間があっても本人が疲れている日は、提案せず、返事も追いません。",
+      "judgePoint": "Calendarの空きより本人の言葉を優先し、関係を壊さない距離を学ぶ",
+      "calendarLabel": "今夜は空き（合成FreeBusy）",
+      "persona": {
+        "rememberedPreferences": ["軽い運動", "音楽"],
+        "memorySummary": "好みは覚えていますが、提案してよい状態かは毎回の会話を優先します。"
+      },
+      "freeWindows": [
+        {
+          "label": "8月23日 夜",
+          "start": "2026-08-23T18:30:00+09:00",
+          "end": "2026-08-23T22:30:00+09:00",
+          "classification": "synthetic_demo"
+        }
+      ],
+      "openingReply": "あんた、今夜はCalendar空いてるね。何か探す？ それとも今日は違う？",
+      "steps": [
+        {
+          "id": "say-tired",
+          "choices": [
+            {
+              "id": "tired-today",
+              "label": "今日は疲れた",
+              "userMessage": "今日は疲れた。何かに行く気力はない。",
+              "agentReply": "そっか。じゃあ今日は出さん。Calendarが空いてても、空きは元気の証拠ちゃう。返事もいらんよ。",
+              "understandingLabel": "今日は提案しない／空き時間より本人の疲れを優先",
+              "eventOrder": [],
+              "selectFirstEvent": false,
+              "timeJumpLabel": null,
+              "memoryOutcome": null
+            }
+          ]
+        },
+        {
+          "id": "set-distance",
+          "choices": [
+            {
+              "id": "ask-once-later",
+              "label": "元気な日に一回だけ聞いて",
+              "userMessage": "また元気な日に、一回だけ聞いて。",
+              "agentReply": "了解。今日は通知を止める。次の空きで一回だけ聞いて、また違ったらすぐ引くからね。",
+              "understandingLabel": null,
+              "eventOrder": [],
+              "selectFirstEvent": false,
+              "timeJumpLabel": null,
+              "memoryOutcome": "疲れている日は提案しない。再開時も一度だけ聞き、断られたら追わない。"
+            }
+          ]
+        }
+      ],
+      "candidateTitle": "今日は提案しない",
+      "candidateEmptyTitle": "Eventを出さないのも、おせっかい",
+      "candidateEmptyDetail": "Calendarの空きより本人の『疲れた』を優先。今日は候補を出さず、次に聞く距離も本人と決めます。",
+      "closingLine": "押すだけではなく、今日は引く。その距離感も、話すほど本人に合っていく。"
+    },
+    {
+      "id": "continuity-followup",
+      "storyNumber": 3,
+      "kind": "continuity_followup",
+      "kicker": "続けるおせっかい",
+      "title": "一回の参加を、次も会えるへ",
+      "summary": "参加後の感想から、単発の楽しさだけでなく、同じ人と再び会える継続性を推薦へ反映します。",
+      "judgePoint": "反応をConversation Memoryへ残し、孤立を一回の外出ではなく関係の継続で捉える",
+      "calendarLabel": "10月から月1回程度の空き（合成FreeBusy）",
+      "persona": {
+        "rememberedPreferences": ["音楽", "共同活動から入る", "再参加には前向き"],
+        "memorySummary": "前回は、活動のあとなら話しやすく、また行けそうと話しました。"
+      },
+      "freeWindows": [
+        {
+          "label": "10月9日 午前",
+          "start": "2026-10-09T08:30:00+09:00",
+          "end": "2026-10-09T12:00:00+09:00",
+          "classification": "synthetic_demo"
+        }
+      ],
+      "openingReply": "この前、活動のあとなら話しやすかったって言ってたね。次も同じ感じを探す？",
+      "steps": [
+        {
+          "id": "show-next-options",
+          "choices": [
+            {
+              "id": "show-three",
+              "label": "次の候補を見せて",
+              "userMessage": "次も無理なく人と話せる候補を見たい。",
+              "agentReply": "覚えてるよ。まず何かを一緒にできるものを3つ。今は活動への近さで並べてある。",
+              "understandingLabel": null,
+              "eventOrder": [
+                "opportunity-event-luma-872e40d644c175190bbeacfb",
+                "opportunity-event-luma-0c6a6b61c0bf3bc9439d5f3c",
+                "event-kcf-3430-2026-10-09"
+              ],
+              "selectFirstEvent": false,
+              "timeJumpLabel": null,
+              "memoryOutcome": null
+            }
+          ]
+        },
+        {
+          "id": "prefer-continuity",
+          "choices": [
+            {
+              "id": "same-people-again",
+              "label": "同じ人にまた会える方がいい",
+              "userMessage": "一回きりより、同じ人にまた会える方がいい。",
+              "agentReply": "それ大事やん。じゃあ近さだけじゃなく、次回があるかで並べ直す。全6回の音楽講座を一番にするね。経路はまだ記録できてないから、そこは隠さないよ。",
+              "understandingLabel": "参加目的：単発の外出より、同じ人と再び会える関係",
+              "eventOrder": [
+                "event-kcf-3430-2026-10-09",
+                "opportunity-event-luma-872e40d644c175190bbeacfb",
+                "opportunity-event-luma-0c6a6b61c0bf3bc9439d5f3c"
+              ],
+              "selectFirstEvent": false,
+              "timeJumpLabel": null,
+              "memoryOutcome": null
+            }
+          ]
+        },
+        {
+          "id": "select-series",
+          "choices": [
+            {
+              "id": "try-series",
+              "label": "全6回の講座を見てみる",
+              "userMessage": null,
+              "agentReply": "いいね。料金は全6回分、経路は未記録。申込み前に公式Sourceで日程と募集状態を確認しよう。",
+              "understandingLabel": null,
+              "eventOrder": [],
+              "selectFirstEvent": true,
+              "timeJumpLabel": null,
+              "memoryOutcome": null
+            }
+          ]
+        },
+        {
+          "id": "after-series-first",
+          "choices": [
+            {
+              "id": "jump-followup",
+              "label": "第1回後のCheck-inへ",
+              "userMessage": null,
+              "agentReply": "初回どうだった？ 次も行けば、また会えそうな人はいた？",
+              "understandingLabel": null,
+              "eventOrder": [],
+              "selectFirstEvent": false,
+              "timeJumpLabel": "第1回のあと",
+              "memoryOutcome": null
+            }
+          ]
+        },
+        {
+          "id": "save-continuity",
+          "choices": [
+            {
+              "id": "recognized-next-time",
+              "label": "次も会えそうな人がいた",
+              "userMessage": "同じ初心者の人と話せた。次も来るって言ってた。",
+              "agentReply": "それなら次回は『知らない場所へ行く』じゃなくて、『知ってる人にまた会う』になるね。次の日程も空きを見ておくよ。",
+              "understandingLabel": null,
+              "eventOrder": [],
+              "selectFirstEvent": false,
+              "timeJumpLabel": null,
+              "memoryOutcome": "継続講座では同じ参加者との再会が動機になる。次回日程とのCalendar適合を優先する。"
+            }
+          ]
+        }
+      ],
+      "candidateTitle": "共同活動と継続性から選んだ3件",
+      "candidateEmptyTitle": "前回の反応を思い出しています",
+      "candidateEmptyDetail": "一度出かけたことを成功にせず、次も会える関係へつながる候補を一緒に選びます。",
+      "closingLine": "一回出かけて終わりにしない。次に会う理由ができるところまで、おせっかいする。"
+    }
+  ],
+  "dataNotes": [
+    {
+      "label": "Event",
+      "classification": "recorded_source_snapshot",
+      "detail": "Lu.maの許可されたCalendarと自治体公式講座から取得した実Eventを、取得日時付きで記録しています。"
+    },
+    {
+      "label": "Routes",
+      "classification": "recorded_live",
+      "detail": "Google Routesで計算できた経路時間の記録値です。未取得Eventは経路未記録と表示し、現在値とは扱いません。"
+    },
+    {
+      "label": "Calendar",
+      "classification": "synthetic_demo",
+      "detail": "Googleログイン不要の合成FreeBusyです。予定タイトル・説明・場所・参加者は含みません。"
+    },
+    {
+      "label": "Conversation",
+      "classification": "deterministic_replay",
+      "detail": "審査時にBackendが停止しても同じ価値を見せられる、確認済みの決定論的3 Story再現です。"
+    }
+  ]
+}

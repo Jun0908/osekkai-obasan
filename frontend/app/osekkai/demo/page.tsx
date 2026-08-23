@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 
-import LiveDemoClient from '@/components/osekkai/live-demo-client';
+import JudgeDemoClient from '@/components/osekkai/judge-demo-client';
 
 export const metadata: Metadata = {
-  title: 'Live Demo | おっせかいおばさん',
-  description: '東京都の最新Event、Google Calendar、Google Routesから複数候補を提案するLive Demoです。',
+  title: 'Judge Demo | おっせかいおばさん',
+  description: 'GoogleログインやBackendなしで、誘う・引く・続ける距離感を実Event snapshotとともに再現する3 Storyの審査用Demoです。',
 };
 
 export default function DemoPage() {
-  return <LiveDemoClient />;
+  return <JudgeDemoClient />;
 }

@@ -22,6 +22,7 @@ from osekkai_contracts import (
 )
 from osekkai_freebusy import ProviderError, load_freebusy
 from osekkai_metrics import calculate_metrics
+from osekkai_memory_vault import ObsidianMemoryVault
 from osekkai_google_credentials import (
     GoogleCredentialError,
     GoogleCredentialStore,
@@ -31,6 +32,7 @@ from osekkai_google_credentials import (
     disconnect_google,
 )
 from osekkai_opportunity_sync import load_opportunities
+from osekkai_map_events import load_map_events_result
 from osekkai_scheduler import load_event_mesh, load_source_status, run_sync
 from osekkai_routes import RoutesError, compute_event_route
 from osekkai_profile import (
@@ -313,11 +315,25 @@ def _profile_update_unlocked(
         profile = pause_one_week(profile, now)
     validate_profile(profile)
     store.save_profile_unlocked(user_id, profile)
+    try:
+        vault = ObsidianMemoryVault(data_root=store.root)
+        if profile.get("memoryConsent"):
+            vault.write_profile_projection(profile)
+        else:
+            vault.delete_profile_projection(user_id)
+    except (ContractError, OSError):
+        pass
     if removed_evidence:
         store.scrub_inferred_copies_unlocked(
             user_id,
             evidence_id=payload["removeEvidenceId"],
         )
+        try:
+            ObsidianMemoryVault(data_root=store.root).delete_reference(
+                user_id, payload["removeEvidenceId"]
+            )
+        except (ContractError, OSError):
+            pass
     if removed_preference:
         store.scrub_inferred_copies_unlocked(
             user_id,
@@ -329,7 +345,13 @@ def _profile_update_unlocked(
 def _demo_reset_unlocked(store: JsonStore, user_id: str, now) -> dict[str, Any]:
     if _data_mode() != "demo":
         raise BusinessError("DEMO_MODE_DISABLED", "デモモードは無効です。")
+    memory_deleted = False
+    try:
+        memory_deleted = ObsidianMemoryVault(data_root=store.root).delete_user(user_id)
+    except (ContractError, OSError):
+        memory_deleted = False
     deleted = store.delete_user_unlocked(user_id)
+    deleted["memoryVaultUsers"] = 1 if memory_deleted else 0
     profile = seed_demo_profile(user_id, now)
     validate_profile(profile)
     store.save_profile_unlocked(user_id, profile)
@@ -492,10 +514,15 @@ def _dispatch_read(
         if isinstance(days, bool) or not isinstance(days, int) or not 1 <= days <= 365:
             raise ContractError("retentionDays must be between 1 and 365")
         with store.user_lock(user_id):
+            removed = store.cleanup_unlocked(user_id, now, days)
+            try:
+                ObsidianMemoryVault(data_root=store.root).cleanup_expired(user_id, now)
+            except (ContractError, OSError):
+                pass
             return {
                 "schemaVersion": SCHEMA_VERSION,
                 "retentionDays": days,
-                "removed": store.cleanup_unlocked(user_id, now, days),
+                "removed": removed,
             }
     if command == "sources-status":
         if payload:
@@ -505,6 +532,8 @@ def _dispatch_read(
         if payload:
             raise ContractError("events payload must be empty")
         return load_event_mesh(store=store)
+    if command == "map-events":
+        return load_map_events_result(payload, store=store)
     if command == "event-route":
         mesh = load_event_mesh(store=store)
         event = next((item for item in mesh["events"] if item.get("id") == payload["eventId"]), None)
@@ -522,7 +551,7 @@ def _dispatch_read(
 
 def _operator_main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description="Operate the Osekkai live event mesh")
-    parser.add_argument("command", choices=("sources-sync", "sources-status", "opportunities", "events"))
+    parser.add_argument("command", choices=("sources-sync", "sources-status", "opportunities", "events", "map-events"))
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--live", action="store_true")
     parser.add_argument("--force", action="store_true")
@@ -535,6 +564,8 @@ def _operator_main(argv: list[str]) -> int:
         value = load_source_status(store=store)
     elif args.command == "events":
         value = load_event_mesh(store=store)
+    elif args.command == "map-events":
+        value = load_map_events_result({"scope": "chiyoda_kojimachi", "offset": 0, "limit": 250}, store=store)
     else:
         if not args.live:
             parser.error("opportunities requires --live")
@@ -596,10 +627,17 @@ def main() -> int:
             with store.user_lock(user_id):
                 if os.environ.get("OSEKKAI_CREDENTIAL_ENCRYPTION_KEY", "").strip():
                     disconnect_google(user_id, GoogleCredentialStore(store.root))
+                memory_deleted = False
+                try:
+                    memory_deleted = ObsidianMemoryVault(data_root=store.root).delete_user(user_id)
+                except (ContractError, OSError):
+                    memory_deleted = False
+                deleted_counts = store.delete_user_unlocked(user_id)
+                deleted_counts["memoryVaultUsers"] = 1 if memory_deleted else 0
                 result = {
                     "schemaVersion": SCHEMA_VERSION,
                     "deleted": True,
-                    "deletedCounts": store.delete_user_unlocked(user_id),
+                    "deletedCounts": deleted_counts,
                 }
             replayed = False
         elif mutation:

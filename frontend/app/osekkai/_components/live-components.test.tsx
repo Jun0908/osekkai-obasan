@@ -2,7 +2,7 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { ConnectionEvidence, LiveEvent, Opportunity, RankedOpportunity } from '@/lib/osekkai/types.generated';
+import type { MapEventSummary, Opportunity, RankedOpportunity } from '@/lib/osekkai/types.generated';
 import EventMap from './event-map';
 import LiveSourceStrip from './live-source-strip';
 import RecommendationShortlist from './recommendation-shortlist';
@@ -29,18 +29,22 @@ const ranking: RankedOpportunity[] = ['one', 'two'].map((id, index) => ({
   exclusionReasons: [],
 }));
 
-const event = (id: string, title: string, status: LiveEvent['status'] = 'scheduled'): LiveEvent => ({
-  schemaVersion: '1.0', id, provider: 'tokyo', sourceRecordId: id, title, description: '公開説明',
-  startsAt: '2026-09-05T14:00:00+09:00', endsAt: '2026-09-05T16:00:00+09:00', timezone: 'Asia/Tokyo',
-  venueName: '東京会場', address: '東京都', latitude: null, longitude: null, communityId: null, seriesId: null,
-  status, registrationStatus: status === 'scheduled' ? 'open' : 'closed', registrationDeadline: null,
+const event = (id: string, title: string, status: MapEventSummary['status'] = 'scheduled'): MapEventSummary => ({
+  id, provider: 'tokyo', title,
+  startsAt: '2026-09-05T14:00:00+09:00', endsAt: '2026-09-05T16:00:00+09:00',
+  venueName: '麹町会場', address: '東京都千代田区麹町1丁目', latitude: 35.684, longitude: 139.7373, seriesId: null,
+  status, registrationStatus: status === 'scheduled' ? 'open' : 'closed',
   capacity: null, participants: null, priceYen: null, categories: [], sourceUrl: `https://example.com/${id}`,
-  sourceDataset: '東京都Open Data', license: 'CC BY', sourceClassification: 'raw_open_data',
-  sourceUpdatedAt: '2026-08-23T09:00:00+09:00', fetchedAt: '2026-08-23T09:00:00+09:00',
-  revalidatedAt: '2026-08-23T09:00:00+09:00', checksum: 'b'.repeat(64), fieldProvenance: {
-    title: { classification: 'source_verified', sourceUrl: `https://example.com/${id}`, capturedAt: '2026-08-23T09:00:00+09:00' },
-  },
+  sourceClassification: 'raw_open_data', revalidatedAt: '2026-08-23T09:00:00+09:00',
+  opportunityId: null, travelMinutes: null, connectionEvidence: null,
 });
+
+const mapProps = {
+  ranking: [] as RankedOpportunity[],
+  counts: { totalInMesh: 2, inWard: 2, withCoordinates: 2, missingCoordinates: 0, returned: 2 },
+  loading: false,
+  loadingMore: false,
+};
 
 describe('Live judge components', () => {
   it('shows multiple ranked recommendations with source facts', () => {
@@ -61,11 +65,10 @@ describe('Live judge components', () => {
   });
 
   it('keeps non-recommended and canceled events in the complete fallback list', () => {
-    const evidence: ConnectionEvidence[] = [];
-    render(<EventMap events={[event('exhibition', '大規模展示'), event('canceled', '中止になった交流会', 'canceled')]} opportunities={[]} evidence={evidence} ranking={[]} />);
+    render(<EventMap {...mapProps} events={[event('exhibition', '大規模展示'), event('canceled', '中止になった交流会', 'canceled')]} />);
     expect(screen.getByText('大規模展示')).toBeInTheDocument();
     expect(screen.getByText('中止になった交流会')).toBeInTheDocument();
-    expect(screen.getByText(/2件中/)).toBeInTheDocument();
+    expect(screen.getByText(/千代田区2件/)).toBeInTheDocument();
   });
 
   it('falls back to region search when browser geolocation is denied', () => {
@@ -77,11 +80,10 @@ describe('Live judge components', () => {
       value: { getCurrentPosition },
     });
 
-    render(<EventMap events={[event('community', '地域の交流会')]} opportunities={[]} evidence={[]} ranking={[]} />);
-    fireEvent.click(screen.getByRole('button', { name: /現在地から探す/ }));
+    render(<EventMap {...mapProps} events={[event('community', '地域の交流会')]} />);
+    fireEvent.click(screen.getByRole('button', { name: /現在地を移動時間に使う/ }));
 
     expect(getCurrentPosition).toHaveBeenCalledOnce();
-    expect(screen.getByText('現在地を使わず、地域名で探せます')).toBeInTheDocument();
-    expect(screen.getByLabelText('駅名または地域名')).toBeInTheDocument();
+    expect(screen.getByText('現在地を使わず、地図のEventを見られます')).toBeInTheDocument();
   });
 });

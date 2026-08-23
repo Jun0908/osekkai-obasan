@@ -3,12 +3,11 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 
-import LiveSourceStrip from '@/app/osekkai/_components/live-source-strip';
 import RecommendationShortlist from '@/app/osekkai/_components/recommendation-shortlist';
 import styles from '@/app/osekkai/osekkai.module.css';
 import { osekkaiApi } from '@/lib/osekkai/api';
 import type { DecisionResult, RankedOpportunity } from '@/lib/osekkai/types.generated';
-import type { OpportunitiesResult, SourceStatusResult } from '@/lib/osekkai/types';
+import type { OpportunitiesResult } from '@/lib/osekkai/types';
 import { friendlyApiError } from './api-client';
 import DemoClient from './demo-client';
 
@@ -16,7 +15,6 @@ type Stage = 'idle' | 'sources' | 'calendar' | 'routes' | 'decision' | 'complete
 
 export default function LiveDemoClient() {
   const [mode, setMode] = useState<'demo' | 'live' | null>(null);
-  const [sources, setSources] = useState<SourceStatusResult | null>(null);
   const [opportunities, setOpportunities] = useState<OpportunitiesResult | null>(null);
   const [decision, setDecision] = useState<DecisionResult | null>(null);
   const [stage, setStage] = useState<Stage>('idle');
@@ -30,12 +28,8 @@ export default function LiveDemoClient() {
       if (!active) return;
       setMode(session.dataMode);
       if (session.dataMode === 'live') {
-        const [sourceStatus, currentOpportunities] = await Promise.all([
-          osekkaiApi.sources(),
-          osekkaiApi.opportunities(),
-        ]);
+        const currentOpportunities = await osekkaiApi.opportunities();
         if (active) {
-          setSources(sourceStatus);
           setOpportunities(currentOpportunities);
         }
       }
@@ -55,8 +49,7 @@ export default function LiveDemoClient() {
       // Respect each provider's freshness window during the judge flow. A forced
       // refresh remains available on the Event Map, while repeated demo runs can
       // reuse the latest verified cache instead of waiting on every provider.
-      const sourceStatus = await osekkaiApi.syncSources(false);
-      setSources(sourceStatus);
+      await osekkaiApi.syncSources(false);
 
       setStage('calendar');
       const freebusy = await osekkaiApi.freebusy();
@@ -125,8 +118,6 @@ export default function LiveDemoClient() {
           <div><span>Routes</span><b>{cards.length ? '実測候補あり' : '同期待ち'}</b></div>
         </aside>
       </section>
-
-      <LiveSourceStrip status={sources} />
 
       <ol className={styles.livePipeline} aria-label="Live判断の進行状況" aria-live="polite">
         {stages.map(([key, label], index) => (

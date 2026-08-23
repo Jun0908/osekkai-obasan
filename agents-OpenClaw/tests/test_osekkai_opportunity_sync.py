@@ -73,6 +73,64 @@ class OpportunitySyncTests(unittest.TestCase):
         self.assertEqual(excluded, [])
         self.assertIsNone(opportunities[0]["priceYen"])
 
+    def test_long_provider_description_is_bounded_without_stopping_materialization(self):
+        fixture = self.fixture()
+        event = {**fixture["events"][0], "description": "<p>交流イベントの説明</p>" * 1000}
+        connection = fixture["connectionEvidence"][0]
+        route = {
+            "mode": "walk",
+            "minutes": 8,
+            "source": "maps_verified",
+            "computedAt": "2026-08-23T08:15:00+09:00",
+            "distanceMeters": 620,
+            "confidence": 1,
+            "resolvedAddress": event["address"],
+            "latitude": event["latitude"],
+            "longitude": event["longitude"],
+        }
+        opportunities, excluded = events_to_opportunities(
+            [event],
+            connection_by_event_id={event["id"]: connection},
+            route_by_event_id={event["id"]: route},
+        )
+        self.assertEqual(excluded, [])
+        self.assertEqual(len(opportunities), 1)
+        self.assertLessEqual(len(opportunities[0]["description"]), 3000)
+        self.assertTrue(opportunities[0]["description"].endswith("全文はSourceを確認］"))
+
+    def test_invalid_provider_record_is_excluded_without_aborting_other_events(self):
+        fixture = self.fixture()
+        valid_event = fixture["events"][0]
+        invalid_event = {**fixture["events"][1], "sourceRecordId": "x" * 161}
+        connection_by_id = {
+            valid_event["id"]: fixture["connectionEvidence"][0],
+            invalid_event["id"]: fixture["connectionEvidence"][1],
+        }
+
+        def route(event):
+            return {
+                "mode": "walk",
+                "minutes": 8,
+                "source": "maps_verified",
+                "computedAt": "2026-08-23T08:15:00+09:00",
+                "distanceMeters": 620,
+                "confidence": 1,
+                "resolvedAddress": event["address"],
+                "latitude": event["latitude"],
+                "longitude": event["longitude"],
+            }
+
+        opportunities, excluded = events_to_opportunities(
+            [valid_event, invalid_event],
+            connection_by_event_id=connection_by_id,
+            route_by_event_id={valid_event["id"]: route(valid_event), invalid_event["id"]: route(invalid_event)},
+        )
+        self.assertEqual([item["eventId"] for item in opportunities], [valid_event["id"]])
+        self.assertEqual(
+            excluded,
+            [{"eventId": invalid_event["id"], "reasons": ["OPPORTUNITY_CONTRACT_INVALID"]}],
+        )
+
     def test_route_longer_than_opportunity_contract_is_excluded_without_aborting_sync(self):
         fixture = self.fixture()
         event = fixture["events"][0]

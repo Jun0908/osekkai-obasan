@@ -16,6 +16,7 @@ export default function CommunityDirectorySheet({
       <div className={styles.mapSheetLabels}>
         <span>Open Data</span>
         <span>{facility.ward}</span>
+        <span>{facility.precise ? '活動場所の座標' : '区役所の目安地点'}</span>
         <span>{facility.communities.length}件</span>
       </div>
       <h2>{facility.name}</h2>

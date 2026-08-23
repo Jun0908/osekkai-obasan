@@ -22,6 +22,7 @@ export type CommunityFacilitySummary = {
   latitude: number;
   longitude: number;
   sourceUrl: string;
+  precise: boolean;
   count: number;
 };
 
@@ -38,8 +39,7 @@ export type CommunityDirectoryResult = {
   };
   counts: {
     total: number;
-    withVenueAddress: number;
-    withKnownFacility: number;
+    withPreciseLocation: number;
     withWardOfficeFallback: number;
   };
   facilities: CommunityFacilitySummary[];

@@ -30,8 +30,11 @@ declare global {
 }
 
 const KOJIMACHI = { latitude: 35.6840, longitude: 139.7373 };
-const INITIAL_ZOOM = 12;
-const WARD_ZOOM = 14;
+const INITIAL_ZOOM = 14;
+const WARD_ZOOM = 13;
+const ALL_WARDS_ZOOM = 10;
+const ALL_WARDS_VALUE = '__all__';
+const DEFAULT_WARD = '千代田区';
 const INITIAL_LIST_LIMIT = 40;
 
 let mapsPromise: Promise<MapsApi> | null = null;
@@ -104,7 +107,7 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
   const [selectedFacility, setSelectedFacility] = useState<CommunityFacilityDetail | null>(null);
   const [facilityLoading, setFacilityLoading] = useState(false);
   const [facilityError, setFacilityError] = useState('');
-  const [wardChoice, setWardChoice] = useState('');
+  const [wardChoice, setWardChoice] = useState(DEFAULT_WARD);
   const [filter, setFilter] = useState<Filter>('all');
   const [origin, setOrigin] = useState<Coordinates | null>(null);
   const [locationState, setLocationState] = useState('地図は麹町中心・現在地は保存しません');
@@ -198,13 +201,23 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
       .finally(() => setFacilityLoading(false));
   };
 
+  const visibleFacilities = useMemo(() => {
+    if (!communities) return [];
+    if (wardChoice === ALL_WARDS_VALUE) return communities.facilities;
+    return communities.facilities.filter((facility) => facility.ward === wardChoice);
+  }, [communities, wardChoice]);
+  const visibleCommunityCount = useMemo(
+    () => visibleFacilities.reduce((sum, facility) => sum + facility.count, 0),
+    [visibleFacilities],
+  );
+
   useEffect(() => {
     const api = window.google?.maps;
     const activeMap = map.current;
     if (!api || !activeMap) return;
     communityMarkers.current.forEach((marker) => marker.setMap(null));
-    if (!showCommunities || !communities) { communityMarkers.current = []; return; }
-    communityMarkers.current = communities.facilities.map((facility) => {
+    if (!showCommunities) { communityMarkers.current = []; return; }
+    communityMarkers.current = visibleFacilities.map((facility) => {
       const marker = new api.Marker({
         map: activeMap,
         position: { lat: facility.latitude, lng: facility.longitude },
@@ -214,7 +227,7 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
       marker.addListener('click', () => openFacility(facility));
       return marker;
     });
-  }, [communities, showCommunities, mapRevision]);
+  }, [visibleFacilities, showCommunities, mapRevision]);
 
   useEffect(() => {
     const api = window.google?.maps;
@@ -269,14 +282,23 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
   };
 
   const resetToKojimachi = () => {
-    setWardChoice('');
+    setWardChoice(DEFAULT_WARD);
     map.current?.setCenter({ lat: KOJIMACHI.latitude, lng: KOJIMACHI.longitude });
     map.current?.setZoom(INITIAL_ZOOM);
   };
 
   const jumpToWard = (ward: string) => {
     setWardChoice(ward);
-    if (!ward) { resetToKojimachi(); return; }
+    if (ward === ALL_WARDS_VALUE) {
+      map.current?.setCenter({ lat: KOJIMACHI.latitude, lng: KOJIMACHI.longitude });
+      map.current?.setZoom(ALL_WARDS_ZOOM);
+      return;
+    }
+    if (ward === DEFAULT_WARD) {
+      map.current?.setCenter({ lat: KOJIMACHI.latitude, lng: KOJIMACHI.longitude });
+      map.current?.setZoom(INITIAL_ZOOM);
+      return;
+    }
     const target = wardOptions.find((facility) => facility.ward === ward);
     if (!target || !map.current) return;
     map.current.setCenter({ lat: target.latitude, lng: target.longitude });
@@ -303,9 +325,9 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
         <button type="button" data-active={showCommunities} onClick={() => setShowCommunities((value) => !value)}>
           ⌂ 地域コミュニティ{showCommunities ? 'を隠す' : 'を表示'}
         </button>
-        <select aria-label="区を選んで地図を移動" value={wardChoice} onChange={(event) => jumpToWard(event.target.value)}>
-          <option value="">区を選んで移動…</option>
+        <select aria-label="表示する区を選ぶ" value={wardChoice} onChange={(event) => jumpToWard(event.target.value)}>
           {wardOptions.map((option) => <option key={option.ward} value={option.ward}>{option.ward}</option>)}
+          <option value={ALL_WARDS_VALUE}>全23区をまとめて表示</option>
         </select>
         <span aria-live="polite">{locationState}</span>
       </div>
@@ -324,7 +346,9 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
       </p>
       {communities ? (
         <p className={styles.mapCount}>
-          東京23区の地域コミュニティ{communities.counts.total.toLocaleString()}件を{communities.facilities.length.toLocaleString()}拠点にまとめて表示（Open Data・開催日時未確認）。
+          {wardChoice === ALL_WARDS_VALUE
+            ? `東京23区の地域コミュニティ${communities.counts.total.toLocaleString()}件を${communities.facilities.length.toLocaleString()}拠点にまとめて表示（Open Data・開催日時未確認）。`
+            : `${wardChoice}の地域コミュニティ${visibleCommunityCount.toLocaleString()}件を${visibleFacilities.length.toLocaleString()}拠点で表示中（東京23区全体では${communities.counts.total.toLocaleString()}件）。他の区は上のセレクトから選べます。`}
         </p>
       ) : null}
       {facilityError ? <p className={styles.mapRouteError} role="alert">{facilityError}</p> : null}

@@ -570,6 +570,12 @@ frontend/.env.example
     - 共有ジオコーディングファイルを`chiyoda-facility-directory.json`（千代田区専用）から`data/tokyo-community/ward-geocoding-directory.json`（23区、区ごとに`wardOffice`＋`anchors`）へ置き換えた。千代田区は従来通り九段生涯学習館／千代田区立スポーツセンターへ解決し、他22区は区役所へフォールバックする
     - `osekkai_community_directory.py`・`frontend/lib/osekkai/community-directory.ts`とも新形式に追従済み。Python側の`load_community_directory(ward)`は引き続き単一区スコープ（Chat Groundingは1区分のFactで十分なため）、TypeScript側はMap向けに23区サマリー＋施設単位オンデマンド詳細（`loadCommunityDirectorySummary`/`loadCommunityFacilityDetail`）へ分離
     - 検証: `test_osekkai_community_directory.py`（6件、実リポジトリの23区分クロスチェック含む）、`test_osekkai_chat_community_directory.py`（2件）を新形式で更新して成功
+  - 再追記（2026-08-23、`communities.csv`が自前ジオコーディング済みに差し替わったことに伴う再設計）:
+    - [Tokyo Community Data](https://github.com/Jun0908/tokyo_community_data)側のパイプラインが`latitude`/`longitude`/`map_location_id`/`geocoded_address`等を`communities.csv`へ直接持つようになった（10,076件中6,590件、65%）。これにより`venue_name`の部分一致で施設を推測する旧ロジック（Chiyodaの2施設のみ手動登録）と、その場しのぎで作った`venue-address-directory.json`は不要になったため削除し、CSV自身の座標を第一の情報源にする設計へ作り直した
+    - 解決優先順位を「①CSVの`latitude`/`longitude`（あれば、`map_location_id`で同一地点をグルーピング） → ②区役所」の2段階に単純化。`ward-geocoding-directory.json`は各区の`wardOffice`のみを持つ形へ縮小（`anchors`は廃止）
+    - 結果、千代田区も含め23区すべてで概ね実座標（65%）を使い、残り35%だけが区役所への目安表示になった。以前は千代田区の九段/スポーツセンターと渋谷区の一部（80件）だけが実座標で、他は区役所1点に集約されていた
+    - `CommunityDirectoryResult.counts`を`{total, withPreciseLocation, withWardOfficeFallback}`に、`CommunityFacilitySummary`に`precise: boolean`を追加。地図の拠点シートに「活動場所の座標」/「区役所の目安地点」のラベルを表示
+    - 検証: TypeScript 5件・Python 8件を新設計で更新して成功。実データで`withPreciseLocation: 6590, withWardOfficeFallback: 3486`を確認
 
 ### Gate 11 — Google Calendar接続がCloudflare Tunnel経由で失敗する（運用上の既知事象・コード修正なしで解決）
 

@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
+from osekkai_community_directory import format_community_facts, load_community_directory
 from osekkai_contracts import ContractError, SCHEMA_VERSION
 from osekkai_dialogue_plan import build_dialogue_plan
 from osekkai_conversation import (
@@ -42,6 +43,10 @@ TIRED_MARKERS = ("疲れた", "つかれた", "しんどい", "exhausted", "tire
 OUTSIDE_MARKERS = ("少し外に出たい", "外に出たい", "散歩したい", "go outside")
 NO_TALK_MARKERS = ("話したくない", "会話したくない", "喋りたくない", "don't want to talk")
 DO_NOT_REMEMBER_MARKERS = ("これは覚えないで", "覚えないで", "don't remember")
+COMMUNITY_INQUIRY_MARKERS = (
+    "サークル", "コミュニティ", "地域の活動", "地域活動", "自治会", "町内会", "同好会",
+    "習い事", "九段", "スポーツセンター",
+)
 INTEREST_CUES = ("好き", "したい", "やりたい", "始めたい", "興味", "行きたい", "参加したい")
 INTEREST_NEGATIONS = ("嫌い", "興味ない", "したくない", "やりたくない", "行きたくない")
 INTEREST_GROUPS = (
@@ -373,10 +378,19 @@ def process_chat_unlocked(
             store.save_profile_unlocked(user_id, profile)
         conversation["profile"] = profile
 
+    community_facts: list[str] | None = None
+    if _contains(message, COMMUNITY_INQUIRY_MARKERS):
+        try:
+            community_facts = format_community_facts(load_community_directory())
+        except (OSError, ValueError, KeyError):
+            # Raw Open Data pins are enhancement-only; chat must keep working without them.
+            community_facts = None
+
     plan = build_dialogue_plan(
         conversation,
         understanding=understanding,
         memories=relevant_memories,
+        community_facts=community_facts,
     )
     rendered = render_conversation_reply(
         plan,

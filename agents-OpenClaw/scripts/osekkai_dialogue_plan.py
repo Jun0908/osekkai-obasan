@@ -81,6 +81,7 @@ def build_dialogue_plan(
     *,
     understanding: dict[str, Any] | None,
     memories: list[dict[str, Any]],
+    community_facts: list[str] | None = None,
 ) -> dict[str, Any]:
     fallback = str(conversation.get("reply", "")).strip()
     context = conversation.get("context") if isinstance(conversation.get("context"), dict) else {}
@@ -96,6 +97,11 @@ def build_dialogue_plan(
     ]
     allowed_event_ids = [str(item["id"]) for item in opportunities if isinstance(item.get("id"), str)]
     allowed_facts = [fact for opportunity in opportunities for fact in _event_facts(opportunity)]
+    # Community-directory facts are Raw Open Data (unverified activity/dates), not Live
+    # Provider events, so they are appended as plain facts the renderer may mention, never
+    # forced into mustMention and never given an eventId the renderer could treat as bookable.
+    if community_facts:
+        allowed_facts.extend(str(fact)[:300] for fact in community_facts if str(fact).strip())
     must_mention: list[str] = []
     notice = context.get("notice")
     if isinstance(notice, str) and notice.strip():

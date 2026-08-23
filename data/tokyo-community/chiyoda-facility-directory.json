@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "ward": "千代田区",
+  "note": "communities.csvのvenue_nameから解決できる施設は、市区町村単位のCSVでは九段・スポーツセンターの2施設のみ。座標は住所を国土地理院 住所検索API（https://msearch.gsi.go.jp/address-search/AddressSearch）でジオコーディングした結果で、個々のコミュニティごとの実住所ではない。TypeScript（frontend/lib/osekkai/community-directory.ts）とPython（agents-OpenClaw/scripts/osekkai_community_directory.py）の両方がこの1ファイルを読む。",
+  "facilities": [
+    {
+      "key": "kudan",
+      "match": "九段",
+      "name": "九段生涯学習館",
+      "address": "東京都千代田区九段南1-5-10",
+      "latitude": 35.695339,
+      "longitude": 139.751984,
+      "sourceUrl": "https://www.city.chiyoda.lg.jp/shisetsu/bunka/kudan-gakushu.html"
+    },
+    {
+      "key": "sports-center",
+      "match": "スポーツセンター",
+      "name": "千代田区立スポーツセンター",
+      "address": "東京都千代田区内神田2-1-8",
+      "latitude": 35.689342,
+      "longitude": 139.767685,
+      "sourceUrl": "https://www.city.chiyoda.lg.jp/shisetsu/bunka/sportscenter.html"
+    }
+  ]
+}

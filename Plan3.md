@@ -524,6 +524,71 @@ frontend/.env.example
     - Event事実がSourceと一致する
     - Calendar予定内容と正確な現在地を表示・保存しない
 
+### Gate 10 — 地域コミュニティOpen DataのLLM Grounding
+
+**問題**: `data/tokyo-community/communities.csv`（千代田区の地域コミュニティ・サークル一覧、Open Data）は`/osekkai/map`には反映済みだが、`話す`のLLM経路からは一切参照できない。
+
+**原因の切り分け**:
+- このCSVを読んでいるのは`frontend/lib/osekkai/community-directory.ts`（Node/TypeScriptのみ、`fs`で直接CSVを読む）と、それを返す`frontend/app/api/osekkai/community-directory/route.ts`だけ。`agents-OpenClaw`配下には`tokyo-community`/`communities.csv`を参照するコードが1件も無い（grep確認済み）
+- LLM経路（`osekkai_chat.py`）は、既存のLive Event Mesh由来の`opportunity`のみを事実として扱う。`osekkai_dialogue_plan.py`の`_event_facts()`（48行目）と`build_dialogue_plan()`（79行目）は`context["recommendations"]`（＝Opportunity）からしか`allowedEventFacts`を作らず、地域コミュニティ一覧を渡す引数自体が存在しない
+- `osekkai_chat.py`の`understand_message()`呼び出し（216〜243行目付近）も、渡しているのは`message` / `memories`（本人のObsidian記憶） / `recent_turns` / `episode_state`だけで、地域のOpen Data候補は渡していない
+- 地域コミュニティのデータは`verification_status: official_source_unverified_current`（活動有無・開催日時は未確認）であり、Plan2 §7のProvenance区分では「Raw Open Data」。既存の`opportunity`（Live Provider Data、必ず`startsAt`/`endsAt`と募集状態を持つ）とは型が異なるため、既存の`_event_facts()`にそのまま混ぜることはできない
+
+- [x] **TASK-311: 地域コミュニティOpen DataをPython側から読めるようにし、Dialogue Planへ根拠付きで渡す**
+  - 依存: TASK-306（Dialogue Plan + LLM Renderer）
+  - 対象:
+    - `agents-OpenClaw/scripts/osekkai_community_directory.py`（新規）
+    - `data/tokyo-community/`配下に、施設名→座標の対応表を共有データとして切り出す（例: `chiyoda-facility-directory.json`）。現状この対応表は`frontend/lib/osekkai/community-directory.ts`内にTypeScriptの定数として直書きされており、Python側に複製すると九段生涯学習館・千代田区立スポーツセンターの座標が二重管理でズレる恐れがあるため、JSONを正本にしてTS・Python両方から読む形に揃える
+    - `agents-OpenClaw/scripts/osekkai_dialogue_plan.py`（`_event_facts`に相当する`_community_facts()`を追加し、`build_dialogue_plan()`に`communities`引数を追加）
+    - `agents-OpenClaw/scripts/osekkai_chat.py`（地域コミュニティ候補を取得し、`understand_message`または`build_dialogue_plan`へ渡す箇所を追加）
+    - `contracts/osekkai/dialogue-plan.schema.json`（`allowedEventFacts`と別に、Raw Open Data由来であることが分かる`allowedCommunityFacts`等のフィールドを追加）
+    - 生成されるTypeScript型・validator
+  - 作業:
+    - `osekkai_community_directory.py`で`communities.csv`を千代田区に絞って読み込み、共有facility JSONで施設座標へ解決する（`frontend/lib/osekkai/community-directory.ts`と同じロジック・同じ出力件数になることをテストで突き合わせる）
+    - ユーザーの発話が地域のサークル・活動場所を尋ねている時だけ（毎ターン全件を渡さない）、該当する施設・コミュニティ名をDialogue Planの事実として渡す
+    - Factの文言に「Open Data・活動有無や開催日時は未確認」を必ず含め、`osekkai_dialogue_plan.py`の`PROHIBITED_CLAIMS`と矛盾しないようにする（「次回あり」「募集中」等をこのFactから断定させない）
+    - LLM UnderstandingがCalendar予定やLive Eventと混同しないよう、事実の出典（Raw Open Data）をRendererのGrounding検査でも区別する
+  - 完了条件:
+    - 「九段でどんなサークルがある？」のような発話に対し、実際に`communities.csv`に載っている名称で応答できる
+    - 応答が「募集中」「次回あり」等、CSVに存在しない確度の高い主張をしない
+    - 該当しない発話では地域コミュニティFactを渡さず、既存の応答挙動・トークン量を悪化させない
+    - Map側（`frontend/lib/osekkai/community-directory.ts`）とPython側の対象件数・施設座標が一致する
+  - 検証:
+    - `python -m unittest discover -s tests -p "test_osekkai_community_directory.py" -v`（新規）
+    - `python -m unittest discover -s tests -p "test_osekkai_dialogue_plan.py" -v`
+    - `npm.cmd run generate:contracts; npm.cmd run typecheck`
+  - 完了記録（2026-08-23）:
+    - 実装は当初案から1点簡略化: `dialogue-plan.schema.json`へ`allowedCommunityFacts`を新設せず、既存の`allowedEventFacts`（`type: string`の配列で形式制約なし）にOpen Data由来と分かる接頭辞付き文字列として合流させた。Contract・生成TypeScript・codegenパイプラインを一切変更せずに済み、他作業と衝突するリスクを避けられるため
+    - `data/tokyo-community/chiyoda-facility-directory.json`を新設し、施設名（九段生涯学習館・千代田区立スポーツセンター）の名称・住所・座標・出典URLをTypeScript（`frontend/lib/osekkai/community-directory.ts`）とPython（新規`agents-OpenClaw/scripts/osekkai_community_directory.py`）の両方から読む形に統一。座標の二重管理・drift問題を解消
+    - `osekkai_community_directory.py`: `communities.csv`を指定区で絞り込み、施設ごとにグルーピングして件数・座標を返す。`format_community_facts()`で1施設1Factに圧縮し、`Open Data・活動有無/開催日時は未確認`の注記を必ず含める（`osekkai_dialogue_plan.py`の`PROHIBITED_CLAIMS`と矛盾しない）
+    - `osekkai_dialogue_plan.py`の`build_dialogue_plan()`に`community_facts`引数を追加。既存呼び出し（引数省略）は完全に無変更の挙動
+    - `osekkai_chat.py`に`COMMUNITY_INQUIRY_MARKERS`（「サークル」「コミュニティ」「九段」「スポーツセンター」等）を追加し、該当キーワードを含む発話の時だけ`load_community_directory()`→`format_community_facts()`を呼び、`build_dialogue_plan`へ渡す。CSV・共有JSONの読み込み失敗は`OSError/ValueError/KeyError`で握りつぶし、Enhancement-onlyとして会話を止めない
+    - 新規テスト: `test_osekkai_community_directory.py`（5件、実リポジトリCSVとの突き合わせを含む）、`test_osekkai_dialogue_plan.py`（4件、新規ファイル）、`test_osekkai_chat_community_directory.py`（2件、キーワード該当/非該当の両方を`process_chat_unlocked`経由でEnd-to-End検証）
+    - 検証結果: Python 182 tests / contract 35 schemas・22 instances 成功。Frontend 98 tests / typecheck / lint / production build 成功。実行中のdev serverで`/api/osekkai/community-directory`が改修後も同じ実データを返すことを確認
+    - 残課題: `COMMUNITY_INQUIRY_MARKERS`はキーワード一致のみで、LLM Understandingの`intent`（`ask_question`等）は使っていない。誤検知・見逃しが目立つ場合はLLM intentとの併用を検討
+
+### Gate 11 — Google Calendar接続がCloudflare Tunnel経由で失敗する（運用上の既知事象・コード修正なしで解決）
+
+**症状**: 開発サーバーを外部公開するCloudflare Quick Tunnel（`cloudflared tunnel --url http://localhost:3000`）を張った状態で、そのトンネルURL（`https://<random>.trycloudflare.com`）を開いて「Googleカレンダーに接続」を行うと接続が完了しない。
+
+**原因**:
+- `GOOGLE_REDIRECT_URI`（`frontend/.env`）は`http://localhost:3000/api/osekkai/calendar/callback`に固定（[osekkai_google_credentials.py](agents-OpenClaw/scripts/osekkai_google_credentials.py)の`GoogleOAuthConfig.from_env`は`http`スキームを`localhost`/`127.0.0.1`以外で拒否するため、そもそも動的にトンネルのホストへ差し替える設計にもなっていない）
+- セッションCookieは`Domain`未指定のホスト限定Cookie（[osekkai-user.ts:140,179](frontend/lib/server/osekkai-user.ts)、`sameSite: 'lax'`）
+- トンネルのホスト（例: `benz-....trycloudflare.com`）で「接続」を開始するとセッションCookieはそのホストにだけ発行される
+- Googleの認証後リダイレクト先は固定で`localhost:3000`のため、ブラウザはトンネル用Cookieを送らない
+- `calendarCallbackGet`（[osekkai-route-handlers.ts:65](frontend/lib/server/osekkai-route-handlers.ts)）は`requireOsekkaiSession()`でセッション必須のため、`SESSION_REQUIRED`（401）で失敗する
+- 実データ上の証拠: `agents-OpenClaw/data/osekkai/credentials/`に`google-state-*.enc`（未完了のOAuth試行）が複数残っており、トンネル経由での失敗試行と一致する時刻だった
+
+**確認したこと・コード修正は不要と判断した根拠**:
+- `http://localhost:3000`を直接開いて接続した既存2ユーザーについて、保存済みRefresh Tokenでの実アクセストークン更新（Google `/token`エンドポイントへの実通信）と実FreeBusy取得を両方とも実行し、両ユーザーとも成功を確認（2026-08-23）
+- したがってCalendar接続の実装自体（OAuth・PKCE・トークン保存・FreeBusy取得）にバグはない。原因は100%、トンネルのホストと固定`redirect_uri`のホストが一致しないことによるセッションCookieの不一致
+
+**運用ルール（今後この事象を再発させないために）**:
+- **Google Calendarへの接続操作は必ず`http://localhost:3000`を直接開いて行う。**Cloudflare Tunnel等の別ホスト経由では行わない
+- 一度`localhost:3000`で接続が完了すれば、以後の閲覧（`/osekkai/map`等）はトンネル経由でも問題ない（Calendar関連のCookie依存はOAuthの往復時だけ）
+- トンネル経由でもCalendar接続を成立させたい場合は、(1) `GOOGLE_REDIRECT_URI`をトンネルのURLに変更し、(2) Google Cloud ConsoleのOAuthクライアントの「承認済みのリダイレクトURI」に同じURLを追加登録する必要がある。ただしCloudflare Quick TunnelのURLは起動のたびに変わるため、固定ホスト名のNamed Tunnelに切り替えない限りこの対応は再起動ごとに崩れる
+- 失敗した接続試行の残骸（`agents-OpenClaw/data/osekkai/credentials/google-state-*.enc`）は自動的には削除されない（`consume_state`は成功時のみ削除）。機能には影響しないが、気になる場合は手動削除で問題ない
+
 ---
 
 ## 11. Test方針

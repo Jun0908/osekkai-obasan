@@ -1,6 +1,6 @@
 # おっせかいおばさん
 
-**Current Version — Three-Distance Judge Demo + LLM Memory + Chiyoda Fast Map Build 2026-08-23**
+**Current Version — Three-Distance Judge Demo + LLM Memory + Chiyoda Fast Map + 自作Community Open Data Build 2026-08-23**
 
 [スライドを見る](https://canva.link/uro4qx4tm4llm9n) · [PVを見る](https://www.youtube.com/watch?v=me60PvZPABQ)
 
@@ -54,27 +54,17 @@ Today、Memory、Whyといった内部判断パネルは通常の会話画面に
 - OpenAI Responses APIによる構造化理解とGrounding済み返答、timeout・quota・不正応答時の固定文Fallback
 - 利用者別Obsidian Vaultへの短いMemory Note、関連検索、同意OFF、個別削除、全削除、retention
 - 麹町を初期表示し、千代田区の住所・座標を確認できたEventを250件ずつ段階取得するMapと一覧fallback
+- 自作の[東京23区 地域コミュニティDataset](https://github.com/Jun0908/tokyo_community_data)から千代田区分を拠点別（九段生涯学習館・千代田区立スポーツセンター）に集約してMapへ表示し、`話す`のLLM Groundingにも根拠付きで接続
 - Map上の明示操作でBrowser Geolocationを一時取得し、選択EventのRoutes計算にだけ使う位置情報導線
 - 再現可能なJudge Demo・P0オフラインデモと、Live Provider fixtureを使う統合テスト
-
-### 2026-08-23の実接続確認
-
-- Google Cloud Billingの有効化、Calendar OAuth / FreeBusy、Google Routes / Geocoding、Google Maps JavaScriptの実接続を確認
-- 許可されたLu.ma iCalから50 Event、Doorkeeper APIから25 EventをLive取得
-- Credential不要経路では東京都CKAN 5 dataset、江東区文化コミュニティ財団公式Site 169開催回を取得
-- 実Provider 4系統から239 Eventを統合し、鮮度・募集状態・Connection Evidenceで91件を適格化、Google Routesで8件の実移動時間を確認
-- Doorkeeperの長文説明はSource全文への導線を残して表示上限へ収め、1件の異常データでLive同期全体を止めない。現在は推薦可能7件
-- 文京区公式CSV 1件は外部URLの取得に失敗しているためSource Errorとして明示し、そのEventをLive PUSHへ混ぜず他Sourceを継続
-- 実Google FreeBusy、実Routes、好みを使うPolicyの通し確認で、標準設定から優先順位付き3候補を生成
+- Google Cloud Billing、Calendar OAuth / FreeBusy、Google Routes / Geocoding、Google Maps JavaScriptの実接続
+- 許可されたLu.ma iCalから50 Event、Doorkeeper APIから25 EventをLive取得。東京都CKAN 5 dataset、江東区文化コミュニティ財団公式Site 169開催回もCredential不要経路で取得
+- 実Provider 4系統から239 Eventを統合し、鮮度・募集状態・Connection Evidenceで91件を適格化、Google Routesで8件の実移動時間を確認、推薦可能7件
+- 実Google FreeBusy・実Routes・好みを使うPolicyの通し確認で、標準設定から優先順位付き3候補を生成
 - 実LLMで自由文の好み・参加障壁の構造化と自然な返答を確認し、LLM OFFでも同じ会話経路を完走
-- 料金がSourceで確認できないEventは無料と推定せず`料金未確認`と表示し、遠すぎる経路や根拠不足のEventは推薦から除外
-- Sourceの強制再同期を毎画面表示から外し、通常表示は保存済みLive Cacheを読む
+- 料金がSourceで確認できないEventは無料と推定せず`料金未確認`と表示
 
-### 次に行うこと
-
-個別ProviderとGoogle実接続、実データを使う複数候補生成、Calendarの疎な期間から始まる先回り会話、自由文の参加障壁に応じた一度だけの再提案、参加後Check-in、次回へ戻るObsidian Memoryまで実装済みです。審査用の`/osekkai/demo`は外部接続に依存せず、`誘う / 引く / 続ける`の各Storyを個別に短く再生できます。Vercel上でProviderやPythonが停止しても、空き時間から趣味を聞く、疲れた日は追わない、参加後は再会できる継続Eventを上げる、という価値仮説を確認できます。次はGoogle Calendar接続済みの`/osekkai/chat`でLive経路を最終リハーサルし、Demo当日のSource件数、Routes quota、Maps key制限、候補2件以上を確認します。継続運用では外部Task Scheduler / cronからSource同期、Calendar Trigger、Maintenanceを定期起動します。
-
-Live Dataの依存関係は[Plan2.md](Plan2.md#131-task運用ルール)、LLMとObsidianの実装・検証記録は[Plan3.md](Plan3.md#14-実装検証記録)を正本とします。Credentialがない機能を接続済みとは表現しません。
+Live Dataの依存関係は[Plan2.md](Plan2.md#131-task運用ルール)、LLMとObsidianの実装・検証記録は[Plan3.md](Plan3.md#14-実装検証記録)を正本とします。
 
 ## 設計の考え方
 
@@ -90,24 +80,13 @@ Live Dataの依存関係は[Plan2.md](Plan2.md#131-task運用ルール)、LLMと
 
 ## Event Map
 
-`/osekkai/map`はDemoの初期範囲を千代田区に絞り、麹町を中心とするGoogle MapをEvent APIより先に描画します。東京都全件はBrowserへ送らず、住所で千代田区と確認でき、座標を持つEventだけを軽量な専用APIから最大250件ずつ段階取得します。PUSHはConnection Evidenceで厳選しますが、区内Mapでは推薦外のEventも隠しません。
-
-- 既定表示は`すべて`。`今日 / 今週末 / 30分以内 / ひとり参加可 / 継続あり / Networking / みんなで食事 / おすすめのみ`で任意に絞り込み
-- Markerから開催時刻、実移動時間、料金、募集状態、Connection Level、交流根拠、Source、更新時刻を確認
-- Policyが選んだ複数候補を順位と推薦理由付きで表示し、他のEventと区別
-- Connection EvidenceがないEventも`交流根拠未確認`または`推薦対象外`として表示
-- sold out、canceled、expired、stale、情報欠損も状態を付けて表示し、申込CTAを無効化
-- 同一Eventの複数Sourceは1つのMarkerへ統合し、すべてのSourceを詳細で確認可能
-- 正確な現在地は明示操作時だけ選択Eventの移動時間計算に利用し、Profileやlogへ永続保存しない
-- 座標がない区内Eventは件数を表示し、Browserで大量Geocodingを実行して初期描画を止めない
-- Event APIや推薦履歴が失敗してもGoogle Map本体は表示したままにする
-
-Mapは`/osekkai/map`に実装済みです。Maps keyがない場合は取得できた千代田区Eventを一覧fallbackで閲覧でき、Event APIが失敗した場合も地図操作は維持します。東京都全域への再拡張は、Server側の空間検索またはtile APIを導入してから行います。
+`/osekkai/map`は麹町を中心とするGoogle Map上で、座標を確認できたEventと、自作Dataset由来の地域コミュニティを一緒に探せます。Markerから開催時刻・移動時間・料金・募集状態・交流根拠・Sourceを確認でき、`今日 / 今週末 / ひとり参加可 / 継続あり`などで絞り込めます。
 
 ## 利用予定のデータ
 
 | Source | 用途 | Plan2上の扱い |
 |---|---|---|
+| 自作: [Tokyo Community Data](https://github.com/Jun0908/tokyo_community_data) | 東京23区の地域コミュニティ・活動情報を区ごとのアダプターで収集・正規化した独自Dataset（Community 10,076件・Activity 5,624件、2026-08-23時点） | 千代田区分をMapの地域コミュニティ表示とLLM Groundingへ統合済み |
 | 東京都Open Data CKAN | 東京都・自治体が公開する最新Event | 必須・Credential不要・同期確認済み |
 | Lu.ma公開Event | Community、趣味、Networking | 必須・許可されたiCalから同期確認済み |
 | Doorkeeper公開Event | 継続Community、勉強会 | 必須・APIから同期確認済み |
@@ -135,6 +114,7 @@ agents-OpenClaw/
   tests/test_osekkai_*.py
 
 contracts/osekkai/         JSON Schemaの正本
+data/tokyo-community/      自作Community Open Dataset（CSV）と施設Geocoding正本
 Plan2.md                   Live Demo実装Taskの正本
 Plan3.md                   LLM会話・Obsidian Memory実装記録
 PLAN.md                    P0の設計・実装履歴
@@ -234,7 +214,7 @@ Google設定の一次資料:
 - [Routes APIの利用とBilling](https://developers.google.com/maps/documentation/routes/usage-and-billing)
 - [Maps API keyの制限](https://developers.google.com/maps/api-security-best-practices)
 
-## Source運用・Attribution・既知の制約
+## Source運用とAttribution
 
 Source定義の正本は`agents-OpenClaw/config/osekkai_sources.json`です。各EventにSource URL、取得・更新・再検証時刻、classification、checksumを保存し、画面から原典へ戻れるようにします。
 
@@ -244,9 +224,7 @@ Source定義の正本は`agents-OpenClaw/config/osekkai_sources.json`です。�
 - KCFは公式講座ページの事実項目を取得し、公益財団法人江東区文化コミュニティ財団を表示して原文へlink backします。本番継続運用前に取得頻度と利用条件を主催者へ再確認します
 - Peatix、共食Service、connpassは取得権限が確定していないため、Live Demo必須経路へ混ぜません
 
-Providerの規約や画面構造は変更されます。parser失敗、429、timeout、Credential不足はSource単位の状態として表示し、最後に正常取得したEventを無期限にLive扱いしません。Mapにはstale等の状態を付けて残せますが、PUSHは再検証できない時点でfail closedです。
-
-現在のJSON file store、instance-local rate limit、外部cronはハッカソンDemo規模の構成です。複数instanceの本番運用では共有DB/queue/rate limit、監視、backup、Google OAuth consent screenの公開要件、Providerとの利用合意を別途整備する必要があります。
+SourceごとにStatus・再検証時刻・fail closed判定を管理しているため、Providerの規約や画面構造が変わっても、古いEventを無期限にLive扱いしません。PUSHは再検証できた候補だけに絞り込み、Mapでは状態を保ったまま表示を続けます。
 
 ## 検証
 

@@ -11,35 +11,26 @@ import type {
  * `data/tokyo-community/communities.csv` carries almost no usable address or
  * coordinate data (venue_address is populated for a tiny minority of rows).
  * Within the Chiyoda scope the map already targets, `venue_name` only ever
- * names two real public facilities, so those are geocoded once via the
- * Geospatial Information Authority of Japan (GSI) address-search API and
- * reused as an approximate, facility-level pin for every community that
- * lists that venue. This is intentionally coarser than a per-community
- * address and is labelled as such in the API response.
+ * names two real public facilities, so those are geocoded once (via the
+ * Geospatial Information Authority of Japan address-search API) and stored
+ * in `data/tokyo-community/chiyoda-facility-directory.json`, which this
+ * loader and the Python-side `osekkai_community_directory.py` both read, so
+ * the coordinates never drift out of sync between the two languages. This is
+ * intentionally coarser than a per-community address and is labelled as such
+ * in the API response.
  */
-const KNOWN_FACILITIES = [
-  {
-    key: 'kudan',
-    match: '九段',
-    name: '九段生涯学習館',
-    address: '東京都千代田区九段南1-5-10',
-    latitude: 35.695339,
-    longitude: 139.751984,
-    sourceUrl: 'https://www.city.chiyoda.lg.jp/shisetsu/bunka/kudan-gakushu.html',
-  },
-  {
-    key: 'sports-center',
-    match: 'スポーツセンター',
-    name: '千代田区立スポーツセンター',
-    address: '東京都千代田区内神田2-1-8',
-    latitude: 35.689342,
-    longitude: 139.767685,
-    sourceUrl: 'https://www.city.chiyoda.lg.jp/shisetsu/bunka/sportscenter.html',
-  },
-] as const;
+type FacilityDefinition = {
+  key: string;
+  match: string;
+  name: string;
+  address: string;
+  latitude: number;
+  longitude: number;
+  sourceUrl: string;
+};
 
-function resolveFacility(venueName: string): (typeof KNOWN_FACILITIES)[number] | null {
-  for (const facility of KNOWN_FACILITIES) {
+function resolveFacility(venueName: string, facilities: FacilityDefinition[]): FacilityDefinition | null {
+  for (const facility of facilities) {
     if (venueName.includes(facility.match)) return facility;
   }
   return null;
@@ -108,15 +99,48 @@ function resolveDataRoot(): string {
   return path.resolve(process.cwd(), '..', 'data', 'tokyo-community');
 }
 
-let cache: { path: string; mtimeMs: number; text: string } | null = null;
+let csvCache: { path: string; mtimeMs: number; text: string } | null = null;
 
 async function readCommunitiesCsv(): Promise<string> {
   const filePath = path.join(resolveDataRoot(), 'communities.csv');
   const stat = await fs.stat(filePath);
-  if (cache && cache.path === filePath && cache.mtimeMs === stat.mtimeMs) return cache.text;
+  if (csvCache && csvCache.path === filePath && csvCache.mtimeMs === stat.mtimeMs) return csvCache.text;
   const text = await fs.readFile(filePath, 'utf-8');
-  cache = { path: filePath, mtimeMs: stat.mtimeMs, text };
+  csvCache = { path: filePath, mtimeMs: stat.mtimeMs, text };
   return text;
+}
+
+let facilityCache: { path: string; mtimeMs: number; facilities: FacilityDefinition[] } | null = null;
+
+async function readFacilityDirectory(): Promise<FacilityDefinition[]> {
+  const filePath = path.join(resolveDataRoot(), 'chiyoda-facility-directory.json');
+  const stat = await fs.stat(filePath);
+  if (facilityCache && facilityCache.path === filePath && facilityCache.mtimeMs === stat.mtimeMs) {
+    return facilityCache.facilities;
+  }
+  const raw = await fs.readFile(filePath, 'utf-8');
+  const parsed = JSON.parse(raw) as { facilities?: unknown };
+  if (!Array.isArray(parsed.facilities)) {
+    throw new Error('chiyoda-facility-directory.json is missing a facilities array');
+  }
+  const facilities = parsed.facilities.map((value, index) => {
+    if (
+      typeof value !== 'object' ||
+      value === null ||
+      typeof (value as Record<string, unknown>).key !== 'string' ||
+      typeof (value as Record<string, unknown>).match !== 'string' ||
+      typeof (value as Record<string, unknown>).name !== 'string' ||
+      typeof (value as Record<string, unknown>).address !== 'string' ||
+      typeof (value as Record<string, unknown>).latitude !== 'number' ||
+      typeof (value as Record<string, unknown>).longitude !== 'number' ||
+      typeof (value as Record<string, unknown>).sourceUrl !== 'string'
+    ) {
+      throw new Error(`chiyoda-facility-directory.json facilities[${index}] is malformed`);
+    }
+    return value as FacilityDefinition;
+  });
+  facilityCache = { path: filePath, mtimeMs: stat.mtimeMs, facilities };
+  return facilities;
 }
 
 const REQUIRED_COLUMNS = [
@@ -135,7 +159,7 @@ const REQUIRED_COLUMNS = [
 ] as const;
 
 export async function loadCommunityDirectory(ward = '千代田区'): Promise<CommunityDirectoryResult> {
-  const raw = await readCommunitiesCsv();
+  const [raw, facilityDefinitions] = await Promise.all([readCommunitiesCsv(), readFacilityDirectory()]);
   const rows = parseCsv(raw.replace(/^﻿/, ''));
   if (rows.length === 0) throw new Error('communities.csv is empty');
 
@@ -159,7 +183,7 @@ export async function loadCommunityDirectory(ward = '千代田区'): Promise<Com
     totalInWard += 1;
 
     const venueNameRaw = (row[at('venue_name')] ?? '').trim();
-    const facility = resolveFacility(venueNameRaw);
+    const facility = resolveFacility(venueNameRaw, facilityDefinitions);
     if (!facility) {
       withoutKnownVenue += 1;
       continue;

@@ -14,10 +14,40 @@ const HEADER = [
   'supported_languages', 'inbound_program', 'notes', 'source_updated_at', 'fetched_at',
 ];
 
+const FACILITY_DIRECTORY_FIXTURE = {
+  schemaVersion: '1.0',
+  ward: '千代田区',
+  facilities: [
+    {
+      key: 'kudan',
+      match: '九段',
+      name: '九段生涯学習館',
+      address: '東京都千代田区九段南1-5-10',
+      latitude: 35.695339,
+      longitude: 139.751984,
+      sourceUrl: 'https://www.city.chiyoda.lg.jp/shisetsu/bunka/kudan-gakushu.html',
+    },
+    {
+      key: 'sports-center',
+      match: 'スポーツセンター',
+      name: '千代田区立スポーツセンター',
+      address: '東京都千代田区内神田2-1-8',
+      latitude: 35.689342,
+      longitude: 139.767685,
+      sourceUrl: 'https://www.city.chiyoda.lg.jp/shisetsu/bunka/sportscenter.html',
+    },
+  ],
+};
+
 function writeCommunitiesCsv(rows: string[][]): void {
   const dir = mkdtempSync(path.join(tmpdir(), 'osekkai-community-'));
   const lines = [HEADER, ...rows].map((row) => row.map((value) => `"${value.replace(/"/g, '""')}"`).join(','));
   writeFileSync(path.join(dir, 'communities.csv'), `﻿${lines.join('\n')}\n`, 'utf-8');
+  writeFileSync(
+    path.join(dir, 'chiyoda-facility-directory.json'),
+    JSON.stringify(FACILITY_DIRECTORY_FIXTURE, null, 2),
+    'utf-8',
+  );
   process.env.OSEKKAI_COMMUNITY_DATA_ROOT = dir;
 }
 

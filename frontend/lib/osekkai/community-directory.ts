@@ -266,6 +266,7 @@ const REQUIRED_COLUMNS = [
   'ward_name',
   'name',
   'name_kana',
+  'category',
   'description',
   'venue_name',
   'venue_address',
@@ -283,6 +284,18 @@ const REQUIRED_COLUMNS = [
   'source_updated_at',
   'fetched_at',
 ] as const;
+
+// Raw category text spans two CSV columns depending on which ward's source
+// listed it: `category` for ward-association style listings (e.g. 町会・自治会),
+// `description` for hobby/genre-style listings (e.g. ダンス). The "20〜30代向け"
+// map toggle excludes rows whose combined text names a town association,
+// neighborhood council, or senior/elderly-only club.
+const AGE_UNRELATED_KEYWORDS = ['町会', '自治会', '住区住民会議', 'シニアクラブ', '高齢者クラブ', '老人会', '老人クラブ'];
+
+function isAgeUnrelatedCommunity(category: string, description: string): boolean {
+  const text = `${category} ${description}`;
+  return AGE_UNRELATED_KEYWORDS.some((keyword) => text.includes(keyword));
+}
 
 const DATA_SOURCE_NOTE =
   '区が公開する地域コミュニティ一覧（Open Data CSV）を地図へ表示しています。単一会場住所、複数会場の代表地点、確認済み施設、公式区域または地域名・町丁目、区役所の順に位置を解決します。複数会場は一覧の最初の住所、地域名・町丁目は活動区域の目安です。個々の開催日時・現在の活動有無は確認していません。';
@@ -314,7 +327,8 @@ async function readRows(): Promise<{ header: string[]; columnAt: (column: (typeo
   return { header, columnAt: (column) => columnIndex.get(column) as number, rows: rows.slice(1) };
 }
 
-export async function loadCommunityDirectorySummary(): Promise<CommunityDirectoryResult> {
+export async function loadCommunityDirectorySummary(options?: { excludeAgeUnrelated?: boolean }): Promise<CommunityDirectoryResult> {
+  const excludeAgeUnrelated = options?.excludeAgeUnrelated ?? false;
   const [{ header, columnAt, rows }, wards, addresses] = await Promise.all([
     readRows(),
     readWardGeocodingDirectory(),
@@ -335,6 +349,7 @@ export async function loadCommunityDirectorySummary(): Promise<CommunityDirector
     const id = (row[at('community_id')] ?? '').trim();
     const name = (row[at('name')] ?? '').trim();
     if (!ward || !id || !name) continue;
+    if (excludeAgeUnrelated && isAgeUnrelatedCommunity(row[at('category')] ?? '', row[at('description')] ?? '')) continue;
     const venueName = (row[at('venue_name')] ?? '').trim();
     const venueAddress = (row[at('venue_address')] ?? '').trim();
     const facility = resolveFacility(ward, venueName, venueAddress, mapLocationFromRow(row, at), wards, addresses);
@@ -376,7 +391,11 @@ export async function loadCommunityDirectorySummary(): Promise<CommunityDirector
   };
 }
 
-export async function loadCommunityFacilityDetail(facilityKey: string): Promise<CommunityFacilityDetail | null> {
+export async function loadCommunityFacilityDetail(
+  facilityKey: string,
+  options?: { excludeAgeUnrelated?: boolean },
+): Promise<CommunityFacilityDetail | null> {
+  const excludeAgeUnrelated = options?.excludeAgeUnrelated ?? false;
   const [{ header, columnAt, rows }, wards, addresses] = await Promise.all([
     readRows(),
     readWardGeocodingDirectory(),
@@ -394,6 +413,7 @@ export async function loadCommunityFacilityDetail(facilityKey: string): Promise<
     const id = (row[at('community_id')] ?? '').trim();
     const name = (row[at('name')] ?? '').trim();
     if (!ward || !id || !name) continue;
+    if (excludeAgeUnrelated && isAgeUnrelatedCommunity(row[at('category')] ?? '', row[at('description')] ?? '')) continue;
     const venueName = (row[at('venue_name')] ?? '').trim();
     const venueAddress = (row[at('venue_address')] ?? '').trim();
     const facility = resolveFacility(ward, venueName, venueAddress, mapLocationFromRow(row, at), wards, addresses);

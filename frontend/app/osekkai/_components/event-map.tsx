@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { friendlyApiError } from '@/components/osekkai/api-client';
 import { osekkaiApi } from '@/lib/osekkai/api';
@@ -108,6 +108,7 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
   const [facilityLoading, setFacilityLoading] = useState(false);
   const [facilityError, setFacilityError] = useState('');
   const [wardChoice, setWardChoice] = useState(DEFAULT_WARD);
+  const [excludeAgeUnrelated, setExcludeAgeUnrelated] = useState(false);
   const [filter, setFilter] = useState<Filter>('all');
   const [origin, setOrigin] = useState<Coordinates | null>(null);
   const [locationState, setLocationState] = useState('地図は麹町中心・現在地は保存しません');
@@ -178,21 +179,23 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
 
   useEffect(() => {
     let cancelled = false;
-    void fetch('/api/osekkai/community-directory')
+    const query = excludeAgeUnrelated ? '?excludeAgeUnrelated=1' : '';
+    void fetch(`/api/osekkai/community-directory${query}`)
       .then((response) => (response.ok ? (response.json() as Promise<CommunityDirectoryResult>) : null))
       .then((data) => { if (!cancelled && data) setCommunities(data); })
       .catch(() => {
         // Community directory pins are enhancement-only and never block the Event map.
       });
     return () => { cancelled = true; };
-  }, []);
+  }, [excludeAgeUnrelated]);
 
-  const openFacility = (facility: CommunityFacilitySummary) => {
+  const openFacility = useCallback((facility: CommunityFacilitySummary) => {
     setSelected(null);
     setSelectedFacility(null);
     setFacilityError('');
     setFacilityLoading(true);
-    void fetch(`/api/osekkai/community-directory?key=${encodeURIComponent(facility.key)}`)
+    const query = excludeAgeUnrelated ? '&excludeAgeUnrelated=1' : '';
+    void fetch(`/api/osekkai/community-directory?key=${encodeURIComponent(facility.key)}${query}`)
       .then((response) => (response.ok ? (response.json() as Promise<CommunityFacilityDetail>) : null))
       .then((detail) => {
         if (detail) setSelectedFacility(detail);
@@ -200,7 +203,7 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
       })
       .catch(() => setFacilityError('この拠点の一覧を取得できませんでした。'))
       .finally(() => setFacilityLoading(false));
-  };
+  }, [excludeAgeUnrelated]);
 
   const visibleFacilities = useMemo(() => {
     if (!communities) return [];
@@ -228,7 +231,7 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
       marker.addListener('click', () => openFacility(facility));
       return marker;
     });
-  }, [visibleFacilities, showCommunities, mapRevision]);
+  }, [visibleFacilities, showCommunities, mapRevision, openFacility]);
 
   useEffect(() => {
     const api = window.google?.maps;
@@ -326,6 +329,15 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
         <button type="button" data-active={showCommunities} onClick={() => setShowCommunities((value) => !value)}>
           ⌂ 地域コミュニティ{showCommunities ? 'を隠す' : 'を表示'}
         </button>
+        <button
+          type="button"
+          data-active={excludeAgeUnrelated}
+          aria-pressed={excludeAgeUnrelated}
+          onClick={() => setExcludeAgeUnrelated((value) => !value)}
+          title="町会・自治会・シニア向けクラブなどを除いて表示します"
+        >
+          20〜30代向けのみ
+        </button>
         <select aria-label="表示する区を選ぶ" value={wardChoice} onChange={(event) => jumpToWard(event.target.value)}>
           {wardOptions.map((option) => <option key={option.ward} value={option.ward}>{option.ward}</option>)}
           <option value={ALL_WARDS_VALUE}>全23区をまとめて表示</option>
@@ -350,6 +362,7 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
           {wardChoice === ALL_WARDS_VALUE
             ? `東京23区の地域コミュニティ${communities.counts.total.toLocaleString()}件を${communities.facilities.length.toLocaleString()}地点に表示。地域名・町丁目の活動区域${communities.counts.withAreaLocation.toLocaleString()}件を区役所から分散（Open Data・開催日時未確認）。`
             : `${wardChoice}の地域コミュニティ${visibleCommunityCount.toLocaleString()}件を${visibleFacilities.length.toLocaleString()}地点で表示中（東京23区全体では${communities.counts.total.toLocaleString()}件）。他の区は上のセレクトから選べます。`}
+          {excludeAgeUnrelated ? '町会・自治会・シニア向けクラブなどを除いています。' : ''}
         </p>
       ) : null}
       {facilityError ? <p className={styles.mapRouteError} role="alert">{facilityError}</p> : null}

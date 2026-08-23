@@ -140,6 +140,19 @@ describe('loadCommunityDirectorySummary', () => {
     });
   });
 
+  it('excludes town-association and senior-club rows when excludeAgeUnrelated is set', async () => {
+    writeCommunitiesCsv([
+      row({ community_id: 'community_1', ward_name: '千代田区', name: '九段町会', category: '町会・自治会', venue_name: '九段' }),
+      row({ community_id: 'community_2', ward_name: '千代田区', name: '卓球クラブ', description: 'スポーツ', venue_name: 'スポーツセンター' }),
+    ]);
+
+    const result = await loadCommunityDirectorySummary({ excludeAgeUnrelated: true });
+
+    expect(result.counts).toEqual({ total: 1, withVenueAddress: 0, withKnownFacility: 1, withAreaLocation: 0, withWardOfficeFallback: 0 });
+    expect(result.facilities.find((facility) => facility.key === 'kudan')).toBeUndefined();
+    expect(result.facilities.find((facility) => facility.key === 'sports-center')).toMatchObject({ count: 1 });
+  });
+
   it('labels the first point of an explicit multi-venue record as representative', async () => {
     writeCommunitiesCsv([
       row({
@@ -181,5 +194,16 @@ describe('loadCommunityFacilityDetail', () => {
     ]);
 
     expect(await loadCommunityFacilityDetail('sports-center')).toBeNull();
+  });
+
+  it('drops town-association communities from the list when excludeAgeUnrelated is set', async () => {
+    writeCommunitiesCsv([
+      row({ community_id: 'community_1', ward_name: '千代田区', name: '読書会さくら', description: '読書', venue_name: 'スポーツセンター' }),
+      row({ community_id: 'community_2', ward_name: '千代田区', name: '九段町会', category: '町会・自治会', venue_name: 'スポーツセンター' }),
+    ]);
+
+    const detail = await loadCommunityFacilityDetail('sports-center', { excludeAgeUnrelated: true });
+
+    expect(detail?.communities.map((community) => community.name)).toEqual(['読書会さくら']);
   });
 });

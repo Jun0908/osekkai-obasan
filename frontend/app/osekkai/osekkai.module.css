@@ -1209,6 +1209,25 @@
   scroll-behavior: smooth;
 }
 
+.chatContextNotice {
+  border-top: 1px solid var(--o-line);
+  background: #fff5d9;
+  padding: .7rem 1.4rem;
+  color: #6d5520;
+  font-size: .72rem;
+  line-height: 1.6;
+}
+
+.chatRecommendations {
+  border-top: 1px solid var(--o-line);
+  background: #f5f1e8;
+  padding: 1rem;
+}
+
+.chatRecommendations .recommendationGrid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .agentMessage,
 .userMessage {
   max-width: 84%;
@@ -2666,6 +2685,7 @@
   .demoInvitation { grid-template-columns: 1fr; gap: 1.5rem; }
   .inkButton { justify-self: stretch; }
   .chatLog { min-height: 390px; max-height: none; }
+  .chatRecommendations .recommendationGrid { grid-template-columns: 1fr; }
   .agentMessage,
   .userMessage { max-width: 94%; }
   .chatSidebar { grid-template-columns: 1fr; }

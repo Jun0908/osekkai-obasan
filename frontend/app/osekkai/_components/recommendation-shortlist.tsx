@@ -22,11 +22,13 @@ export default function RecommendationShortlist({
   ranking,
   onAction,
   busy,
+  hideRevisit = false,
 }: {
   opportunities: Opportunity[];
   ranking: RankedOpportunity[];
   onAction?: (action: Action, opportunity: Opportunity) => void;
   busy?: string;
+  hideRevisit?: boolean;
 }) {
   const byId = new Map(opportunities.map((opportunity) => [opportunity.id, opportunity]));
   const ranked = ranking.flatMap((item) => {
@@ -56,7 +58,10 @@ export default function RecommendationShortlist({
           <h3>{opportunity.title}</h3>
           <p className={styles.eventWhen}>{dateLabel(opportunity.startsAt)} · {opportunity.address}</p>
           <div className={styles.eventFacts}>
-            <span>Google Routes {opportunity.travelEstimate.minutes}分</span>
+            <span>
+              {opportunity.travelEstimate.source === 'maps_verified' ? 'Google Routes' : 'デモ移動目安'}{' '}
+              {opportunity.travelEstimate.minutes === null ? '未確認' : `${opportunity.travelEstimate.minutes}分`}
+            </span>
             <span>{opportunity.priceYen === null ? '料金未確認' : opportunity.priceYen === 0 ? '無料' : `${opportunity.priceYen.toLocaleString()}円`}</span>
             <span>{opportunity.registrationStatus === 'open' ? '募集中' : opportunity.registrationStatus}</span>
             {opportunity.capacity !== null && opportunity.capacity !== undefined ? <span>定員 {opportunity.capacity}人</span> : null}
@@ -72,12 +77,25 @@ export default function RecommendationShortlist({
           </div>
           <ConnectionEvidenceView evidence={opportunity.connectionEvidence} />
           <div className={styles.recommendationActions}>
-            <a className={styles.primaryCardAction} href={opportunity.sourceUrl} target="_blank" rel="noreferrer">行ってみる ↗</a>
+            {onAction ? (
+              <button
+                className={styles.primaryCardAction}
+                type="button"
+                disabled={Boolean(busy)}
+                onClick={() => onAction('accepted', opportunity)}
+              >
+                行ってみる
+              </button>
+            ) : (
+              <a className={styles.primaryCardAction} href={opportunity.sourceUrl} target="_blank" rel="noreferrer">行ってみる ↗</a>
+            )}
             {onAction ? (
               <>
                 <button type="button" disabled={Boolean(busy)} onClick={() => onAction('declined', opportunity)}>これは違う</button>
                 <button type="button" disabled={Boolean(busy)} onClick={() => onAction('pause_one_week', opportunity)}>今回は無理</button>
-                <button type="button" disabled={Boolean(busy)} onClick={() => onAction('revisit', opportunity)}>次回も知らせて</button>
+                {!hideRevisit ? (
+                  <button type="button" disabled={Boolean(busy)} onClick={() => onAction('revisit', opportunity)}>次回も知らせて</button>
+                ) : null}
               </>
             ) : null}
           </div>

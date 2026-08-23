@@ -41,6 +41,7 @@ const profile = {
   lastPushAt: null,
   explicitPreferences: {},
   inferredPreferences: {},
+  participationFriction: {},
   currentSignals: {
     interventionHint: "none",
     currentReceptivity: null,
@@ -239,6 +240,7 @@ describe("Osekkai API client", () => {
               schemaVersion: "1.0",
               reply: "今日は休んで大丈夫です。",
               profileDelta: {},
+              frictionDelta: [],
               interventionHint: "do_not_push",
               confidence: 1,
               safety: {
@@ -249,7 +251,20 @@ describe("Osekkai API client", () => {
               },
               persisted: false,
               conversationId: null,
-              profile
+              profile,
+              context: {
+                schemaVersion: "1.0",
+                episodeId: null,
+                state: "getting_to_know",
+                trigger: "user_initiated",
+                quickReplies: [],
+                recommendations: [],
+                calendarSummary: null,
+                selectedOpportunityId: null,
+                checkInDueAt: null,
+                canSendMessage: true,
+                notice: null
+              }
             },
             requestId: "22222222-2222-4222-8222-222222222222"
           }),

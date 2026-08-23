@@ -18,6 +18,10 @@ const EPISODE_ID = '33333333-3333-4333-8333-333333333333';
 describe('generated Osekkai mutation request validators', () => {
   it('accepts only the closed chat request shape', () => {
     expect(validateChatRequest({ message: 'hello', remember: false }).valid).toBe(true);
+    expect(validateChatRequest({ action: 'start', remember: false }).valid).toBe(true);
+    expect(validateChatRequest({ action: 'select', opportunityId: 'event-1' }).valid).toBe(true);
+    expect(validateChatRequest({ action: 'check_in', message: 'また行きたい' }).valid).toBe(true);
+    expect(validateChatRequest({ action: 'select', message: 'event-1' }).valid).toBe(false);
     expect(validateChatRequest({ message: '   ' }).valid).toBe(false);
     expect(validateChatRequest({ message: 'hello', remember: 'yes' }).valid).toBe(false);
     expect(validateChatRequest({ message: 'hello', unknown: true }).valid).toBe(false);

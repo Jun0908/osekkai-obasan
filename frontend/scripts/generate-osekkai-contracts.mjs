@@ -18,7 +18,10 @@ const validatorsPath = join(frontendRoot, "lib", "osekkai", "validators.generate
 const contractFiles = [
   "common.schema.json",
   "distance-profile.schema.json",
+  "participation-friction-profile.schema.json",
   "conversation.schema.json",
+  "conversation-episode.schema.json",
+  "conversation-context.schema.json",
   "chat-result.schema.json",
   "freebusy.schema.json",
   "event.schema.json",
@@ -44,7 +47,10 @@ const contractFiles = [
 
 const typeRoots = [
   ["distance-profile.schema.json", "DistanceProfile"],
+  ["participation-friction-profile.schema.json", "ParticipationFrictionProfile"],
   ["conversation.schema.json", "ConversationTurn"],
+  ["conversation-episode.schema.json", "ConversationEpisode"],
+  ["conversation-context.schema.json", "ConversationContext"],
   ["chat-result.schema.json", "ChatResult"],
   ["freebusy.schema.json", "FreeBusyResult"],
   ["event.schema.json", "LiveEvent"],
@@ -70,7 +76,10 @@ const typeRoots = [
 
 const validatorRoots = {
   rawValidateDistanceProfile: "distance-profile.schema.json",
+  rawValidateParticipationFrictionProfile: "participation-friction-profile.schema.json",
   rawValidateConversationTurn: "conversation.schema.json",
+  rawValidateConversationEpisode: "conversation-episode.schema.json",
+  rawValidateConversationContext: "conversation-context.schema.json",
   rawValidateChatResult: "chat-result.schema.json",
   rawValidateFreeBusyResult: "freebusy.schema.json",
   rawValidateLiveEvent: "event.schema.json",
@@ -148,7 +157,7 @@ for (const [file, rootName] of typeRoots) {
   // `{ [key: string]: any } & ...`.  The runtime validator still receives the
   // canonical `allOf`; omitting it only for the static shape keeps the closed
   // Episode object useful to TypeScript callers.
-  if (["opportunity.schema.json", "decision.schema.json", "intervention-episode.schema.json"].includes(file)) {
+  if (["opportunity.schema.json", "decision.schema.json", "intervention-episode.schema.json", "conversation-episode.schema.json"].includes(file)) {
     delete schema.allOf;
   }
   const block = await compile(schema, rootName, {
@@ -225,8 +234,14 @@ function validateWith<T>(name: string, validator: StandaloneValidator, value: un
 
 export const validateDistanceProfile = (value: unknown) =>
   validateWith<import('./types.generated').DistanceProfile>('DistanceProfile', rawValidateDistanceProfile, value);
+export const validateParticipationFrictionProfile = (value: unknown) =>
+  validateWith<import('./types.generated').ParticipationFrictionProfile>('ParticipationFrictionProfile', rawValidateParticipationFrictionProfile, value);
 export const validateConversationTurn = (value: unknown) =>
   validateWith<import('./types.generated').ConversationTurn>('ConversationTurn', rawValidateConversationTurn, value);
+export const validateConversationEpisode = (value: unknown) =>
+  validateWith<import('./types.generated').ConversationEpisode>('ConversationEpisode', rawValidateConversationEpisode, value);
+export const validateConversationContext = (value: unknown) =>
+  validateWith<import('./types.generated').ConversationContext>('ConversationContext', rawValidateConversationContext, value);
 export const validateChatResult = (value: unknown) =>
   validateWith<import('./types.generated').ChatResult>('ChatResult', rawValidateChatResult, value);
 export const validateFreeBusyResult = (value: unknown) =>

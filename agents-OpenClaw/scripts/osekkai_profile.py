@@ -16,6 +16,19 @@ from osekkai_store import JsonStore
 JST = ZoneInfo("Asia/Tokyo")
 DEFAULT_MAX_SOCIAL_INTENSITY = 2
 DEFAULT_MAX_TRAVEL_MINUTES = 40
+PARTICIPATION_FRICTIONS = {
+    "search_fatigue",
+    "first_time_anxiety",
+    "stranger_anxiety",
+    "group_size",
+    "conversation_load",
+    "travel_effort",
+    "time_commitment",
+    "cost",
+    "low_social_energy",
+    "push_aversion",
+    "not_today",
+}
 
 
 def _stored_pre_inference_value(profile: dict[str, Any], key: str, default: Any) -> Any:
@@ -114,6 +127,7 @@ def default_profile(user_id: str, now: datetime) -> dict[str, Any]:
         "pauseUntil": None,
         "explicitPreferences": {},
         "inferredPreferences": {},
+        "participationFriction": {},
         "currentSignals": {
             "interventionHint": "none",
             "currentReceptivity": None,
@@ -130,15 +144,22 @@ def get_or_create_profile_unlocked(store: JsonStore, user_id: str, now: datetime
     if profile is None:
         profile = default_profile(user_id, now)
         store.save_profile_unlocked(user_id, profile)
-    elif (
-        profile.get("maxTravelMinutes") == 30
-        and "maxTravelMinutes" not in profile.get("explicitPreferences", {})
-    ):
-        # The original demo default was 30 minutes. Move untouched profiles to
-        # the current Tokyo standard while preserving every explicit setting.
-        profile["maxTravelMinutes"] = DEFAULT_MAX_TRAVEL_MINUTES
-        profile["updatedAt"] = now.isoformat()
-        store.save_profile_unlocked(user_id, profile)
+    else:
+        migrated = False
+        if "participationFriction" not in profile:
+            profile["participationFriction"] = {}
+            migrated = True
+        if (
+            profile.get("maxTravelMinutes") == 30
+            and "maxTravelMinutes" not in profile.get("explicitPreferences", {})
+        ):
+            # The original demo default was 30 minutes. Move untouched profiles to
+            # the current Tokyo standard while preserving every explicit setting.
+            profile["maxTravelMinutes"] = DEFAULT_MAX_TRAVEL_MINUTES
+            migrated = True
+        if migrated:
+            profile["updatedAt"] = now.isoformat()
+            store.save_profile_unlocked(user_id, profile)
     return profile
 
 
@@ -273,6 +294,19 @@ def remove_evidence(profile: dict[str, Any], evidence_id: str, now: datetime) ->
             inferred[key]["evidence"] = after
             if not after:
                 del inferred[key]
+    friction = result.get("participationFriction", {})
+    if isinstance(friction, dict):
+        for key in list(friction):
+            entry = friction.get(key)
+            if not isinstance(entry, dict):
+                continue
+            before = entry.get("evidence", [])
+            after = [item for item in before if not (isinstance(item, dict) and item.get("id") == evidence_id)]
+            if len(after) != len(before):
+                removed = True
+                entry["evidence"] = after
+                if not after:
+                    del friction[key]
     if removed:
         reconcile_inferred_derived_values(result, changed_keys)
         result["updatedAt"] = now.isoformat()
@@ -286,12 +320,121 @@ def remove_inferred_preference(
         raise ContractError("removeInferredPreferenceKey is invalid")
     result = copy.deepcopy(profile)
     inferred = result.get("inferredPreferences", {})
-    removed = preference_key in inferred
-    if removed:
+    friction_key = preference_key.removeprefix("friction:") if preference_key.startswith("friction:") else None
+    friction = result.get("participationFriction", {})
+    removed = preference_key in inferred or (
+        friction_key is not None and isinstance(friction, dict) and friction_key in friction
+    )
+    if preference_key in inferred:
         del inferred[preference_key]
         reconcile_inferred_derived_values(result, {preference_key})
+    if friction_key is not None and isinstance(friction, dict):
+        friction.pop(friction_key, None)
+    if removed:
         result["updatedAt"] = now.isoformat()
     return result, removed
+
+
+def apply_participation_frictions(
+    profile: dict[str, Any],
+    friction_types: list[str],
+    *,
+    origin: str,
+    reference_type: str,
+    reference_id: str,
+    evidence_text: str,
+    confidence: float,
+    now: datetime,
+) -> tuple[dict[str, Any], list[str]]:
+    """Store structured participation barriers without replacing explicit evidence."""
+
+    if origin not in {"explicit", "inferred"}:
+        raise ContractError("participation friction origin is invalid")
+    if reference_type not in {"message", "feedback"}:
+        raise ContractError("participation friction reference type is invalid")
+    if not isinstance(reference_id, str) or not 1 <= len(reference_id) <= 200:
+        raise ContractError("participation friction reference id is invalid")
+    if not isinstance(confidence, (int, float)) or not 0 <= confidence <= 1:
+        raise ContractError("participation friction confidence is invalid")
+    unknown = set(friction_types) - PARTICIPATION_FRICTIONS
+    if unknown:
+        raise ContractError(f"unknown participation friction: {', '.join(sorted(unknown))}")
+
+    result = copy.deepcopy(profile)
+    store = result.setdefault("participationFriction", {})
+    safe_text = " ".join(evidence_text.strip().split())[:160] or "本人の回答"
+    timestamp = now.isoformat()
+    evidence_ids: list[str] = []
+    for friction_type in dict.fromkeys(friction_types):
+        item_confidence = float(confidence)
+        existing = store.get(friction_type)
+        if not isinstance(existing, dict):
+            existing = {
+                "value": True,
+                "origin": origin,
+                "confidence": item_confidence,
+                "evidence": [],
+                "observedAt": timestamp,
+                "lastConfirmedAt": timestamp,
+            }
+            store[friction_type] = existing
+        elif existing.get("origin") == "explicit" and origin == "inferred":
+            # Inferred observations may add provenance but never weaken or
+            # replace a setting the person stated directly.
+            item_confidence = min(item_confidence, float(existing.get("confidence", 1.0)))
+        else:
+            existing["origin"] = origin if origin == "explicit" else existing.get("origin", origin)
+            existing["confidence"] = max(float(existing.get("confidence", 0.0)), item_confidence)
+        evidence_id = str(uuid.uuid4())
+        evidence_ids.append(evidence_id)
+        existing.setdefault("evidence", []).append(
+            {
+                "id": evidence_id,
+                "referenceType": reference_type,
+                "referenceId": reference_id,
+                "text": safe_text,
+                "observedAt": timestamp,
+                "lastConfirmedAt": timestamp,
+            }
+        )
+        existing["value"] = True
+        existing["lastConfirmedAt"] = timestamp
+        existing.setdefault("observedAt", timestamp)
+    result["updatedAt"] = timestamp
+    return result, evidence_ids
+
+
+def effective_participation_frictions(
+    profile: dict[str, Any],
+    now: datetime,
+    *,
+    half_life_days: int = 60,
+    minimum_confidence: float = 0.35,
+) -> dict[str, float]:
+    """Return effective confidence, decaying inferred but not explicit evidence."""
+
+    result: dict[str, float] = {}
+    entries = profile.get("participationFriction", {})
+    if not isinstance(entries, dict):
+        return result
+    half_life = max(1, half_life_days)
+    for key, value in entries.items():
+        if key not in PARTICIPATION_FRICTIONS or not isinstance(value, dict):
+            continue
+        confidence = value.get("confidence")
+        if not isinstance(confidence, (int, float)):
+            continue
+        effective = float(confidence)
+        if value.get("origin") == "inferred":
+            try:
+                confirmed = parse_datetime(str(value.get("lastConfirmedAt")))
+                age_days = max(0.0, (now.astimezone(JST) - confirmed).total_seconds() / 86400)
+                effective *= 0.5 ** (age_days / half_life)
+            except (ContractError, TypeError, ValueError):
+                continue
+        if effective >= minimum_confidence:
+            result[key] = round(min(1.0, effective), 4)
+    return result
 
 
 def apply_inferred_delta(

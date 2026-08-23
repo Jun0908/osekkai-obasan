@@ -11,6 +11,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from osekkai_contracts import POLICY_VERSION, REASON_CODES, SCHEMA_VERSION, ContractError, validate_reason_codes
+from osekkai_profile import effective_participation_frictions
 
 
 JST = ZoneInfo("Asia/Tokyo")
@@ -64,6 +65,31 @@ def load_policy_config() -> dict[str, Any]:
         for key, items in adjacent.items()
     ):
         raise ContractError("policy adjacentCategories are invalid")
+    trigger = value.get("conversationTrigger")
+    expected_trigger_fields = {
+        "horizonDays", "activityStart", "activityEnd", "longFreeWindowMinutes",
+        "minimumLongFreeWindows", "maximumBusyOccupancyPercent", "minimumCandidates",
+        "checkInDelayMinutes", "inferredFrictionHalfLifeDays", "adjustedTravelMinutes",
+        "adjustedDurationMinutes", "adjustedGroupSize", "adjustedBudgetYen",
+    }
+    if not isinstance(trigger, dict) or set(trigger) != expected_trigger_fields:
+        raise ContractError("policy conversationTrigger is invalid")
+    if not 1 <= trigger["horizonDays"] <= 30:
+        raise ContractError("conversation trigger horizon is invalid")
+    for key in ("activityStart", "activityEnd"):
+        try:
+            time.fromisoformat(trigger[key])
+        except (TypeError, ValueError) as exc:
+            raise ContractError("conversation activity time is invalid") from exc
+    for key in (
+        "longFreeWindowMinutes", "minimumLongFreeWindows", "minimumCandidates",
+        "checkInDelayMinutes", "inferredFrictionHalfLifeDays", "adjustedTravelMinutes",
+        "adjustedDurationMinutes", "adjustedGroupSize", "adjustedBudgetYen",
+    ):
+        if isinstance(trigger[key], bool) or not isinstance(trigger[key], int) or trigger[key] < 0:
+            raise ContractError(f"conversation trigger {key} is invalid")
+    if not 0 <= trigger["maximumBusyOccupancyPercent"] <= 100:
+        raise ContractError("conversation busy occupancy threshold is invalid")
     return value
 
 
@@ -366,6 +392,164 @@ def _recommendation_reasons(
         ]
     )
     return reasons
+
+
+def _has_connection_fact(opportunity: dict[str, Any], *facts: str) -> bool:
+    connection = opportunity.get("connectionEvidence")
+    if not isinstance(connection, dict):
+        return False
+    if any(connection.get(name) == "yes" for name in facts):
+        return True
+    evidence = connection.get("evidence", [])
+    return any(
+        isinstance(item, dict) and item.get("kind") in set(facts)
+        for item in evidence
+    )
+
+
+def _conversation_reason(
+    opportunity: dict[str, Any], friction_types: set[str]
+) -> dict[str, Any] | None:
+    text: str | None = None
+    if "first_time_anxiety" in friction_types and _has_connection_fact(
+        opportunity, "beginnerFriendly", "soloFriendly", "beginner_friendly", "solo_friendly"
+    ):
+        text = "初参加・ひとり参加への案内がSourceで確認できる候補を優先しました。"
+    elif friction_types & {"stranger_anxiety", "conversation_load"} and _has_connection_fact(
+        opportunity, "groupWork", "sharedMeal", "structuredConversation", "group_work", "shared_meal", "structured_conversation"
+    ):
+        text = "知らない人との雑談だけに頼らず、共同活動や進行の根拠がある候補です。"
+    elif "group_size" in friction_types and isinstance(opportunity.get("capacity"), int):
+        text = f"Sourceで確認できた定員は{opportunity['capacity']}人です。"
+    elif "travel_effort" in friction_types:
+        text = f"移動負担を優先し、Google Routes実測{opportunity['travelEstimate']['minutes']}分で並べ直しました。"
+    elif "time_commitment" in friction_types:
+        text = "拘束時間を抑え、Calendarの空きへ往復込みで収まる候補を優先しました。"
+    elif "cost" in friction_types and isinstance(opportunity.get("priceYen"), int):
+        text = f"料金確認済みで、参加費は{opportunity['priceYen']:,}円です。"
+    if text is None:
+        return None
+    return {
+        "code": "personal_fit",
+        "text": text,
+        "evidenceUrl": opportunity.get("sourceUrl"),
+        "classification": "private_user_data",
+    }
+
+
+def rank_conversation_candidates(
+    profile: dict[str, Any],
+    freebusy: dict[str, Any],
+    opportunity_result: dict[str, Any],
+    now: datetime,
+    *,
+    friction_types: set[str] | None = None,
+    config: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
+    """Rank full, source-backed cards for Chat without creating an intervention."""
+
+    config = copy.deepcopy(config or load_policy_config())
+    trigger = config["conversationTrigger"]
+    config["minimumFreeWindowMinutes"] = trigger["longFreeWindowMinutes"]
+    active = friction_types
+    if active is None:
+        active = set(
+            effective_participation_frictions(
+                profile,
+                now,
+                half_life_days=trigger["inferredFrictionHalfLifeDays"],
+            )
+        )
+    adjusted_profile = copy.deepcopy(profile)
+    if "travel_effort" in active:
+        adjusted_profile["maxTravelMinutes"] = min(
+            int(adjusted_profile.get("maxTravelMinutes", 240)),
+            trigger["adjustedTravelMinutes"],
+        )
+    if "cost" in active:
+        adjusted_profile["maxBudgetYen"] = min(
+            int(adjusted_profile.get("maxBudgetYen", 1_000_000)),
+            trigger["adjustedBudgetYen"],
+        )
+
+    data_mode = opportunity_result.get("dataMode", "demo")
+    windows = _eligible_windows(freebusy, config, now)
+    source_items = opportunity_result.get("opportunities", [])
+    eligible, _exclusions, _matched = filter_candidates(
+        adjusted_profile, windows, source_items, config, now, data_mode
+    )
+    narrowed: list[dict[str, Any]] = []
+    for opportunity in eligible:
+        if "group_size" in active:
+            capacity = opportunity.get("capacity")
+            if not isinstance(capacity, int) or isinstance(capacity, bool) or capacity > trigger["adjustedGroupSize"]:
+                continue
+        if "time_commitment" in active:
+            try:
+                duration = int((_parse_datetime(opportunity["endsAt"]) - _parse_datetime(opportunity["startsAt"])).total_seconds() // 60)
+            except (KeyError, TypeError, ValueError, ContractError):
+                continue
+            if duration > trigger["adjustedDurationMinutes"]:
+                continue
+        if "cost" in active and not isinstance(opportunity.get("priceYen"), int):
+            continue
+        narrowed.append(opportunity)
+
+    scored: list[tuple[dict[str, Any], float, dict[str, bool]]] = []
+    for opportunity in narrowed:
+        if data_mode == "live":
+            score, _components, fit_flags = _live_score_candidate(adjusted_profile, opportunity, config)
+        else:
+            score, _components = _score_candidate(adjusted_profile, opportunity, config)
+            fit_flags = {"exact": False, "adjacent": False}
+        adjustment = 0.0
+        if "first_time_anxiety" in active:
+            adjustment += 0.15 if _has_connection_fact(
+                opportunity, "beginnerFriendly", "soloFriendly", "beginner_friendly", "solo_friendly"
+            ) else -0.08
+        if active & {"stranger_anxiety", "conversation_load"}:
+            adjustment += 0.14 if _has_connection_fact(
+                opportunity, "groupWork", "sharedMeal", "structuredConversation", "group_work", "shared_meal", "structured_conversation"
+            ) else -0.08
+            if opportunity.get("conversationRequired") == "low":
+                adjustment += 0.05
+        scored.append((opportunity, round(max(-1.0, min(1.0, score + adjustment)), 4), fit_flags))
+    scored.sort(
+        key=lambda entry: (
+            -entry[1],
+            -float(entry[0].get("sourceTrust", 0)),
+            entry[0].get("startsAt", ""),
+            int(entry[0].get("travelEstimate", {}).get("minutes", 10**9)),
+            entry[0].get("id", ""),
+        )
+    )
+
+    recommendations: list[dict[str, Any]] = []
+    for rank, (opportunity, _score, fit_flags) in enumerate(
+        scored[: int(config["maxRankedOpportunities"])], start=1
+    ):
+        if data_mode == "live" and isinstance(opportunity.get("connectionEvidence"), dict):
+            reasons = _recommendation_reasons(adjusted_profile, opportunity, fit_flags)
+        else:
+            reasons = [
+                {
+                    "code": "personal_fit",
+                    "text": "話した好みと、確認できた参加条件に合う候補です。",
+                    "evidenceUrl": opportunity.get("sourceUrl"),
+                    "classification": "private_user_data",
+                }
+            ]
+        friction_reason = _conversation_reason(opportunity, active)
+        if friction_reason is not None:
+            reasons = [friction_reason, *reasons]
+        recommendations.append(
+            {
+                "rank": rank,
+                "opportunity": copy.deepcopy(opportunity),
+                "recommendationReasons": reasons[:6],
+            }
+        )
+    return recommendations
 
 
 def _guardrail_reason(

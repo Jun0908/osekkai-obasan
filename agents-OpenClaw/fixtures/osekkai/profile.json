@@ -28,6 +28,7 @@
     }
   },
   "inferredPreferences": {},
+  "participationFriction": {},
   "currentSignals": {
     "interventionHint": "none",
     "currentReceptivity": null,

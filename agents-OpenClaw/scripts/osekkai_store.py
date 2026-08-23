@@ -50,6 +50,7 @@ class JsonStore:
     SUBDIRECTORIES = (
         "profiles",
         "conversations",
+        "conversation-episodes",
         "interventions",
         "opportunities",
         "credentials",
@@ -301,6 +302,44 @@ class JsonStore:
         values = [self._read_json(path) for path in directory.glob("*.json")]
         return sorted(values, key=lambda item: item.get("createdAt", ""))
 
+    def save_conversation_episode_unlocked(self, user_id: str, episode: dict[str, Any]) -> None:
+        episode_id = require_uuid(episode.get("id"), "conversationEpisode.id")
+        if episode.get("userId") != user_id:
+            raise StorageError("conversation episode ownership mismatch")
+        path = self._safe_path("conversation-episodes", user_id, f"{episode_id}.json")
+        if not path.exists():
+            existing = self._safe_path("conversation-episodes", user_id)
+            if existing.exists() and sum(1 for _ in existing.glob("*.json")) >= self.MAX_EPISODES_PER_USER:
+                raise StorageError("conversation episode quota exceeded")
+        self._enforce_directory_byte_quota(
+            path,
+            episode,
+            self.MAX_EPISODE_BYTES_PER_USER,
+            "conversation episode",
+        )
+        self._atomic_write_json(path, episode)
+
+    def load_conversation_episode_unlocked(
+        self, user_id: str, episode_id: str
+    ) -> dict[str, Any] | None:
+        require_uuid(user_id, "userId")
+        require_uuid(episode_id, "conversationEpisodeId")
+        return self._read_json(
+            self._safe_path("conversation-episodes", user_id, f"{episode_id}.json")
+        )
+
+    def list_conversation_episodes_unlocked(self, user_id: str) -> list[dict[str, Any]]:
+        require_uuid(user_id, "userId")
+        directory = self._safe_path("conversation-episodes", user_id)
+        if not directory.exists():
+            return []
+        values = [self._read_json(path) for path in directory.glob("*.json")]
+        return sorted(
+            values,
+            key=lambda item: (str(item.get("updatedAt", "")), str(item.get("id", ""))),
+            reverse=True,
+        )
+
     def save_episode_unlocked(self, user_id: str, episode: dict[str, Any]) -> None:
         episode_id = require_uuid(episode.get("id"), "episode.id")
         if episode.get("userId") != user_id:
@@ -418,6 +457,7 @@ class JsonStore:
         file_areas = ("profiles", "idempotency", "credentials", "metrics")
         dir_areas = (
             "conversations",
+            "conversation-episodes",
             "interventions",
             "opportunities",
             "assessments",
@@ -519,6 +559,37 @@ class JsonStore:
                     del inferred[preference_key]
             JsonStore._reconcile_scrubbed_inference_copy(value, changed_keys)
 
+        friction = value.get("participationFriction")
+        if isinstance(friction, dict):
+            for friction_key, item in list(friction.items()):
+                if not isinstance(item, dict) or item.get("origin") != "inferred":
+                    continue
+                evidence = item.get("evidence")
+                if not isinstance(evidence, list):
+                    del friction[friction_key]
+                    continue
+                kept = []
+                for evidence_item in evidence:
+                    observed_at = (
+                        evidence_item.get("lastConfirmedAt")
+                        if isinstance(evidence_item, dict)
+                        else None
+                    )
+                    try:
+                        expired = (
+                            not isinstance(observed_at, str)
+                            or datetime.fromisoformat(observed_at) < cutoff
+                        )
+                    except (TypeError, ValueError):
+                        expired = True
+                    if expired:
+                        removed += 1
+                    else:
+                        kept.append(evidence_item)
+                item["evidence"] = kept
+                if not kept:
+                    del friction[friction_key]
+
         for child in value.values():
             _, child_removed = JsonStore._scrub_expired_inferred_evidence(child, cutoff)
             removed += child_removed
@@ -567,6 +638,30 @@ class JsonStore:
                     if not kept:
                         del inferred[key]
             JsonStore._reconcile_scrubbed_inference_copy(value, changed_keys)
+        friction = value.get("participationFriction")
+        if isinstance(friction, dict):
+            friction_name = (
+                preference_key.removeprefix("friction:")
+                if isinstance(preference_key, str) and preference_key.startswith("friction:")
+                else None
+            )
+            if friction_name is not None and friction_name in friction:
+                del friction[friction_name]
+                removed += 1
+            if evidence_id is not None:
+                for key, item in list(friction.items()):
+                    if not isinstance(item, dict) or not isinstance(item.get("evidence"), list):
+                        continue
+                    evidence = item["evidence"]
+                    kept = [
+                        entry
+                        for entry in evidence
+                        if not isinstance(entry, dict) or entry.get("id") != evidence_id
+                    ]
+                    removed += len(evidence) - len(kept)
+                    item["evidence"] = kept
+                    if not kept:
+                        del friction[key]
         for child in value.values():
             removed += JsonStore._scrub_inferred_copy(
                 child,
@@ -589,6 +684,19 @@ class JsonStore:
             raise StorageError("provide exactly one inferred-data deletion selector")
         updated_episodes = 0
         removed = 0
+        conversation_episode_directory = self._safe_path("conversation-episodes", user_id)
+        if evidence_id is not None and conversation_episode_directory.exists():
+            for path in conversation_episode_directory.glob("*.json"):
+                episode = self._read_json(path)
+                evidence_ids = episode.get("frictionEvidenceIds")
+                if not isinstance(evidence_ids, list) or evidence_id not in evidence_ids:
+                    continue
+                episode["frictionEvidenceIds"] = [
+                    item for item in evidence_ids if item != evidence_id
+                ]
+                self._atomic_write_json(path, episode)
+                removed += 1
+                updated_episodes += 1
         episode_directory = self._safe_path("interventions", user_id)
         if episode_directory.exists():
             for path in episode_directory.glob("*.json"):
@@ -627,7 +735,7 @@ class JsonStore:
         for area in ("profiles", "idempotency"):
             directory = self._safe_path(area)
             candidates.update(path.stem for path in directory.glob("*.json"))
-        for area in ("conversations", "interventions"):
+        for area in ("conversations", "conversation-episodes", "interventions"):
             directory = self._safe_path(area)
             candidates.update(path.name for path in directory.iterdir() if path.is_dir())
 

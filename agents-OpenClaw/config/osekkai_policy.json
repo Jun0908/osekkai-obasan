@@ -3,6 +3,21 @@
   "policyVersion": "osekkai-p0-v1",
   "timezone": "Asia/Tokyo",
   "minimumFreeWindowMinutes": 180,
+  "conversationTrigger": {
+    "horizonDays": 7,
+    "activityStart": "08:00",
+    "activityEnd": "21:00",
+    "longFreeWindowMinutes": 90,
+    "minimumLongFreeWindows": 2,
+    "maximumBusyOccupancyPercent": 20,
+    "minimumCandidates": 2,
+    "checkInDelayMinutes": 120,
+    "inferredFrictionHalfLifeDays": 60,
+    "adjustedTravelMinutes": 20,
+    "adjustedDurationMinutes": 120,
+    "adjustedGroupSize": 12,
+    "adjustedBudgetYen": 1000
+  },
   "batteryBands": {
     "lowMax": 30,
     "mediumMax": 60

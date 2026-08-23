@@ -103,6 +103,17 @@ const preferenceLabels: Record<string, string> = {
   conversationRequirement: '会話の少なさ',
   conversationPreference: '会話の少なさ',
   pushCadenceDelta: '声かけの頻度',
+  'friction:search_fatigue': 'Eventを探す負担',
+  'friction:first_time_anxiety': '初参加への不安',
+  'friction:stranger_anxiety': '知らない人への不安',
+  'friction:group_size': '人の多さ',
+  'friction:conversation_load': '会話の多さ',
+  'friction:travel_effort': '移動の負担',
+  'friction:time_commitment': '拘束時間',
+  'friction:cost': '料金の負担',
+  'friction:low_social_energy': '人に会う余力',
+  'friction:push_aversion': '誘い方の強さ',
+  'friction:not_today': '今日ではない',
 };
 
 function printableValue(value: unknown): string {
@@ -148,6 +159,28 @@ function normalizeMemories(value: unknown): PreferenceMemory[] {
   });
 }
 
+function normalizeParticipationFriction(value: unknown): PreferenceMemory[] {
+  if (!isRecord(value)) return [];
+  return Object.entries(value).flatMap(([name, raw]) => {
+    if (!isRecord(raw)) return [];
+    const key = `friction:${name}`;
+    const evidence = objectArray(raw.evidence).flatMap((item) => {
+      const id = readString(item, 'id');
+      const text = readString(item, 'text');
+      return id && text
+        ? [{ id, text, createdAt: readString(item, 'lastConfirmedAt', 'observedAt') }]
+        : [];
+    });
+    return [{
+      key,
+      label: preferenceLabels[key] ?? name,
+      value: readString(raw, 'origin') === 'explicit' ? '本人が回答' : '会話から推定',
+      confidence: readNumber(raw, 'confidence'),
+      evidence,
+    }];
+  });
+}
+
 export function normalizeProfile(raw: unknown): ProfileView {
   const root = firstRecord(raw);
   const profile = firstRecord(root.profile, root.distanceProfile, raw);
@@ -180,7 +213,10 @@ export function normalizeProfile(raw: unknown): ProfileView {
     socialBattery,
     pauseUntil: readString(profile, 'pauseUntil', 'cooldownUntil'),
     rejectionStreak: readNumber(profile, 'rejectionStreak') ?? 0,
-    inferred: normalizeMemories(inferred),
+    inferred: [
+      ...normalizeMemories(inferred),
+      ...normalizeParticipationFriction(profile.participationFriction),
+    ],
   };
 }
 

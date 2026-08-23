@@ -275,10 +275,19 @@ export function chatGet(request: Request) {
 export function chatPost(request: Request) {
   return withOsekkaiErrors(async () => {
     const parsed = await parseMutationRequest(request);
-    assertAllowedFields(parsed.body, ['message', 'remember']);
-    const message = requireString(parsed.body, 'message', { min: 1, max: 2_000 });
+    assertAllowedFields(parsed.body, ['action', 'message', 'opportunityId', 'remember']);
+    const action = parsed.body.action ?? 'message';
+    if (!['start', 'message', 'select', 'check_in'].includes(String(action))) {
+      throw new OsekkaiHttpError('VALIDATION_ERROR', '未対応の会話操作です。', 400);
+    }
     const remember = optionalBoolean(parsed.body, 'remember');
-    const payload: JsonObject = { message };
+    const payload: JsonObject = { action: String(action) };
+    if (action === 'message' || action === 'check_in') {
+      payload.message = requireString(parsed.body, 'message', { min: 1, max: 2_000 });
+    }
+    if (action === 'select') {
+      payload.opportunityId = requireString(parsed.body, 'opportunityId', { min: 1, max: 200 });
+    }
     if (remember !== undefined) {
       payload.remember = remember;
     }

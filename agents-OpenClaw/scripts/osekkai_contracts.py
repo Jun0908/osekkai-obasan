@@ -286,6 +286,14 @@ def validate_profile(profile: Any) -> dict[str, Any]:
     return obj
 
 
+def validate_conversation_episode(value: Any) -> dict[str, Any]:
+    return validate_schema(value, "conversation-episode.schema.json")
+
+
+def validate_conversation_context(value: Any) -> dict[str, Any]:
+    return validate_schema(value, "conversation-context.schema.json")
+
+
 def validate_freebusy(value: Any) -> dict[str, Any]:
     obj = dict(require_mapping(value, "freebusy"))
     if obj.get("schemaVersion") != SCHEMA_VERSION or obj.get("dataMode") not in DATA_MODES:

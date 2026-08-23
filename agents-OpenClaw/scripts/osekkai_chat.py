@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
+import copy
 import uuid
 from datetime import datetime
 from typing import Any
 
 from osekkai_contracts import ContractError, SCHEMA_VERSION
+from osekkai_conversation import (
+    handle_check_in_unlocked,
+    handle_conversation_message_unlocked,
+    move_to_safety_handoff_unlocked,
+    select_opportunity_unlocked,
+    start_user_episode_unlocked,
+)
 from osekkai_profile import apply_inferred_delta, get_or_create_profile_unlocked, pause_one_week
 from osekkai_safety import assess_safety
 from osekkai_store import JsonStore
@@ -62,19 +70,100 @@ def process_chat_unlocked(
     user_id: str,
     payload: dict[str, Any],
     now: datetime,
+    data_mode: str = "demo",
 ) -> dict[str, Any]:
-    message = payload.get("message")
-    if not isinstance(message, str) or not message.strip():
-        raise ContractError("message must be a non-empty string")
-    if len(message) > 2000:
-        raise ContractError("message must be at most 2000 characters")
+    action = payload.get("action", "message")
+    if action not in {"start", "message", "select", "check_in"}:
+        raise ContractError("chat action is invalid")
+    message = payload.get("message", "")
+    if action in {"message", "check_in"}:
+        if not isinstance(message, str) or not message.strip():
+            raise ContractError("message must be a non-empty string")
+        if len(message) > 2000:
+            raise ContractError("message must be at most 2000 characters")
     remember_value = payload.get("remember", True)
     if not isinstance(remember_value, bool):
         raise ContractError("remember must be a boolean")
 
     profile = get_or_create_profile_unlocked(store, user_id, now)
-    remember = remember_value and profile["memoryConsent"] and not _contains(message, DO_NOT_REMEMBER_MARKERS)
-    safety = assess_safety(message)
+    remember = (
+        remember_value
+        and profile["memoryConsent"]
+        and not _contains(message, DO_NOT_REMEMBER_MARKERS)
+    )
+    safety = assess_safety(message or "こんにちは")
+
+    if action == "start":
+        conversation = start_user_episode_unlocked(store, user_id, profile, now, data_mode)
+        return _chat_result(
+            conversation,
+            profile=profile,
+            profile_delta={},
+            friction_delta=[],
+            intervention_hint="none",
+            confidence=1.0,
+            safety=safety,
+            persisted=False,
+            conversation_id=None,
+        )
+
+    if safety["requiresHumanSupport"]:
+        episode = move_to_safety_handoff_unlocked(store, user_id, now)
+        profile["currentSignals"] = {
+            "interventionHint": "do_not_push",
+            "currentReceptivity": 0.0,
+            "safety": {"level": "urgent", "requiresHumanSupport": True},
+            "observedAt": now.isoformat(),
+        }
+        profile["updatedAt"] = now.isoformat()
+        store.save_profile_unlocked(user_id, profile)
+        return _chat_result(
+            {
+                "episode": episode,
+                "reply": safety["message"],
+                "context": {
+                    "schemaVersion": SCHEMA_VERSION,
+                    "episodeId": episode["id"],
+                    "state": "safety_handoff",
+                    "trigger": episode["trigger"],
+                    "quickReplies": [],
+                    "recommendations": [],
+                    "calendarSummary": None,
+                    "selectedOpportunityId": episode.get("selectedOpportunityId"),
+                    "checkInDueAt": episode.get("checkInDueAt"),
+                    "canSendMessage": False,
+                    "notice": "Event推薦を止め、人の支えにつながる案内を優先しています。",
+                },
+            },
+            profile=profile,
+            profile_delta={},
+            friction_delta=[],
+            intervention_hint="do_not_push",
+            confidence=1.0,
+            safety=safety,
+            persisted=False,
+            conversation_id=None,
+        )
+
+    if action == "select":
+        opportunity_id = payload.get("opportunityId")
+        if not isinstance(opportunity_id, str) or not opportunity_id.strip():
+            raise ContractError("opportunityId must be a non-empty string")
+        conversation = select_opportunity_unlocked(
+            store, user_id, profile, opportunity_id, now, data_mode
+        )
+        return _chat_result(
+            conversation,
+            profile=conversation["profile"],
+            profile_delta={},
+            friction_delta=[],
+            intervention_hint="none",
+            confidence=1.0,
+            safety=safety,
+            persisted=False,
+            conversation_id=None,
+        )
+
     explicit_pause = _contains(message, PAUSE_MARKERS)
     explicit_no_action = _contains(message, DO_NOT_PUSH_MARKERS)
     tired = _contains(message, TIRED_MARKERS)
@@ -110,11 +199,6 @@ def process_chat_unlocked(
         intervention_hint = "do_not_push"
         current_receptivity = 0.0
         confidence = 1.0
-    if safety["requiresHumanSupport"]:
-        intervention_hint = "do_not_push"
-        current_receptivity = 0.0
-        confidence = 1.0
-
     if explicit_pause:
         profile = pause_one_week(profile, now)
     if remember and delta:
@@ -131,6 +215,43 @@ def process_chat_unlocked(
     }
     profile["updatedAt"] = now.isoformat()
     store.save_profile_unlocked(user_id, profile)
+    conversation_profile = (
+        profile
+        if remember or not delta
+        else apply_inferred_delta(copy.deepcopy(profile), delta, confidence, message, now)
+    )
+
+    if action == "check_in":
+        conversation = handle_check_in_unlocked(
+            store,
+            user_id,
+            conversation_profile,
+            message,
+            now,
+            data_mode,
+            remember=remember,
+        )
+    else:
+        conversation = handle_conversation_message_unlocked(
+            store,
+            user_id,
+            conversation_profile,
+            message,
+            now,
+            data_mode,
+            remember=remember,
+            attraction_changed=bool(interest_categories),
+        )
+    if not remember:
+        # The current reply may use the unsaved preference, but only operational
+        # controls (for example cooldown) may cross the no-memory boundary.
+        changed = conversation.get("profile")
+        if isinstance(changed, dict):
+            for key in ("cooldownUntil", "pauseUntil", "currentSignals"):
+                profile[key] = copy.deepcopy(changed.get(key))
+            profile["updatedAt"] = now.isoformat()
+            store.save_profile_unlocked(user_id, profile)
+        conversation["profile"] = profile
 
     conversation_id: str | None = None
     if remember:
@@ -147,31 +268,63 @@ def process_chat_unlocked(
                 "createdAt": now.isoformat(),
             },
         )
-
-    if safety["requiresHumanSupport"]:
-        reply = safety["message"]
-    elif explicit_pause:
-        reply = "わかったわ。今週はおっせかいを休むね。話した内容は、記憶しない指定なら保存しないよ。"
-    elif explicit_no_action:
-        reply = "今日は何かさせる日じゃなさそうね。提案はせず、ここでは話すだけにしておくわ。"
-    elif wants_outside and no_talk:
-        reply = "少し外へ出たい気持ちは受け取ったよ。会話がほとんど要らない場所だけ、条件が合う時に一件まで探すね。"
-    elif tired:
-        reply = "疲れているのね。今日は距離を詰めず、無理に予定を増やさないでおくわ。"
-    elif interest_labels:
-        reply = f"{interest_labels[0]}ね。ええやん。その好みから、今ある交流Eventを探してみるわ。"
-    else:
-        reply = "もうちょい具体的に聞かせて。最近やってみたいこと、ひとつだけある？"
+        assistant_id = str(uuid.uuid4())
+        store.save_conversation_unlocked(
+            user_id,
+            {
+                "schemaVersion": SCHEMA_VERSION,
+                "id": assistant_id,
+                "userId": user_id,
+                "role": "assistant",
+                "text": conversation["reply"],
+                "remember": True,
+                "createdAt": now.isoformat(),
+            },
+        )
+        episode = conversation.get("episode")
+        if isinstance(episode, dict):
+            episode["turnIds"] = list(
+                dict.fromkeys([*episode.get("turnIds", []), conversation_id, assistant_id])
+            )
+            episode["updatedAt"] = now.isoformat()
+            store.save_conversation_episode_unlocked(user_id, episode)
 
     public_delta = delta if remember else {}
+    return _chat_result(
+        conversation,
+        profile=conversation.get("profile", profile),
+        profile_delta=public_delta,
+        friction_delta=conversation.get("frictionDelta", []),
+        intervention_hint=intervention_hint,
+        confidence=confidence,
+        safety=safety,
+        persisted=remember,
+        conversation_id=conversation_id,
+    )
+
+
+def _chat_result(
+    conversation: dict[str, Any],
+    *,
+    profile: dict[str, Any],
+    profile_delta: dict[str, Any],
+    friction_delta: list[str],
+    intervention_hint: str,
+    confidence: float,
+    safety: dict[str, Any],
+    persisted: bool,
+    conversation_id: str | None,
+) -> dict[str, Any]:
     return {
         "schemaVersion": SCHEMA_VERSION,
-        "reply": reply,
-        "profileDelta": public_delta,
+        "reply": conversation["reply"],
+        "profileDelta": profile_delta,
+        "frictionDelta": friction_delta,
         "interventionHint": intervention_hint,
         "confidence": confidence,
         "safety": safety,
-        "persisted": remember,
+        "persisted": persisted,
         "conversationId": conversation_id,
         "profile": profile,
+        "context": conversation["context"],
     }

@@ -120,21 +120,32 @@ def _compact_idempotency_result(command: str, payload: dict[str, Any], result: A
     if not isinstance(result, dict):
         raise StorageError("mutation result cannot be replayed")
     if command == "chat":
-        if result.get("persisted") is True:
+        if result.get("persisted") is True or payload.get("action") in {
+            "start",
+            "select",
+            "check_in",
+        }:
             response = {
                 key: copy.deepcopy(result[key])
                 for key in (
                     "schemaVersion",
                     "reply",
                     "profileDelta",
+                    "frictionDelta",
                     "interventionHint",
                     "confidence",
                     "safety",
                     "persisted",
                     "conversationId",
+                    "context",
                 )
             }
-            return {"kind": "chat-remembered", "response": response}
+            return {
+                "kind": (
+                    "chat-remembered" if result.get("persisted") is True else "chat-operational"
+                ),
+                "response": response,
+            }
         # Do not duplicate a no-memory reply, semantic delta, safety inference,
         # or profile/evidence snapshot in the idempotency ledger.
         return {"kind": "chat-no-memory"}
@@ -176,14 +187,20 @@ def _replay_idempotency_result(
     kind = metadata.get("kind")
     if kind == "full" and isinstance(metadata.get("result"), dict):
         return metadata["result"]
-    if kind in {"profile-current", "chat-remembered", "chat-no-memory", "feedback"}:
+    if kind in {
+        "profile-current",
+        "chat-remembered",
+        "chat-operational",
+        "chat-no-memory",
+        "feedback",
+    }:
         profile = get_or_create_profile_unlocked(store, user_id, now)
         validate_profile(profile)
     else:
         profile = None
     if kind == "profile-current":
         return profile
-    if kind == "chat-remembered":
+    if kind in {"chat-remembered", "chat-operational"}:
         response = metadata.get("response")
         if not isinstance(response, dict):
             raise StorageError("remembered chat replay metadata is invalid")
@@ -206,6 +223,7 @@ def _replay_idempotency_result(
             "schemaVersion": SCHEMA_VERSION,
             "reply": "この操作はすでに受け取りました。記憶しない内容は再保存していません。",
             "profileDelta": {},
+            "frictionDelta": [],
             "interventionHint": hint,
             "confidence": 1.0 if hint == "do_not_push" else 0.5,
             "safety": {
@@ -217,6 +235,19 @@ def _replay_idempotency_result(
             "persisted": False,
             "conversationId": None,
             "profile": profile,
+            "context": {
+                "schemaVersion": SCHEMA_VERSION,
+                "episodeId": None,
+                "state": "getting_to_know",
+                "trigger": "user_initiated",
+                "quickReplies": [],
+                "recommendations": [],
+                "calendarSummary": None,
+                "selectedOpportunityId": None,
+                "checkInDueAt": None,
+                "canSendMessage": True,
+                "notice": None,
+            },
         }
     if kind in {"decide", "feedback", "outcome"}:
         episode_id = metadata.get("episodeId")
@@ -337,6 +368,7 @@ def _demo_seed_unlocked(store: JsonStore, user_id: str, now) -> dict[str, Any]:
     untouched = (
         _is_untouched_default_profile(profile, user_id)
         and not store.list_conversations_unlocked(user_id)
+        and not store.list_conversation_episodes_unlocked(user_id)
         and not store.list_episodes_unlocked(user_id)
     )
     if untouched:
@@ -359,7 +391,7 @@ def _dispatch_unlocked(
     now,
 ) -> Any:
     if command == "chat":
-        return process_chat_unlocked(store, user_id, payload, now)
+        return process_chat_unlocked(store, user_id, payload, now, _data_mode())
     if command == "profile-update":
         return _profile_update_unlocked(store, user_id, payload, now)
     if command == "decide":

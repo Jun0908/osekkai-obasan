@@ -1,23 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 
+import RecommendationShortlist from '@/app/osekkai/_components/recommendation-shortlist';
 import styles from '@/app/osekkai/osekkai.module.css';
+import type {
+  ChatResult,
+  ConversationContext,
+  Opportunity,
+  RankedOpportunity,
+} from '@/lib/osekkai/types.generated';
 import {
   friendlyApiError,
   newIdempotencyKey,
   osekkaiRequest,
-  type JsonObject,
 } from './api-client';
-import {
-  firstRecord,
-  normalizeProfile,
-  readBoolean,
-  readString,
-  type ProfileView,
-} from './models';
+import { normalizeProfile, type ProfileView } from './models';
 import { InlineNotice, PageIntro } from './ui';
 
 type ChatTurn = {
@@ -26,11 +25,7 @@ type ChatTurn = {
   text: string;
 };
 
-const initialTurn: ChatTurn = {
-  id: 'welcome',
-  speaker: 'osekkai',
-  text: 'あんた、何が好きなのよ。最近やってみたいこと、ひとつ教えて。',
-};
+type RecommendationAction = 'accepted' | 'declined' | 'pause_one_week' | 'revisit';
 
 const starters = [
   'ヨガをやってみたい',
@@ -39,40 +34,88 @@ const starters = [
   '音楽好きと知り合いたい',
 ];
 
-async function fetchProfileView(): Promise<ProfileView> {
-  return normalizeProfile(await osekkaiRequest('/profile'));
+function recommendationProps(context?: ConversationContext): {
+  opportunities: Opportunity[];
+  ranking: RankedOpportunity[];
+} {
+  if (!context) return { opportunities: [], ranking: [] };
+  return {
+    opportunities: context.recommendations.map((item) => item.opportunity),
+    ranking: context.recommendations.map((item) => ({
+      rank: item.rank,
+      score: 0,
+      opportunityId: item.opportunity.id,
+      recommendationReasons: item.recommendationReasons,
+      exclusionReasons: [],
+    })),
+  };
 }
 
 export default function ChatClient() {
-  const router = useRouter();
+  const startKeyRef = useRef(newIdempotencyKey('chat-start'));
+  const chatLogRef = useRef<HTMLDivElement>(null);
   const [profile, setProfile] = useState<ProfileView>();
-  const [turns, setTurns] = useState<ChatTurn[]>([initialTurn]);
+  const [turns, setTurns] = useState<ChatTurn[]>([]);
+  const [context, setContext] = useState<ConversationContext>();
   const [message, setMessage] = useState('');
   const [remember, setRemember] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [consenting, setConsenting] = useState(false);
-  const [enablingRecommendations, setEnablingRecommendations] = useState(false);
   const [error, setError] = useState('');
   const [safetySupport, setSafetySupport] = useState(false);
-  const statusRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let active = true;
-    void fetchProfileView()
-      .then((next) => {
+    const initialize = async () => {
+      try {
+        const [profileRaw, started] = await Promise.all([
+          osekkaiRequest('/profile'),
+          osekkaiRequest<ChatResult>('/chat', {
+            method: 'POST',
+            mutation: true,
+            body: {
+              action: 'start',
+              remember: false,
+              idempotencyKey: startKeyRef.current,
+            },
+          }),
+        ]);
         if (!active) return;
-        setProfile(next);
-        setRemember(next.memoryConsent);
+        const nextProfile = normalizeProfile(profileRaw);
+        setProfile(nextProfile);
+        setRemember(nextProfile.memoryConsent);
+        setContext(started.context);
+        setSafetySupport(started.safety.requiresHumanSupport);
+        setTurns([{ id: 'episode-start', speaker: 'osekkai', text: started.reply }]);
         setError('');
-      })
-      .catch((reason: unknown) => {
+      } catch (reason) {
         if (active) setError(friendlyApiError(reason));
-      });
-
+      }
+    };
+    void initialize();
     return () => {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    const chatLog = chatLogRef.current;
+    if (!chatLog) return;
+    chatLog.scrollTop = chatLog.scrollHeight;
+  }, [turns, submitting]);
+
+  const applyChatResult = (result: ChatResult) => {
+    setContext(result.context);
+    setSafetySupport(result.safety.requiresHumanSupport);
+    setTurns((current) => [
+      ...current,
+      {
+        id: newIdempotencyKey('turn-osekkai'),
+        speaker: 'osekkai',
+        text: result.reply,
+      },
+    ]);
+  };
 
   const updateRemember = async (checked: boolean) => {
     if (!checked || profile?.memoryConsent) {
@@ -101,112 +144,106 @@ export default function ChatClient() {
     }
   };
 
-  const sendMessage = async (event: FormEvent) => {
-    event.preventDefault();
-    const text = message.trim();
-    if (!text || submitting) return;
-
+  const submitText = async (text: string) => {
+    const clean = text.trim();
+    if (!clean || submitting || context?.canSendMessage === false) return;
     const userTurn: ChatTurn = {
       id: newIdempotencyKey('turn-user'),
       speaker: 'you',
-      text,
+      text: clean,
     };
     setTurns((current) => [...current, userTurn]);
     setMessage('');
     setSubmitting(true);
     setError('');
-
     try {
-      const raw = await osekkaiRequest<JsonObject>('/chat', {
+      const action = context?.state === 'check_in_due' ? 'check_in' : 'message';
+      const result = await osekkaiRequest<ChatResult>('/chat', {
         method: 'POST',
         mutation: true,
         body: {
-          message: text,
+          action,
+          message: clean,
           remember,
-          idempotencyKey: newIdempotencyKey('chat'),
+          idempotencyKey: newIdempotencyKey(`chat-${action}`),
         },
       });
-      const result = firstRecord(raw.chatResult, raw.result, raw);
-      const safety = firstRecord(result.safety);
-      const reply = readString(result, 'reply', 'replyText', 'message')
-        ?? 'うまく言葉にできなかったみたい。もう一度、短く聞かせてもらえる？';
-      setSafetySupport(readBoolean(safety, false, 'requiresHumanSupport'));
-      setTurns((current) => [
-        ...current,
-        {
-          id: newIdempotencyKey('turn-osekkai'),
-          speaker: 'osekkai',
-          text: reply,
-        },
-      ]);
-      window.requestAnimationFrame(() => statusRef.current?.focus());
+      applyChatResult(result);
     } catch (reason) {
       setError(friendlyApiError(reason));
       setTurns((current) => current.filter((turn) => turn.id !== userTurn.id));
-      setMessage(text);
+      setMessage(clean);
     } finally {
       setSubmitting(false);
     }
   };
 
-  const receiveRecommendations = async () => {
-    setEnablingRecommendations(true);
+  const sendMessage = (event: FormEvent) => {
+    event.preventDefault();
+    void submitText(message);
+  };
+
+  const handleRecommendation = async (
+    action: RecommendationAction,
+    opportunity: Opportunity,
+  ) => {
+    if (submitting || action === 'revisit') return;
+    if (action === 'declined') {
+      await submitText('これは違う');
+      return;
+    }
+    if (action === 'pause_one_week') {
+      await submitText('今回は無理');
+      return;
+    }
+    setTurns((current) => [
+      ...current,
+      {
+        id: newIdempotencyKey('turn-user'),
+        speaker: 'you',
+        text: `「${opportunity.title}」に行ってみる`,
+      },
+    ]);
+    setSubmitting(true);
     setError('');
     try {
-      const updates: Record<string, boolean> = {};
-      if (!profile?.pushConsent) updates.pushConsent = true;
-      if (!profile?.memoryConsent) updates.memoryConsent = true;
-      if (Object.keys(updates).length) {
-        const raw = await osekkaiRequest('/profile', {
-          method: 'PATCH',
-          mutation: true,
-          body: {
-            operation: 'update_settings',
-            updates,
-            idempotencyKey: newIdempotencyKey('push-consent'),
-          },
-        });
-        setProfile(normalizeProfile(raw));
-      }
-      const latestUserText = [...turns].reverse().find((turn) => turn.speaker === 'you')?.text;
-      if (!remember && latestUserText) {
-        await osekkaiRequest('/chat', {
-          method: 'POST',
-          mutation: true,
-          body: {
-            message: latestUserText,
-            remember: true,
-            idempotencyKey: newIdempotencyKey('recommendation-preference'),
-          },
-        });
-        setRemember(true);
-      }
-      router.push('/osekkai/demo');
+      const result = await osekkaiRequest<ChatResult>('/chat', {
+        method: 'POST',
+        mutation: true,
+        body: {
+          action: 'select',
+          opportunityId: opportunity.id,
+          remember,
+          idempotencyKey: newIdempotencyKey('chat-select'),
+        },
+      });
+      applyChatResult(result);
     } catch (reason) {
       setError(friendlyApiError(reason));
     } finally {
-      setEnablingRecommendations(false);
+      setSubmitting(false);
     }
   };
 
-  const hasAnswered = turns.some((turn) => turn.speaker === 'you');
+  const recommendations = recommendationProps(context);
+  const showStarters = context?.state === 'getting_to_know';
 
   return (
     <>
       <PageIntro
         eyebrow="CONVERSATION"
-        title="あんた、何が好きなのよ。"
+        title="おばさんに話す"
         aside={
           <Link className={styles.smallTextLink} href="/osekkai/settings">
             設定
           </Link>
         }
       >
-        <p>検索条件を並べなくて大丈夫。好きなことか、次にやってみたいことを、ひとつだけ。</p>
+        <p>好みも、行きたくても動けない理由も、一度に一つだけ。話した分だけ誘い方が合ってきます。</p>
       </PageIntro>
 
       {safetySupport ? (
-        <InlineNotice tone="warning" title="いまは人の支えを優先しましょう">
+        <InlineNotice tone="warning" title="いまは人の支えを優先します">
           <p>
             このAIだけで抱えず、信頼できる人や地域の相談窓口につながってください。
             今すぐ身の危険がある場合は119または110へ連絡してください。
@@ -219,44 +256,79 @@ export default function ChatClient() {
           <div className={styles.panelHeader}>
             <div>
               <p className={styles.eyebrow}>ONE QUESTION AT A TIME</p>
-              <h2 id="chat-heading">好みをひとつ教えて</h2>
+              <h2 id="chat-heading">会話の続き</h2>
             </div>
             <span className={styles.privatePill}>一問ずつ</span>
           </div>
 
-          <div className={styles.chatLog} aria-live="polite" aria-relevant="additions">
+          <div
+            ref={chatLogRef}
+            className={styles.chatLog}
+            aria-live="polite"
+            aria-relevant="additions"
+          >
             {turns.map((turn) => (
               <article
                 key={turn.id}
                 className={turn.speaker === 'you' ? styles.userMessage : styles.agentMessage}
               >
-                <p className={styles.messageSpeaker}>{turn.speaker === 'you' ? 'あなた' : 'おっせかいおばさん'}</p>
+                <p className={styles.messageSpeaker}>
+                  {turn.speaker === 'you' ? 'あなた' : 'おっせかいおばさん'}
+                </p>
                 <p>{turn.text}</p>
               </article>
             ))}
-            {submitting ? (
+            {submitting || !context ? (
               <div className={styles.typingIndicator} role="status">
                 <span /><span /><span />
                 <span className={styles.srOnly}>返事を考えています</span>
               </div>
             ) : null}
-            <div ref={statusRef} tabIndex={-1} className={styles.srOnly}>
-              {hasAnswered ? '返事が届きました' : ''}
-            </div>
           </div>
+
+          {context?.notice ? (
+            <div className={styles.chatContextNotice} role="note">{context.notice}</div>
+          ) : null}
+
+          {recommendations.opportunities.length > 0 ? (
+            <div className={styles.chatRecommendations} aria-label="会話から選んだイベント候補">
+              <RecommendationShortlist
+                opportunities={recommendations.opportunities}
+                ranking={recommendations.ranking}
+                onAction={(action, opportunity) => void handleRecommendation(action, opportunity)}
+                busy={submitting ? '会話を更新中' : undefined}
+                hideRevisit
+              />
+            </div>
+          ) : null}
+
+          {context?.quickReplies.length ? (
+            <div className={styles.starterRow} aria-label="返事の候補">
+              {context.quickReplies.map((reply) => (
+                <button
+                  key={reply.id}
+                  type="button"
+                  onClick={() => void submitText(reply.message)}
+                  disabled={submitting}
+                >
+                  {reply.label}
+                </button>
+              ))}
+            </div>
+          ) : null}
 
           <form className={styles.chatComposer} onSubmit={sendMessage}>
             <label className={styles.composerLabel} htmlFor="osekkai-message">
-              好きなこと・やってみたいこと
+              好きなこと、ひっかかること、行ったあとの感想
             </label>
             <textarea
               id="osekkai-message"
               value={message}
               onChange={(event) => setMessage(event.target.value)}
-              placeholder="例：ボルダリングをやってみたい"
+              placeholder="例：ボルダリングが好き／初参加がちょっと不安"
               rows={3}
               maxLength={1000}
-              disabled={submitting}
+              disabled={submitting || context?.canSendMessage === false}
             />
             <div className={styles.composerFooter}>
               <label className={styles.rememberControl}>
@@ -266,34 +338,34 @@ export default function ChatClient() {
                   onChange={(event) => void updateRemember(event.target.checked)}
                   disabled={submitting || consenting || !profile}
                 />
-                <span>{consenting ? '設定中…' : 'この好みを次の提案に使う'}</span>
+                <span>{consenting ? '設定中…' : 'この会話を次の提案に使う'}</span>
               </label>
               <span className={styles.characterCount}>{message.length} / 1000</span>
-              <button className={styles.primaryButton} type="submit" disabled={submitting || !message.trim()}>
+              <button
+                className={styles.primaryButton}
+                type="submit"
+                disabled={submitting || !message.trim() || context?.canSendMessage === false}
+              >
                 {submitting ? '聞いています…' : '送る'}
               </button>
             </div>
           </form>
-          <div className={styles.starterRow} aria-label="入力例">
-            {starters.map((starter) => (
-              <button key={starter} type="button" onClick={() => setMessage(starter)} disabled={submitting}>
-                {starter}
-              </button>
-            ))}
-          </div>
-          {hasAnswered && !submitting ? (
-            <div className={styles.chatNextAction}>
-              <p>この好みを次の提案に使い、条件が合う時のおっせかいをオンにします。設定でいつでも戻せます。</p>
-              <button
-                className={styles.primaryButton}
-                type="button"
-                disabled={enablingRecommendations || !profile}
-                onClick={() => void receiveRecommendations()}
-              >
-                {enablingRecommendations ? '設定中…' : 'この好みで提案を受け取る'} <span aria-hidden="true">→</span>
-              </button>
+
+          {showStarters && !context?.quickReplies.length ? (
+            <div className={styles.starterRow} aria-label="入力例">
+              {starters.map((starter) => (
+                <button
+                  key={starter}
+                  type="button"
+                  onClick={() => setMessage(starter)}
+                  disabled={submitting}
+                >
+                  {starter}
+                </button>
+              ))}
             </div>
           ) : null}
+
           {error ? <InlineNotice tone="error"><p>{error}</p></InlineNotice> : null}
         </section>
       </div>

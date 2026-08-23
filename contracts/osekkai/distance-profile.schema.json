@@ -9,7 +9,7 @@
     "maxPushesPerWeek", "preferredTone", "maxTravelMinutes", "maxBudgetYen",
     "socialBattery", "maxSocialIntensity", "preferredCategories", "avoidedCategories",
     "rejectionStreak", "cooldownUntil", "pauseUntil", "lastPushAt", "explicitPreferences",
-    "inferredPreferences", "currentSignals", "createdAt", "updatedAt"
+    "inferredPreferences", "participationFriction", "currentSignals", "createdAt", "updatedAt"
   ],
   "properties": {
     "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
@@ -44,6 +44,7 @@
       "type": "object",
       "additionalProperties": { "$ref": "common.schema.json#/$defs/inferredPreference" }
     },
+    "participationFriction": { "$ref": "participation-friction-profile.schema.json" },
     "currentSignals": {
       "type": "object",
       "additionalProperties": false,

@@ -13,8 +13,9 @@ import math
 from datetime import datetime
 from typing import Any
 
+from osekkai_conversation import promote_due_check_ins_unlocked
 from osekkai_profile import clock_now
-from osekkai_store import JsonStore, StorageError
+from osekkai_store import JsonStore, LockTimeout, StorageError
 
 
 MIN_RETENTION_DAYS = 1
@@ -45,7 +46,8 @@ def run_maintenance_cycle(
             f"retention_days must be between {MIN_RETENTION_DAYS} and {MAX_RETENTION_DAYS}"
         )
 
-    initial_user_count = len(store.list_user_ids())
+    user_ids = store.list_user_ids()
+    initial_user_count = len(user_ids)
     max_batches = max(1, math.ceil(initial_user_count / store.MAINTENANCE_BATCH_SIZE) + 1)
     totals = {
         "conversations": 0,
@@ -64,7 +66,20 @@ def run_maintenance_cycle(
         "skippedNamespaces": [],
         "removed": totals,
         "cycleCompleted": False,
+        "checkInsDue": 0,
     }
+
+    if hasattr(store, "user_lock"):
+        for user_id in user_ids:
+            try:
+                with store.user_lock(user_id, timeout=store.MAINTENANCE_USER_LOCK_TIMEOUT_SECONDS):
+                    summary["checkInsDue"] += promote_due_check_ins_unlocked(
+                        store, user_id, now
+                    )
+            except (OSError, StorageError, LockTimeout, ValueError):
+                # Retention has its own per-namespace diagnostics below. A busy
+                # or damaged namespace must not prevent other due check-ins.
+                continue
 
     for batch_index in range(max_batches):
         result = store.cleanup_all_if_due(

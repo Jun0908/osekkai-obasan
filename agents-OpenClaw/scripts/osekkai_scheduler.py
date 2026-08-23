@@ -12,8 +12,10 @@ from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
 from osekkai_connection import extract_connection_evidence
+from osekkai_contracts import ContractError
 from osekkai_doorkeeper import DoorkeeperError, sync_doorkeeper
 from osekkai_event_normalizer import normalize_event_mesh
+from osekkai_freebusy import ProviderError
 from osekkai_luma import LumaError, sync_configured_calendar
 from osekkai_opportunity_sync import events_to_opportunities
 from osekkai_public_events import PublicEventError, sync_kcf_courses
@@ -344,6 +346,55 @@ def load_event_mesh(*, store: JsonStore | None = None) -> dict[str, Any]:
             "counts": {"received": 0, "merged": 0, "eligible": 0, "excluded": 0},
         }
     return copy.deepcopy(value)
+
+
+def run_calendar_conversation_triggers(
+    *,
+    store: JsonStore | None = None,
+    now: datetime | None = None,
+    data_mode: str = "live",
+    user_ids: Iterable[str] | None = None,
+) -> dict[str, Any]:
+    """Evaluate registered users without exposing Calendar event details.
+
+    The local import avoids a module cycle: the conversation trigger uses
+    ``sync_before_push`` from this module for its final live revalidation.
+    Delivery is intentionally separate; this worker only creates resumable
+    Chat episodes that an approved notification channel may announce.
+    """
+
+    from osekkai_conversation import start_calendar_sparse_episode_unlocked
+
+    storage = store or JsonStore()
+    captured = now or datetime.now().astimezone()
+    requested = list(user_ids) if user_ids is not None else storage.list_user_ids()
+    created: list[dict[str, str]] = []
+    skipped = 0
+    for user_id in requested:
+        try:
+            with storage.user_lock(user_id):
+                result = start_calendar_sparse_episode_unlocked(
+                    storage, user_id, captured, data_mode
+                )
+        except (ContractError, ProviderError, StorageError, LockTimeout, OSError, TimeoutError):
+            skipped += 1
+            continue
+        if result is None:
+            skipped += 1
+            continue
+        created.append(
+            {
+                "userId": user_id,
+                "episodeId": result["episode"]["id"],
+                "state": result["episode"]["state"],
+            }
+        )
+    return {
+        "schemaVersion": "1.0",
+        "evaluatedAt": captured.isoformat(),
+        "created": created,
+        "skipped": skipped,
+    }
 
 
 def sync_before_push(

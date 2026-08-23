@@ -4,11 +4,23 @@
   "title": "Chat result",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "reply", "profileDelta", "interventionHint", "confidence", "safety", "persisted", "conversationId", "profile"],
+  "required": ["schemaVersion", "reply", "profileDelta", "frictionDelta", "interventionHint", "confidence", "safety", "persisted", "conversationId", "profile", "context"],
   "properties": {
     "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
     "reply": { "type": "string", "minLength": 1, "maxLength": 2000 },
     "profileDelta": { "type": "object" },
+    "frictionDelta": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "search_fatigue", "first_time_anxiety", "stranger_anxiety", "group_size",
+          "conversation_load", "travel_effort", "time_commitment", "cost",
+          "low_social_energy", "push_aversion", "not_today"
+        ]
+      }
+    },
     "interventionHint": { "type": "string", "enum": ["none", "do_not_push", "consider_push"] },
     "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
     "safety": {
@@ -24,6 +36,7 @@
     },
     "persisted": { "type": "boolean" },
     "conversationId": { "oneOf": [{ "$ref": "common.schema.json#/$defs/uuid" }, { "type": "null" }] },
-    "profile": { "$ref": "distance-profile.schema.json" }
+    "profile": { "$ref": "distance-profile.schema.json" },
+    "context": { "$ref": "conversation-context.schema.json" }
   }
 }

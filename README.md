@@ -1,6 +1,6 @@
-# おっせかいおばさん　おねいさん
+# おっせかいおばさん
 
-**Current Version — Live Demo Build 2026-08-23**
+**Current Version — Contextual Conversation Live Demo Build 2026-08-23**
 
 [スライドを見る](https://canva.link/uro4qx4tm4llm9n) · [PVを見る](https://www.youtube.com/watch?v=me60PvZPABQ)
 
@@ -12,7 +12,7 @@
 
 一般的なEvent検索は「何に行くか」を利用者自身に探させます。孤独状態では、その検索、比較、予定調整、移動判断自体が負担になります。
 
-おっせかいおばさんは、次の処理をOpenClawで継続実行することを目指します。
+おっせかいおばさんは、次の処理をOpenClawで継続実行します。
 
 1. 東京都内の最新Eventを複数Sourceから更新
 2. 会話、共同活動、継続参加などのConnection Evidenceを確認
@@ -30,7 +30,9 @@
 
 Today、Memory、Whyといった内部判断パネルは通常の会話画面に表示しません。保存された好みの確認・個別削除、通知時間、移動時間、予算、言葉の強さは、必要な人だけが設定画面の詳細を開いて変更できます。`今日は何もしない`は安全・Feedbackの選択肢として残しますが、ホームや最初の会話では前面に出しません。
 
-次の実装では`話す`を好み登録だけの画面から、Calendarの空き、実Event、断った理由、参加後の反応を一つの流れで扱う会話面へ拡張します。Demoでは追加設定を求めず、Google CalendarのFreeBusyが薄く、参加可能な実Eventが見つかった時を会話開始のTriggerにします。Calendarから取得するのは空き時間だけで、予定名や「家にいる」といった推測には使いません。詳細Taskは[Plan2.md](Plan2.md#132-実行順task-queue)に記録しています。
+`話す`では、好みの一問からCalendarとRoutesに収まる実Eventを2〜3件提示し、断られた時だけ「何がひっかかった？」と一問だけ聞きます。初参加への不安、知らない人、人数、会話量、移動、時間、料金、疲れ、誘い方などを好みとは分けて覚え、候補と誘い方を一度だけ調整します。`行ってみる`を選ぶとEvent終了後の活動時間に短いCheck-inへつながり、その回答が次の順位や言葉へ反映されます。
+
+先回り会話は、Google Calendarの次の7日間に長いFree Windowがあり、PUSH同意・Quiet Hours・週次上限・Cooldown・Safetyを満たし、再検証できた実Eventが複数ある時だけ始まります。Calendarから取得するのはFreeBusyだけで、予定名や「家にいる」といった推測には使いません。本人が`話す`を開いた時はCalendarが疎くなくても会話でき、未完了の候補選びや期限が来たCheck-inから再開します。詳細Taskと検証記録は[Plan2.md](Plan2.md#132-実行順task-queue)に記録しています。
 
 ## 現在の実装状態
 
@@ -38,13 +40,15 @@ Today、Memory、Whyといった内部判断パネルは通常の会話画面に
 
 - Next.jsの`/osekkai` UI、`/api/osekkai` API、匿名Session、記憶・通知同意、休止、全削除
 - PythonをownerとするProfile、Distance Profile、Policy、Safety Guardrail、判断記録、Feedback、KPI
-- JSON Schema 24件を正本とするPython–TypeScript Contractと生成validator
+- JSON Schema 27件を正本とするPython–TypeScript Contractと生成validator
 - 東京都Open Data CKAN、許可されたLu.ma iCal、Doorkeeper API、公共文化施設公式SiteのProvider adapter
 - Event / Series / Community / Source Registry、重複統合、鮮度・募集状態、Connection Evidence
 - Calendar OAuthのstate・PKCE・匿名session紐付け、暗号化token、FreeBusyだけを使うCalendar adapter
 - Google Routesの徒歩・公共交通・住所解決、往復・滞在・bufferを含む実現可能性判定
 - Sourceごとの更新間隔、lock、retry/backoff、障害分離、PUSH直前再検証を行うScheduler
 - 優先順位付きの複数候補、根拠、Source状態、CTAを表示するLive Demo UI
+- Conversation Episodeの9状態、Calendar Trigger、11種のParticipation FrictionとEvidence優先・減衰Rule
+- `話す`内で完結する`複数候補 → 一問だけの理由確認 → 一度だけ調整 → 参加選択 → Event後Check-in`
 - 現在地または地域名から、取得した全Eventを探せるMapと一覧fallback
 - Map上の明示操作でBrowser Geolocationを一時取得し、選択EventのRoutes計算にだけ使う位置情報導線
 - 再現可能なP0オフラインデモと、Live Provider fixtureを使う統合テスト
@@ -59,9 +63,9 @@ Today、Memory、Whyといった内部判断パネルは通常の会話画面に
 - 料金がSourceで確認できないEventは無料と推定せず`料金未確認`と表示し、遠すぎる経路や根拠不足のEventは推薦から除外
 - Sourceの強制再同期を毎画面表示から外し、通常表示は保存済みLive Cacheを読む
 
-### 次に実装するVersion
+### 次に行うこと
 
-個別ProviderとGoogle実接続、および実データを使う複数候補生成までは完了しています。次は`話す`を、好みの初回登録、Calendarの疎な期間から始まる先回り会話、断った理由に応じた一度だけの再提案、参加後のさりげない確認まで続く会話面へ拡張します。その後、審査で使うBrowser sessionで最終リハーサルを行います。
+個別ProviderとGoogle実接続、実データを使う複数候補生成、Calendarの疎な期間から始まる先回り会話、断った理由に応じた一度だけの再提案、参加後のさりげない確認まで実装済みです。次は審査で使うGoogle Calendar接続済みBrowser sessionで60秒の最終リハーサルを行い、Demo当日のSource件数、Routes quota、Maps key制限、候補2件以上を確認します。継続運用では外部Task Scheduler / cronからSource同期、Calendar Trigger、Maintenanceを定期起動します。
 
 詳細な依存関係、完了条件、検証記録は[Plan2.md](Plan2.md#131-task運用ルール)を正本とします。Credentialがない機能を接続済みとは表現しません。
 
@@ -71,7 +75,7 @@ Today、Memory、Whyといった内部判断パネルは通常の会話画面に
 
 中心にあるのはEvent検索ではなく、本人ごとに「どんな誘われ方なら一歩動けるか」を学ぶDistance Profileです。好みだけでなく、少人数か大人数か、会話か共同作業か、許容できる移動、断った理由、参加後の感想を少しずつ覚えます。候補を一つへ決めつけず、理由の異なる複数案と断れる選択肢を残します。
 
-判断経路は`Conversation Memory → Distance Profile → Live Data → Connection判定 → FreeBusy → Routes → Safety Guardrail → PUSH Policy → Feedback`としてつながっています。不透明な自動最適化を最初から入れず、明示Policy、Feedback蓄積、オフライン評価、安全制約付き最適化の順に育てます。
+判断経路は`Conversation Episode → Attraction / Participation Friction → Live Data → Connection判定 → FreeBusy → Routes → Safety Guardrail → PUSH Policy → Check-in`としてつながっています。不透明な自動最適化を最初から入れず、明示Policy、Feedback蓄積、オフライン評価、安全制約付き最適化の順に育てます。
 
 成果はClickだけでは測りません。参加、再参加、自発的な外出、同じCommunityとの継続接点を追い、本人同意が得られる段階で孤独尺度も扱います。実測、推計、仮定を分離し、個人の変化を東京都全体の金額へ安易に外挿しません。匿名・集計できる段階では、時間、距離、料金、交流形式による参加障壁や、接点が不足する地域を施策改善へ返せます。
 

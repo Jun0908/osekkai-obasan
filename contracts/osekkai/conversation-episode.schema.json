@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/conversation-episode.schema.json",
+  "title": "Conversation Episode",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "id", "userId", "state", "trigger", "startedReason",
+    "shownOpportunityIds", "adjustedOpportunityIds", "presentationCount", "adjustmentCount",
+    "selectedOpportunityId", "selectedEventId", "selectedEventEndsAt", "checkInDueAt", "checkInCompletedAt",
+    "cooldownUntil", "frictionEvidenceIds", "turnIds", "closedAt", "createdAt", "updatedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "id": { "$ref": "common.schema.json#/$defs/uuid" },
+    "userId": { "$ref": "common.schema.json#/$defs/uuid" },
+    "state": {
+      "type": "string",
+      "enum": [
+        "getting_to_know", "calendar_sparse", "shortlist_shown", "friction_probe",
+        "adjusted_shortlist", "accepted", "check_in_due", "cooldown", "safety_handoff"
+      ]
+    },
+    "trigger": {
+      "type": "string",
+      "enum": ["user_initiated", "calendar_sparse", "preference_intake", "check_in"]
+    },
+    "startedReason": { "type": "string", "minLength": 1, "maxLength": 120 },
+    "shownOpportunityIds": {
+      "type": "array", "maxItems": 3, "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+    },
+    "adjustedOpportunityIds": {
+      "type": "array", "maxItems": 3, "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+    },
+    "presentationCount": { "type": "integer", "minimum": 0, "maximum": 2 },
+    "adjustmentCount": { "type": "integer", "minimum": 0, "maximum": 1 },
+    "selectedOpportunityId": {
+      "type": ["string", "null"], "minLength": 1, "maxLength": 200
+    },
+    "selectedEventId": {
+      "type": ["string", "null"], "minLength": 1, "maxLength": 200
+    },
+    "selectedEventEndsAt": {
+      "oneOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }]
+    },
+    "checkInDueAt": {
+      "oneOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }]
+    },
+    "checkInCompletedAt": {
+      "oneOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }]
+    },
+    "cooldownUntil": {
+      "oneOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }]
+    },
+    "frictionEvidenceIds": {
+      "type": "array", "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/uuid" }
+    },
+    "turnIds": {
+      "type": "array", "uniqueItems": true,
+      "items": { "$ref": "common.schema.json#/$defs/uuid" }
+    },
+    "closedAt": {
+      "oneOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }]
+    },
+    "createdAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "updatedAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "state": { "enum": ["shortlist_shown", "adjusted_shortlist", "accepted", "check_in_due"] } } },
+      "then": { "properties": { "shownOpportunityIds": { "type": "array", "minItems": 1 } } }
+    },
+    {
+      "if": { "properties": { "state": { "const": "adjusted_shortlist" } } },
+      "then": {
+        "properties": {
+          "adjustmentCount": { "type": "integer", "const": 1 },
+          "adjustedOpportunityIds": { "type": "array", "minItems": 1 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "enum": ["accepted", "check_in_due"] } } },
+      "then": {
+        "properties": {
+          "selectedOpportunityId": { "type": "string" },
+          "selectedEventId": { "type": "string" },
+          "selectedEventEndsAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+          "checkInDueAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+        }
+      }
+    }
+  ]
+}

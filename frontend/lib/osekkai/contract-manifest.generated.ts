@@ -1,5 +1,5 @@
 /* Generated from /contracts/osekkai. Do not edit. */
-export const OSEKKAI_CONTRACT_HASH = "8fe80f135e70b1fbe400b0596ebe487662df46f4000d7250b8af2c5a82db5701" as const;
+export const OSEKKAI_CONTRACT_HASH = "c4167c1cef50847ca4eb867ceb72266b3cc9c596286cd8ea6a9d4f1828407fa7" as const;
 export const OSEKKAI_CONTRACTS = [
   {
     "file": "contracts/osekkai/common.schema.json",
@@ -9,7 +9,12 @@ export const OSEKKAI_CONTRACTS = [
   {
     "file": "contracts/osekkai/distance-profile.schema.json",
     "id": "https://osekkai.local/contracts/distance-profile.schema.json",
-    "sha256": "92b6ea8a2e5577b1570176027c1d685cbe2248eb4ce5d5f8c5e73ec0a6d3528e"
+    "sha256": "9c51e51cfd9b1695783e65cfbe56970dd4f4b58fb8bafe5ccacb9f4bab8df499"
+  },
+  {
+    "file": "contracts/osekkai/participation-friction-profile.schema.json",
+    "id": "https://osekkai.local/contracts/participation-friction-profile.schema.json",
+    "sha256": "8105166171b640271605036773766aa1980f9cc5b95d022ccd3438d2a9e6e859"
   },
   {
     "file": "contracts/osekkai/conversation.schema.json",
@@ -17,9 +22,19 @@ export const OSEKKAI_CONTRACTS = [
     "sha256": "4f6dbae782d3f56ff0c8865976808ec6b0ae7ca4f0c0ad6bd0fde5e8b3306aea"
   },
   {
+    "file": "contracts/osekkai/conversation-episode.schema.json",
+    "id": "https://osekkai.local/contracts/conversation-episode.schema.json",
+    "sha256": "2749084f15d74f5a0ce511b3bd624f5acf77a6ec0cf2c9b8d2882a2175058a92"
+  },
+  {
+    "file": "contracts/osekkai/conversation-context.schema.json",
+    "id": "https://osekkai.local/contracts/conversation-context.schema.json",
+    "sha256": "cb39e2bc34b1c9ad67dcc897572d186546514c47fa14b43e42c0a43fedd43509"
+  },
+  {
     "file": "contracts/osekkai/chat-result.schema.json",
     "id": "https://osekkai.local/contracts/chat-result.schema.json",
-    "sha256": "402781aab861cb3b9ffde80ab80293d3b0e3f3be5ad9537501467eef0b382e2e"
+    "sha256": "0103357b565496ce95419d77d72cb9de839eb39337b2722a245eeddeb90bdb4a"
   },
   {
     "file": "contracts/osekkai/freebusy.schema.json",
@@ -74,7 +89,7 @@ export const OSEKKAI_CONTRACTS = [
   {
     "file": "contracts/osekkai/chat-request.schema.json",
     "id": "https://osekkai.local/contracts/chat-request.schema.json",
-    "sha256": "4df403cfd171f9dd52eb48c1da4ae652ff5383fbb26ea45a6aa578cf6b0a3a0d"
+    "sha256": "05ae5241026634f9f55f82d71038d1f981cdc2c087d0896e5565e9606a5b1d3b"
   },
   {
     "file": "contracts/osekkai/profile-update-request.schema.json",

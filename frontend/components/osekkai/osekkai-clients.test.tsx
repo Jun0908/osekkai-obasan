@@ -47,6 +47,43 @@ const profile = {
   },
 };
 
+function chatResult(
+  state = 'getting_to_know',
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    schemaVersion: '1.0',
+    reply: 'あんた、何が好きなのよ。最近やってみたいこと、ひとつ教えて。',
+    profileDelta: {},
+    frictionDelta: [],
+    interventionHint: 'none',
+    confidence: 1,
+    safety: {
+      requiresHumanSupport: false,
+      level: 'normal',
+      message: null,
+      supportResourcesVerified: false,
+    },
+    persisted: false,
+    conversationId: null,
+    profile,
+    context: {
+      schemaVersion: '1.0',
+      episodeId: '33333333-3333-4333-8333-333333333333',
+      state,
+      trigger: 'user_initiated',
+      quickReplies: [],
+      recommendations: [],
+      calendarSummary: null,
+      selectedOpportunityId: null,
+      checkInDueAt: null,
+      canSendMessage: true,
+      notice: null,
+    },
+    ...overrides,
+  };
+}
+
 describe('Osekkai client components', () => {
   beforeEach(() => {
     apiMocks.getOsekkaiSession.mockResolvedValue({
@@ -62,12 +99,14 @@ describe('Osekkai client components', () => {
   it('Chat asks one hobby question without exposing internal profile panels', async () => {
     apiMocks.osekkaiRequest.mockImplementation(async (path: string) => {
       if (path === '/profile') return profile;
+      if (path === '/chat') return chatResult();
       throw new Error(`unexpected path: ${path}`);
     });
 
     render(<ChatClient />);
 
-    expect(await screen.findByRole('heading', { name: 'あんた、何が好きなのよ。' })).toBeInTheDocument();
+    expect(await screen.findByText('あんた、何が好きなのよ。最近やってみたいこと、ひとつ教えて。')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'おばさんに話す' })).toBeInTheDocument();
     expect(screen.getByText('ヨガをやってみたい')).toBeInTheDocument();
     expect(screen.getByText('ボルダリングが好き')).toBeInTheDocument();
     expect(screen.queryByText(/大人数は疲れる/)).not.toBeInTheDocument();
@@ -75,7 +114,7 @@ describe('Osekkai client components', () => {
     expect(screen.queryByText('Why')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'ボルダリングが好き' }));
-    expect(screen.getByRole('textbox', { name: '好きなこと・やってみたいこと' }))
+    expect(screen.getByRole('textbox', { name: '好きなこと、ひっかかること、行ったあとの感想' }))
       .toHaveValue('ボルダリングが好き');
   });
 
@@ -115,31 +154,102 @@ describe('Osekkai client components', () => {
     );
   });
 
-  it('Chat gets explicit push consent before opening the live recommendations', async () => {
-    apiMocks.osekkaiRequest.mockImplementation(async (path: string, options?: { method?: string }) => {
-      if (path === '/profile' && options?.method === 'PATCH') return { ...profile, pushConsent: true };
+  it('Chat keeps shortlist, one friction question, adjustment, and selection in one screen', async () => {
+    const opportunity = {
+      id: 'opportunity-1',
+      title: '初心者ボルダリング交流会',
+      startsAt: '2026-09-05T13:00:00+09:00',
+      endsAt: '2026-09-05T15:00:00+09:00',
+      address: '東京都内',
+      provider: 'Lu.ma',
+      sourceUrl: 'https://lu.ma/example',
+      sourceClassification: 'live_provider',
+      capturedAt: '2026-08-23T10:00:00+09:00',
+      revalidatedAt: '2026-08-23T10:00:00+09:00',
+      travelEstimate: { minutes: 18 },
+      priceYen: 1000,
+      registrationStatus: 'open',
+    };
+    const recommendations = [{
+      rank: 1,
+      opportunity,
+      recommendationReasons: [{
+        code: 'personal_fit',
+        text: '好みと空き時間に合う候補です。',
+        evidenceUrl: opportunity.sourceUrl,
+        classification: 'private_user_data',
+      }],
+    }];
+    apiMocks.osekkaiRequest.mockImplementation(async (
+      path: string,
+      options?: { method?: string; body?: Record<string, unknown> },
+    ) => {
       if (path === '/profile') return profile;
-      if (path === '/chat') return { reply: 'ボルダリングね。ええやん。', safety: { requiresHumanSupport: false } };
+      if (path === '/chat' && options?.body?.action === 'start') return chatResult();
+      if (path === '/chat' && options?.body?.action === 'select') {
+        return chatResult('accepted', {
+          reply: 'よし、決まり。終わったあとに一言だけ聞くわ。',
+          context: {
+            ...chatResult().context,
+            state: 'accepted',
+            selectedOpportunityId: opportunity.id,
+            checkInDueAt: '2026-09-05T17:00:00+09:00',
+          },
+        });
+      }
+      if (path === '/chat' && options?.body?.message === 'これは違う') {
+        return chatResult('friction_probe', {
+          reply: '何がひっかかった？ 一つだけ教えて。',
+          context: {
+            ...chatResult().context,
+            state: 'friction_probe',
+            quickReplies: [
+              { id: 'first-time', label: '初参加が不安', message: '初参加で入り方がわからない' },
+            ],
+          },
+        });
+      }
+      if (path === '/chat' && options?.body?.message === '初参加で入り方がわからない') {
+        return chatResult('adjusted_shortlist', {
+          reply: '初参加しやすい条件で一回だけ並べ直したで。',
+          context: {
+            ...chatResult().context,
+            state: 'adjusted_shortlist',
+            recommendations,
+          },
+        });
+      }
+      if (path === '/chat') {
+        return chatResult('shortlist_shown', {
+          reply: '空き時間と移動まで見て候補を持ってきたで。',
+          context: {
+            ...chatResult().context,
+            state: 'shortlist_shown',
+            recommendations,
+          },
+        });
+      }
       throw new Error(`unexpected path: ${path}`);
     });
 
     render(<ChatClient />);
-    const composer = await screen.findByRole('textbox', { name: '好きなこと・やってみたいこと' });
+    const composer = await screen.findByRole('textbox', { name: '好きなこと、ひっかかること、行ったあとの感想' });
     fireEvent.change(composer, { target: { value: 'ボルダリングが好き' } });
     fireEvent.click(screen.getByRole('button', { name: '送る' }));
-    fireEvent.click(await screen.findByRole('button', { name: /この好みで提案を受け取る/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'これは違う' }));
+    fireEvent.click(await screen.findByRole('button', { name: '初参加が不安' }));
+    fireEvent.click(await screen.findByRole('button', { name: '行ってみる' }));
 
     await waitFor(() => {
-      expect(apiMocks.osekkaiRequest).toHaveBeenCalledWith('/profile', {
-        method: 'PATCH',
+      expect(apiMocks.osekkaiRequest).toHaveBeenCalledWith('/chat', {
+        method: 'POST',
         mutation: true,
-        body: {
-          operation: 'update_settings',
-          updates: { pushConsent: true },
-          idempotencyKey: 'push-consent-test-id',
-        },
+        body: expect.objectContaining({
+          action: 'select',
+          opportunityId: opportunity.id,
+        }),
       });
-      expect(navigationMocks.push).toHaveBeenCalledWith('/osekkai/demo');
+      expect(screen.getByText(/よし、決まり/)).toBeInTheDocument();
     });
   });
 

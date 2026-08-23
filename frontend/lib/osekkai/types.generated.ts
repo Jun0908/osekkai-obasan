@@ -106,6 +106,7 @@ explicitPreferences: {
 inferredPreferences: {
 [k: string]: InferredPreference
 }
+participationFriction: ParticipationFrictionProfile
 currentSignals: {
 interventionHint: ("none" | "do_not_push" | "consider_push")
 currentReceptivity: (number | null)
@@ -119,6 +120,24 @@ createdAt: string
 updatedAt: string
 }
 
+export interface ParticipationFrictionProfile {
+[k: string]: {
+value: true
+origin: ("explicit" | "inferred")
+confidence: number
+evidence: {
+id: string
+referenceType: ("message" | "feedback")
+referenceId: string
+text: string
+observedAt: string
+lastConfirmedAt: string
+}[]
+observedAt: string
+lastConfirmedAt: string
+}
+}
+
 export interface ConversationTurn {
 schemaVersion: "1.0"
 id: string
@@ -129,12 +148,140 @@ remember: boolean
 createdAt: string
 }
 
+export interface ConversationEpisode {
+schemaVersion: "1.0"
+id: string
+userId: string
+state: ("getting_to_know" | "calendar_sparse" | "shortlist_shown" | "friction_probe" | "adjusted_shortlist" | "accepted" | "check_in_due" | "cooldown" | "safety_handoff")
+trigger: ("user_initiated" | "calendar_sparse" | "preference_intake" | "check_in")
+startedReason: string
+/**
+ * @maxItems 3
+ */
+shownOpportunityIds: []|[string]|[string, string]|[string, string, string]
+/**
+ * @maxItems 3
+ */
+adjustedOpportunityIds: []|[string]|[string, string]|[string, string, string]
+presentationCount: number
+adjustmentCount: number
+selectedOpportunityId: (string | null)
+selectedEventId: (string | null)
+selectedEventEndsAt: (string | null)
+checkInDueAt: (string | null)
+checkInCompletedAt: (string | null)
+cooldownUntil: (string | null)
+frictionEvidenceIds: string[]
+turnIds: string[]
+closedAt: (string | null)
+createdAt: string
+updatedAt: string
+}
+
+export interface ConversationContext {
+schemaVersion: "1.0"
+episodeId: (string | null)
+state: ("getting_to_know" | "calendar_sparse" | "shortlist_shown" | "friction_probe" | "adjusted_shortlist" | "accepted" | "check_in_due" | "cooldown" | "safety_handoff")
+trigger: ("user_initiated" | "calendar_sparse" | "preference_intake" | "check_in")
+/**
+ * @maxItems 3
+ */
+quickReplies: []|[{
+id: string
+label: string
+message: string
+}]|[{
+id: string
+label: string
+message: string
+}, {
+id: string
+label: string
+message: string
+}]|[{
+id: string
+label: string
+message: string
+}, {
+id: string
+label: string
+message: string
+}, {
+id: string
+label: string
+message: string
+}]
+/**
+ * @maxItems 3
+ */
+recommendations: []|[{
+rank: number
+opportunity: Opportunity
+/**
+ * @minItems 1
+ * @maxItems 6
+ */
+recommendationReasons: [RecommendationReason]|[RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason]
+}]|[{
+rank: number
+opportunity: Opportunity
+/**
+ * @minItems 1
+ * @maxItems 6
+ */
+recommendationReasons: [RecommendationReason]|[RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason]
+}, {
+rank: number
+opportunity: Opportunity
+/**
+ * @minItems 1
+ * @maxItems 6
+ */
+recommendationReasons: [RecommendationReason]|[RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason]
+}]|[{
+rank: number
+opportunity: Opportunity
+/**
+ * @minItems 1
+ * @maxItems 6
+ */
+recommendationReasons: [RecommendationReason]|[RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason]
+}, {
+rank: number
+opportunity: Opportunity
+/**
+ * @minItems 1
+ * @maxItems 6
+ */
+recommendationReasons: [RecommendationReason]|[RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason]
+}, {
+rank: number
+opportunity: Opportunity
+/**
+ * @minItems 1
+ * @maxItems 6
+ */
+recommendationReasons: [RecommendationReason]|[RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason]|[RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason, RecommendationReason]
+}]
+calendarSummary: ({
+source: ("google_freebusy" | "synthetic_demo")
+generatedAt: string
+longFreeWindowCount: number
+busyOccupancyPercent: number
+} | null)
+selectedOpportunityId: (string | null)
+checkInDueAt: (string | null)
+canSendMessage: boolean
+notice: (string | null)
+}
+
 export interface ChatResult {
 schemaVersion: "1.0"
 reply: string
 profileDelta: {
 [k: string]: any
 }
+frictionDelta: ("search_fatigue" | "first_time_anxiety" | "stranger_anxiety" | "group_size" | "conversation_load" | "travel_effort" | "time_commitment" | "cost" | "low_social_energy" | "push_aversion" | "not_today")[]
 interventionHint: ("none" | "do_not_push" | "consider_push")
 confidence: number
 safety: {
@@ -146,6 +293,7 @@ supportResourcesVerified: boolean
 persisted: boolean
 conversationId: (string | null)
 profile: DistanceProfile
+context: ConversationContext
 }
 
 export interface FreeBusyResult {
@@ -425,10 +573,22 @@ note: string
 }[]
 }
 
-export interface ChatRequest {
+export type ChatRequest = ({
+action: "start"
+remember?: boolean
+} | {
+action?: "message"
 message: string
 remember?: boolean
-}
+} | {
+action: "select"
+opportunityId: string
+remember?: boolean
+} | {
+action: "check_in"
+message: string
+remember?: boolean
+})
 
 export interface ProfileUpdateRequest {
 patch?: {

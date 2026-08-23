@@ -2,16 +2,45 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://osekkai.local/contracts/chat-request.schema.json",
   "title": "Chat request",
-  "type": "object",
-  "additionalProperties": false,
-  "required": ["message"],
-  "properties": {
-    "message": {
-      "type": "string",
-      "minLength": 1,
-      "maxLength": 2000,
-      "pattern": "\\S"
+  "oneOf": [
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action"],
+      "properties": {
+        "action": { "const": "start" },
+        "remember": { "type": "boolean" }
+      }
     },
-    "remember": { "type": "boolean" }
-  }
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["message"],
+      "properties": {
+        "action": { "const": "message" },
+        "message": { "type": "string", "minLength": 1, "maxLength": 2000, "pattern": "\\S" },
+        "remember": { "type": "boolean" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "opportunityId"],
+      "properties": {
+        "action": { "const": "select" },
+        "opportunityId": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "remember": { "type": "boolean" }
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action", "message"],
+      "properties": {
+        "action": { "const": "check_in" },
+        "message": { "type": "string", "minLength": 1, "maxLength": 2000, "pattern": "\\S" },
+        "remember": { "type": "boolean" }
+      }
+    }
+  ]
 }

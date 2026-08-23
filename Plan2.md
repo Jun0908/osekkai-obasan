@@ -370,16 +370,62 @@ AI Derivedには必ず根拠文、Source URL、confidenceを付けます。
 
 `話す`は好み登録だけの画面ではなく、状況に応じておばさん側から始まり、断り方と参加後の反応まで扱う会話面にします。
 
+この会話で学ぶものは、次の2層に分けます。PDFで示した「自分から検索する気力がない」「初参加は怖い」「誘ってほしいが、強く誘われると面倒」という矛盾を、単なる趣味Tagへ潰しません。
+
+1. **Attraction Profile（何に惹かれるか）**
+   - 趣味、興味Category、やってみたい活動
+   - 好きだったEvent、Community、参加形式
+   - 継続して参加したいTheme
+2. **Participation Friction Profile（なぜ動きにくいか）**
+   - `search_fatigue`: 自分で検索・比較することが面倒
+   - `first_time_anxiety`: 初参加の流れが分からず不安
+   - `stranger_anxiety`: 知らない人だけの場が怖い
+   - `group_size`: 人数が多すぎる、または少なすぎる
+   - `conversation_load`: 雑談中心、自己紹介、会話量が重い
+   - `travel_effort`: 距離、乗換、徒歩が負担
+   - `time_commitment`: 拘束時間や開始・終了時刻が合わない
+   - `cost`: 料金が負担、または料金不明が不安
+   - `low_social_energy`: その日の対人Energyが低い
+   - `push_aversion`: 強い誘い方や連続通知が嫌
+   - `not_today`: Event自体ではなく、今回は行かない
+
+各Friction Evidenceは、`explicit / inferred`、根拠となった発話またはFeedback ID、confidence、記録日時、最終確認日時を持ちます。明示回答をAI推定で上書きせず、古い推定は時間減衰させます。会話本文をそのままProfileに固定せず、本人が確認・削除できる構造化EvidenceだけをMemory同意後に保存します。
+
+Calendarの疎さは「話しかける機会」のTriggerにすぎません。空きが多いことから、孤独、自宅滞在、参加意欲、Social Batteryを推測しません。推薦判断は次の順で進めます。
+
+`Attraction Profile → Calendarの余白 → 実EventとRoutes → Participation Friction → 誘い方と候補の調整 → 参加後Feedback → 次回の距離感`
+
 内部状態は次を持ちます。
 
 - `getting_to_know`: 好みがまだ少なく、一度に1つだけ聞く
 - `calendar_sparse`: 対象時間帯のFreeBusyが薄く、参加可能な複数候補がある
-- `nudge_sent`: 根拠付き候補を会話内へ提示済み
-- `resistance`: 行きたくない理由を1つだけ確認し、別候補へ一度だけ調整する
+- `shortlist_shown`: 根拠付きの複数候補を会話内へ提示済み
+- `friction_probe`: 参加をためらう理由を一問だけ確認し、Participation Frictionへ構造化する
+- `adjusted_shortlist`: 理由に合わせて候補・順位・言葉の強さを一度だけ調整済み
 - `accepted`: 行く候補が選ばれ、Event終了後の確認時刻を持つ
 - `check_in_due`: 「昨日どうやった？」と一問だけ聞く
 - `cooldown`: 断った後や通知上限到達後に追わない
 - `safety_handoff`: 緊急性のある入力をEvent推薦から切り離す
+
+`話す`での質問はSurveyにせず、一度に一問だけにします。候補を複数見せたうえで、拒否された時は候補と過去Evidenceから最も情報価値の高い理由を一つだけ聞きます。自由入力に複数の理由が含まれる場合はそれぞれ構造化できますが、追加質問を連続させません。
+
+Frictionに対する調整は次のように固定します。
+
+| Friction | 候補・誘い方の調整 |
+|---|---|
+| `search_fatigue` | 検索や比較を要求せず、Agentが絞った2〜3件と差分だけを示す |
+| `first_time_anxiety` | 初参加案内、初心者歓迎、一人参加可のSource根拠がある候補を優先する |
+| `stranger_anxiety` / `conversation_load` | 雑談中心を下げ、共同作業、共食、少人数、進行役ありの根拠がある候補を優先する |
+| `group_size` | 定員または参加人数が確認できる候補だけで再順位付けする |
+| `travel_effort` | Google Routesの実測で上限を狭め、乗換・徒歩を含む到達可能性を再判定する |
+| `time_commitment` | Free Windowへ収まる短時間候補を優先し、途中退出可は根拠がある時だけ使う |
+| `cost` | 料金確認済みで予算内の候補を優先し、料金不明を安いと推測しない |
+| `low_social_energy` / `not_today` | Demoの主Sceneにはしないが、再提案せずCooldownへ入れる |
+| `push_aversion` | 台詞の強さを下げ、そのEpisodeでは追わず、次回通知間隔も広げる |
+
+複数候補の要件は維持します。Policyは2〜3件を順位付きで返し、Chatは第一候補を会話上の主役にしながら代替候補も同時に見せます。Friction回答後は、候補を1件へ固定するのではなく、条件に合わない候補を外すか順位を変えた複数候補を一度だけ再提示します。
+
+Calendar Triggerは、おばさん側から先回りして話しかける条件です。本人が`話す`を開いた場合はCalendarが疎くなくても会話できます。現在Episodeがなければ、保存済みProfileが少ない時だけ好みを一問聞き、十分なら「何か探す？」「この前の続き見る？」のように始めます。本人がEventを探したい意思を示した後は、Live Source、Calendar、Routesを評価し、同じ`複数候補 → Friction確認 → 一度だけ調整 → 参加選択 → Event後Check-in`を最後まで進めます。
 
 Demoの会話開始Triggerは、追加設定や自宅判定を要求せず、次をすべて満たす場合に限定します。
 
@@ -415,23 +461,23 @@ Demo用Google Calendarの次の7日間をFreeBusyだけで確認します。対�
 
 #### 8〜23秒: おばさん側から会話を始める
 
-過去会話の好み、Calendarの空き、Google Routes、Connection Evidenceを使い、会話内へ優先順位付きの複数候補を出します。
+過去会話のAttraction ProfileとParticipation Friction Profile、Calendarの空き、Google Routes、Connection Evidenceを使い、会話内へ優先順位付きの複数候補を出します。初回でFriction Evidenceがまだない場合は、好みと現実条件だけで候補を出し、断られた理由を一問だけ聞いて学びます。
 
 > 「あんた、今週末けっこう空いてるやろ。前に料理好き言うてたな。予定に収まるやつ、3つ見つけたで。」
 
 各カードには、実Event名、日時、Routes実測、料金または`料金未確認`、募集状態、交流・継続根拠、Sourceと更新時刻を表示します。`ひとり参加OK`、`途中退出OK`、`次回あり`等はSource根拠がある場合だけ言います。
 
-#### 23〜36秒: 行きたくない理由を一つだけ聞く
+#### 23〜36秒: 参加をためらう理由を一つだけ聞く
 
 > 利用者「イベントとか行きたくない」
 
-> おばさん「そら最初はめんどいわ。人が多いのと、遠いのと、どっちが嫌なん？」
+> おばさん「そら最初はめんどいわ。初参加が不安なん？ それとも人が多いのがしんどい？」
 
-Quick Replyは候補と状況に応じて`人が多い / 遠い / 今日は気が乗らない`等へ変えます。通常の自由入力も残します。ここで回答をSurveyのように並べすぎず、一問ずつ進めます。
+Quick Replyは候補と状況に応じて`初参加が不安 / 知らない人ばかりは怖い / 会話が多いのはしんどい / 人が多い / 遠い / 長い / 高い / 今日は気が乗らない`等から、その時に必要な2〜3個だけを出します。通常の自由入力も残します。ここで回答をSurveyのように並べすぎず、一問ずつ進めます。
 
 #### 36〜46秒: 一度だけ候補を調整して後押しする
 
-たとえば`人が多い`なら、大人数候補を外し、共同作業や少人数会話の根拠がある別候補へ順位を変えます。
+たとえば`人が多い`なら大人数候補を外し、`初参加が不安`なら初参加案内や進行役の根拠がある候補を上げ、`知らない人との雑談がしんどい`なら共同作業や共食など会話のきっかけが設計された候補へ順位を変えます。
 
 > 「ほな大人数のはやめとこ。少人数で一緒に作る方ならどう？ 絶対楽しいとは言わんけど、あんたにはこっちの方が合いそうやで。」
 
@@ -443,9 +489,9 @@ Demoでは時間を進め、Event終了後の`check_in_due`を表示します。
 
 > 「昨日の料理のやつ、どうやった？ また行ってもええ感じやった？」
 
-`また行きたい / 人の感じはよかった / ちょっと遠かった / 人が多すぎた / 行けなかった`の一つと自由入力から、カテゴリだけでなく参加形式、対人負荷、移動許容、時間帯、押し方を更新します。更新後、次の複数候補の順位が変わるところまで見せます。
+`また行きたい / 初参加でも入りやすかった / 人の感じはよかった / 会話が多すぎた / ちょっと遠かった / 人が多すぎた / 行けなかった`から、その時に必要な選択肢だけを出し、自由入力も受けます。カテゴリだけでなく、初参加不安、知らない人への不安、会話量、Group size、移動許容、時間、料金、押し方を更新し、次の複数候補の順位が変わるところまで見せます。
 
-このDemoの主役は検索結果ではありません。**Calendarの余白を見つけ、断られ方を理解し、参加後の一言まで覚えることで、おかんの距離感が育つこと**を見せます。
+このDemoの主役は検索結果ではありません。**Calendarの余白を見つけ、好みだけでなく動けない理由を理解し、参加後の一言まで覚えることで、おかんの距離感が育つこと**を見せます。
 
 ---
 
@@ -562,23 +608,24 @@ Demoでは時間を進め、Event終了後の`check_in_due`を表示します。
 
 ### 必須
 
-- [ ] 東京都全域を対象にSourceを検索し、区固定コードがない
-- [ ] Tokyo CKANからDatasetと最新Resourceを自動発見できる
-- [ ] Lu.ma iCalまたはAPIから最新イベントを同期できる
-- [ ] Doorkeeper公式APIから東京の将来イベントを同期できる
-- [ ] 少なくとも1つの公共文化施設公式サイトから連続講座を同期できる
-- [ ] 開催終了、取消、満席、申込終了をPUSH前に除外できる
-- [ ] EventだけでなくCommunity / Seriesを保存できる
-- [ ] Connection Level 2以上だけが推薦候補になる
-- [ ] `一人参加OK`、`次回あり`等の根拠URL・根拠文を表示できる
-- [ ] Google Calendar FreeBusyが実接続で動く
-- [ ] Google Routesが実移動時間を返す
-- [ ] 本人の好みと隣接興味から、選びやすい少数の複数候補を順位と理由付きで選べる
-- [ ] Calendarの疎な期間と実候補が揃った時だけ、おばさん側から会話を開始できる
-- [ ] 行きたくない理由によって候補を一度だけ調整し、再拒否時はCooldownへ入る
-- [ ] Event後の一問Check-inが次の候補順位へ反映される
-- [ ] Live / AI推定 / Organizer Verifiedを画面で区別できる
-- [ ] Sourceの最終更新時刻を表示できる
+- [x] 東京都全域を対象にSourceを検索し、区固定コードがない
+- [x] Tokyo CKANからDatasetと最新Resourceを自動発見できる
+- [x] Lu.ma iCalまたはAPIから最新イベントを同期できる
+- [x] Doorkeeper公式APIから東京の将来イベントを同期できる
+- [x] 少なくとも1つの公共文化施設公式サイトから連続講座を同期できる
+- [x] 開催終了、取消、満席、申込終了をPUSH前に除外できる
+- [x] EventだけでなくCommunity / Seriesを保存できる
+- [x] Connection Level 2以上だけが推薦候補になる
+- [x] `一人参加OK`、`次回あり`等の根拠URL・根拠文を表示できる
+- [x] Google Calendar FreeBusyが実接続で動く
+- [x] Google Routesが実移動時間を返す
+- [x] Attraction ProfileとParticipation Friction Profileを分け、選びやすい2〜3件を順位と理由付きで選べる
+- [x] Calendarの疎な期間と実候補が揃った時だけ、おばさん側から会話を開始できる
+- [x] 初参加不安、知らない人への不安、会話量、人数、移動、時間、料金、押され方等を一問ずつ理解できる
+- [x] 参加をためらう理由によって候補・順位・誘い方を一度だけ調整し、再拒否時はCooldownへ入る
+- [x] Event後の一問Check-inが次の候補順位と誘い方へ反映される
+- [x] Live / AI推定 / Organizer Verifiedを画面で区別できる
+- [x] Sourceの最終更新時刻を表示できる
 - [ ] 実在する現在イベントで60秒Demoを完走できる
 - [ ] Live Demoのイベント種別・表示項目・台詞が、ユーザー制作中PVの世界観と矛盾しない
 
@@ -1103,7 +1150,7 @@ Demoでは時間を進め、Event終了後の`check_in_due`を表示します。
 
 #### Gate 6.5 — Contextual Okan Conversation
 
-- [ ] **TASK-156: 会話EpisodeとState MachineのContractを作る**
+- [x] **TASK-156: 会話EpisodeとState MachineのContractを作る**
   - 依存: TASK-155
   - 対象:
     - `contracts/osekkai/conversation-context.schema.json`
@@ -1113,19 +1160,30 @@ Demoでは時間を進め、Event終了後の`check_in_due`を表示します。
     - `agents-OpenClaw/scripts/osekkai_conversation.py`
     - 生成Python / TypeScript validator・型・test
   - 作業:
-    - `getting_to_know / calendar_sparse / nudge_sent / resistance / accepted / check_in_due / cooldown / safety_handoff`を明示状態として定義
+    - `getting_to_know / calendar_sparse / shortlist_shown / friction_probe / adjusted_shortlist / accepted / check_in_due / cooldown / safety_handoff`を明示状態として定義
     - 状態遷移、開始理由、根拠Event、提示回数、再提案回数、次回確認時刻をEpisodeへ保存
     - Trigger優先順位を`Safety > check-in > user initiated > calendar sparse > preference intake > quiet`へ固定
+    - Attraction ProfileとParticipation Friction Profileを別Contractにし、Frictionは`search_fatigue / first_time_anxiety / stranger_anxiety / group_size / conversation_load / travel_effort / time_commitment / cost / low_social_energy / push_aversion / not_today`を扱う
+    - Friction Evidenceに`explicit / inferred`、発話またはFeedbackの参照ID、confidence、記録日時、最終確認日時を持たせ、会話本文そのものと分離する
+    - 明示設定、明示会話回答、参加後Feedback、推定の優先順位と、推定Evidenceの時間減衰Ruleを定義する
     - UIへ返す情報と内部根拠を分け、Today / Memory / Whyのような内部Panelを通常Chatへ復活させない
   - 完了条件:
     - 同一入力・Profile・時刻・Live候補から同じ状態遷移になる
-    - 不正な状態遷移、根拠EventなしのPUSH、2回を超える再提案をContract境界で拒否する
+    - 不正な状態遷移、根拠EventなしのPUSH、1回を超える調整後再提案をContract境界で拒否する
+    - 好みが同じでもParticipation Frictionが異なれば、候補順位または誘い方が変わる
+    - 明示EvidenceをAI推定で上書きせず、Memory同意なしでは推定Profileを永続化しない
     - Safety入力は他の状態より先に`Safety handoff`へ移る
   - 検証:
     - 全状態と不正遷移のPython unit test
+    - 全Friction分類、Evidence優先順位、confidence減衰、Memory同意なしのtest
     - Python / TypeScriptの同一fixture検証
+  - 完了記録（2026-08-23）:
+    - Conversation Episode、公開Conversation Context、Participation Friction ProfileをContract化し、Python / TypeScriptの生成validatorと型へ追加
+    - 9状態の決定的遷移、Safety優先、提示2回・調整1回の上限、明示Evidence優先、推定Evidence減衰をPython ownerへ実装
+    - Memory同意なしでは会話本文・好み・Friction推定を保存せず、Episodeの進行に必要な最小metadataだけを保持
+    - 正常遷移、不正遷移、全11 Friction、明示優先、減衰、Memory同意なしを自動testで確認
 
-- [ ] **TASK-157: Google Calendarの疎なFreeBusyを会話Triggerへ接続する**
+- [x] **TASK-157: Google Calendarの疎なFreeBusyを会話Triggerへ接続する**
   - 依存: TASK-156、TASK-100、TASK-120
   - 対象:
     - `agents-OpenClaw/scripts/osekkai_freebusy.py`
@@ -1150,8 +1208,13 @@ Demoでは時間を進め、Event終了後の`check_in_due`を表示します。
   - 検証:
     - empty / sparse / dense / malformed / timeout FreeBusy fixture
     - 実Demo Calendarを使うread-only smoke
+  - 完了記録（2026-08-23）:
+    - 7日間の活動時間、90分以上のFree Window数、Busy占有率を集計する`osekkai_context_trigger.py`を追加し、閾値をPolicy JSONへ集約
+    - PUSH同意、Quiet Hours、週次上限、Cooldown、Safetyを先に適用し、再検証済みLive候補が2件以上ある時だけEpisodeを作るScheduler経路を実装
+    - Calendarから保存する情報をFreeBusyの集計値へ限定し、予定名・場所・参加者・自宅滞在推定をConversation Contextへ入れない
+    - sparse / dense / malformed / timeout、同意・Cooldown・Safety、候補1件以下のfail closedを自動testで確認。実BrowserではCalendar未接続sessionが架空候補を出さず接続案内になることも確認
 
-- [ ] **TASK-158: 断り方を理解する一度だけの後押しと会話内複数候補を実装する**
+- [x] **TASK-158: 参加をためらう理由を理解する一度だけの後押しと会話内複数候補を実装する**
   - 依存: TASK-157、TASK-150
   - 対象:
     - `agents-OpenClaw/scripts/osekkai_chat.py`
@@ -1161,20 +1224,36 @@ Demoでは時間を進め、Event終了後の`check_in_due`を表示します。
     - 対応Contract・test
   - 作業:
     - Chat初期表示を固定の好み質問から、現在Episodeに応じたおばさん発話へ変更
-    - `人が多い / 遠い / 今日は気が乗らない`等の抵抗理由を一問だけ取得し、Group size、Conversation format、Travel、Timingへ構造化
-    - 理由に合わない候補を外して複数候補を再順位付けし、再提案は最大1回に制限
+    - 未学習時はAttraction Profileを一問で聞き、既知ならCalendar Triggerから複数候補の提示へ進む
+    - 本人が`話す`を開いたUser-initiated Episodeは疎なCalendarを必須にせず、好み確認または保存済みProfileからLive候補取得へ進める
+    - Conversation Episodeを再読込し、`複数候補 → Friction確認 → 一度だけ調整 → 参加選択`を画面遷移せずChat内で完走できるようにする
+    - 拒否発話から`search_fatigue / first_time_anxiety / stranger_anxiety / group_size / conversation_load / travel_effort / time_commitment / cost / low_social_energy / push_aversion / not_today`を構造化する
+    - 候補と過去Evidenceから最も情報価値の高い確認を一問だけ作り、Dynamic Quick Replyはその時に必要な2〜3個だけを表示する
+    - 自由入力に複数理由が含まれる場合は複数Evidenceへ分けるが、質問をSurveyのように連続させない
+    - `search_fatigue`では追加検索を求めず、`first_time_anxiety`では初参加案内、`stranger_anxiety / conversation_load`では共同活動や進行役、`group_size`では確認済み定員を使って再順位付けする
+    - `travel_effort / time_commitment / cost`はRoutes、FreeBusy、料金根拠で再判定し、`low_social_energy / not_today / push_aversion`は再提案せずCooldownへ入れる
+    - 理由に合わない候補を外すか順位を変え、第一候補と代替を含む2〜3件を再提示する。調整後の再提案は最大1回に制限する
     - 2回目の拒否、`もういい`、pause操作ではCooldownへ入り、罪悪感・孤独Label・脅しを使わない
     - 候補カードを会話内へ表示し、実Event名、日時、Routes、料金状態、募集状態、Connection根拠、Sourceを保持
     - `ひとり参加OK / 途中退出OK / 次回あり / 少人数`をSource根拠なしで生成しない
   - 完了条件:
-    - 利用者の抵抗理由によって候補の除外・順位・文面が実際に変わる
+    - 好みだけでなく、参加をためらう理由によって候補の除外・順位・文面・通知間隔が実際に変わる
+    - Calendarの空きだけから参加意欲、Social Battery、自宅滞在を推定しない
+    - 第一候補だけを押し付けず、調整前後とも条件を満たす複数候補を比較できる
+    - 初回の好み入力だけで会話が終了せず、同じChatから実Event候補の提示と参加選択まで到達できる
     - 自由入力とDynamic Quick Replyの両方で同じState Machineを通る
     - Chatに内部Profile、推論confidence、Calendar詳細、正確な現在地を露出しない
   - 検証:
-    - 拒否理由別Policy test、unsupported claim test、二度目拒否Cooldown test
+    - 全Friction別Policy test、複数理由自由入力test、unsupported claim test、二度目拒否Cooldown test
+    - 同じ好みで`初参加が不安 / 雑談が苦手 / 遠い / 高い / 強く誘われたくない`を切り替え、別の順位・文面になるfixture
     - Desktop / mobile component testとbrowser smoke
+  - 完了記録（2026-08-23）:
+    - User-initiated会話とCalendar Trigger会話を同じEpisode Engineへ統合し、好み入力からLive候補取得、複数候補、Friction一問確認、一度だけの再順位付け、参加選択を同じChatで完走可能にした
+    - 全11 Frictionを自由入力から構造化し、移動・料金・時間・初参加・会話負荷等を候補の除外、順位、推薦理由へ反映。低Energy、not today、強い誘いへの拒否は再提案せずCooldownへ移す
+    - Chatから内部Profile / Memory / Whyを外したまま、実Event名、日時、Google Routes、料金・募集状態、Connection根拠、Sourceを含む2〜3候補Cardを表示
+    - Frontend component testとBrowser smokeで`複数候補 → これは違う → Dynamic Quick Reply → 一度だけ再提案 → 行ってみる`を確認。390px幅で2候補が一列表示され、横overflowがないことも確認
 
-- [ ] **TASK-159: Event後のさりげないCheck-inと学習Loopを実装する**
+- [x] **TASK-159: Event後のさりげないCheck-inと学習Loopを実装する**
   - 依存: TASK-158、TASK-160
   - 対象:
     - `agents-OpenClaw/scripts/osekkai_conversation.py`
@@ -1185,17 +1264,24 @@ Demoでは時間を進め、Event終了後の`check_in_due`を表示します。
   - 作業:
     - `行ってみる`で選択Eventと終了時刻をEpisodeへ紐付け、終了後の活動時間帯に`check_in_due`を作る
     - 「昨日どうやった？ また行ってもええ感じやった？」のように一問ずつ聞き、Survey画面へ分離しない
-    - `また行きたい / 人の感じはよかった / ちょっと遠かった / 人が多すぎた / 行けなかった`と自由入力を学習Evidenceへ変換
-    - カテゴリ、参加形式、Group size、移動許容、時間帯、継続意向、言葉の強さを別々のconfidenceで更新
+    - `また行きたい / 初参加でも入りやすかった / 人の感じはよかった / 会話が多すぎた / ちょっと遠かった / 人が多すぎた / 行けなかった`と自由入力を学習Evidenceへ変換
+    - AttractionとParticipation Frictionを混ぜず、カテゴリ、参加形式、初参加不安、知らない人への不安、Conversation load、Group size、移動許容、時間帯、料金、継続意向、言葉の強さを別々のconfidenceで更新
+    - `行けなかった`は失敗扱いせず、一問だけ必要なら`予定 / 距離 / 気分 / 不安 / その他`を確認し、未回答なら理由を推測しない
     - 明示設定を推定で上書きせず、Memory同意なしでは会話本文・推定Profileを保存しない
     - Evidence個別削除と全削除を既存Settingsへ接続し、削除後の順位を再計算
   - 完了条件:
     - Event終了前にはCheck-inしない。未参加、取消、延期を参加成功として学習しない
-    - Feedback後に次の複数候補の順位または除外理由が再現可能に変わる
+    - Feedback後に次の複数候補の順位、除外理由、または誘い方が再現可能に変わる
     - 同じCheck-in回答を再送しても一度だけ記録する
+    - `話す`を再度開くと未完了Episodeまたは期限到来Check-inを復元し、会話の続きから再開できる
   - 検証:
-    - Event終了前後、未参加、取消、重複送信、Memory同意なし、Evidence削除test
-    - 60秒Demo fixtureで`Calendar Trigger → 抵抗 → 一度だけ後押し → 参加 → Check-in → 次の順位変化`を完走
+    - Event終了前後、未参加理由不明、取消、重複送信、Memory同意なし、Evidence削除test
+    - 60秒Demo fixtureで`Calendar Trigger → 複数候補 → Participation Friction確認 → 一度だけ調整 → 参加 → Check-in → 次の順位・誘い方変化`を完走
+  - 完了記録（2026-08-23）:
+    - 選択Opportunityと元Event ID、終了時刻、活動時間へ調整したCheck-in時刻をEpisodeへ保存し、Maintenanceで期限到来Episodeを`check_in_due`へ昇格
+    - Event終了前のCheck-inを拒否し、未参加理由不明時は一問だけ確認。取消・延期を成功学習せず、最新Event Meshの状態を再確認する
+    - 参加後回答をAttractionとParticipation Frictionへ分け、明示設定優先・Memory同意・Evidence個別削除・全削除・retentionへ接続
+    - 未完了Episode / Check-inの再開、終了前拒否、重複拒否、Memory同意なし、Evidence削除伝播を含むPython全149件とFrontend全90件で確認
 
 #### Gate 7 — 完成検証
 
@@ -1275,8 +1361,9 @@ Demoでは時間を進め、Event終了後の`check_in_due`を表示します。
     - CalendarとRoutesが実接続で判断を変える
     - 最新EventをPUSH直前に再検証する
     - 複数候補のPUSH、候補ごとの根拠、Source、更新時刻、CTAが表示される
-    - Calendarの疎な期間をTriggerに会話が始まり、抵抗理由で一度だけ候補が調整される
-    - Event後Check-inの回答で次の候補順位が変わる
+    - Calendarの疎な期間をTriggerに会話が始まり、好みだけでなくParticipation Frictionを一問で確認できる
+    - Frictionに応じて複数候補の除外・順位・誘い方が一度だけ調整され、再拒否時はCooldownへ入る
+    - Event後Check-inの回答で次の候補順位または誘い方が変わる
     - 既存P0と全自動テストに退行がない
     - Demo動画の完成状態には依存しない
 
@@ -1547,7 +1634,7 @@ Demoでは時間を進め、Event終了後の`check_in_due`を表示します。
 | アイデア力 | イベント検索ではなく、「次も会える可能性」を先回りして届ける |
 | 技術力 | OpenClaw scheduler、API / iCal / Webhook / HTML統合、鮮度再検証、Series判定、Calendar、Routes |
 | ソーシャルインパクト | 外出回数ではなく、再参加・顔見知り・役割へ進むことを成果にする |
-| サービスデザイン | 選びやすい少数の複数候補、断れる、好みを少しずらす、おばさんの人格で背中を押す |
+| サービスデザイン | 選びやすい複数候補、断れる、参加摩擦を一問ずつ理解する、押し方を学ぶおばさんの人格 |
 
 ---
 
@@ -1566,21 +1653,23 @@ Demoでは時間を進め、Event終了後の`check_in_due`を表示します。
 - 許可されたLu.ma iCal 50 Event、Doorkeeper API 25 EventのLive取得
 - Google Calendar OAuth / FreeBusy、Google Routes / Geocoding、Google Maps JavaScriptの実接続
 - 好みを1つ聞いてProfile Storeへ学習し、隣接ジャンルを含む複数候補Policyへ渡す通常導線
+- Conversation Episodeの9状態と、未完了会話・期限到来Check-inを`話す`から再開する導線
+- 疎なFreeBusyとGuardrail、再検証済み複数Live候補を組み合わせるCalendar Trigger
+- 好みとは別に11種のParticipation Frictionを学習し、一問だけの確認と一度だけの再提案へ反映する導線
+- 同じChatで`複数候補 → 理由確認 → 調整 → 行ってみる → Event後Check-in`まで完走する導線
 - Mapの明示buttonからBrowser Geolocationを一時取得し、選択EventのRoutes計算にだけ使う導線
 - 実Provider 4系統239 Event、適格91件、Routes確認済み6候補と、実Calendar・Routes・好みによる優先順位付き3候補の通し確認
 - Python/Frontendの統合・障害・Privacy自動テスト
 
-### 次に実装する
+### 次に行う
 
-- `TASK-156`: Conversation EpisodeとState Machine
-- `TASK-157`: 疎なGoogle Calendar FreeBusyを使う会話Trigger
-- `TASK-158`: 断った理由に合わせる一度だけの後押しと会話内複数候補
-- `TASK-159`: Event後のCheck-inと次の順位へ反映する学習Loop
-- 実装後、審査Browser sessionで本人同意を含む60秒会話Demoを行う最終リハーサル
+- 審査で使うGoogle Calendar接続済みBrowser sessionで、本人同意を含む60秒会話Demoを最終リハーサルする
+- 外部Task Scheduler / cronからSource同期、Calendar Trigger、Maintenanceを定期起動する運用時刻を固定する
+- Demo当日にSource件数、Calendar接続、Routes quota、Maps key制限、候補2件以上を事前確認する
 
 Demo動画・PV制作はユーザー側で進行中のため、未完成実装には数えません。こちらの責任範囲は、動画と矛盾しない実イベント・根拠・台詞をLive UIへ出すことです。
 
-Live Provider、Google実接続、複数候補生成、Mapの一時位置取得は実装・接続・通し確認済みです。現在の`話す`は好みを一つ聞くところまでで、Calendar Trigger、抵抗理由による調整、Event後Check-inはTASK-156〜159として未実装です。候補が0件の場合は成功を装わず、Provider、Calendar、Routes、Connection条件のどこで外れたかをUIへ出します。
+Live Provider、Google実接続、複数候補生成、Mapの一時位置取得に加え、Calendar Trigger、Participation Friction Profile、ためらう理由による一度だけの調整、参加選択、Event後Check-inまで実装・自動検証済みです。候補が0件の場合は成功を装わず、Provider、Calendar、Routes、Connection条件のどこで外れたかをUIへ出します。残る作業は審査用のCalendar接続済みBrowser sessionと実データを使う最終リハーサル、および外部Schedulerの運用設定です。
 
 ---
 

@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/conversation-context.schema.json",
+  "title": "ConversationContext",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "episodeId", "state", "trigger", "quickReplies", "recommendations",
+    "calendarSummary", "selectedOpportunityId", "checkInDueAt", "canSendMessage", "notice"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "episodeId": {
+      "oneOf": [{ "$ref": "common.schema.json#/$defs/uuid" }, { "type": "null" }]
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "getting_to_know", "calendar_sparse", "shortlist_shown", "friction_probe",
+        "adjusted_shortlist", "accepted", "check_in_due", "cooldown", "safety_handoff"
+      ]
+    },
+    "trigger": {
+      "type": "string",
+      "enum": ["user_initiated", "calendar_sparse", "preference_intake", "check_in"]
+    },
+    "quickReplies": {
+      "type": "array", "maxItems": 3,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "label", "message"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "label": { "type": "string", "minLength": 1, "maxLength": 80 },
+          "message": { "type": "string", "minLength": 1, "maxLength": 200 }
+        }
+      }
+    },
+    "recommendations": {
+      "type": "array", "maxItems": 3,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["rank", "opportunity", "recommendationReasons"],
+        "properties": {
+          "rank": { "type": "integer", "minimum": 1, "maximum": 3 },
+          "opportunity": { "$ref": "opportunity.schema.json" },
+          "recommendationReasons": {
+            "type": "array", "minItems": 1, "maxItems": 6,
+            "items": { "$ref": "decision.schema.json#/$defs/recommendationReason" }
+          }
+        }
+      }
+    },
+    "calendarSummary": {
+      "oneOf": [
+        {
+          "type": "object", "additionalProperties": false,
+          "required": ["source", "generatedAt", "longFreeWindowCount", "busyOccupancyPercent"],
+          "properties": {
+            "source": { "type": "string", "enum": ["google_freebusy", "synthetic_demo"] },
+            "generatedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+            "longFreeWindowCount": { "type": "integer", "minimum": 0 },
+            "busyOccupancyPercent": { "type": "number", "minimum": 0, "maximum": 100 }
+          }
+        },
+        { "type": "null" }
+      ]
+    },
+    "selectedOpportunityId": { "type": ["string", "null"], "maxLength": 200 },
+    "checkInDueAt": {
+      "oneOf": [{ "$ref": "common.schema.json#/$defs/dateTime" }, { "type": "null" }]
+    },
+    "canSendMessage": { "type": "boolean" },
+    "notice": { "type": ["string", "null"], "maxLength": 500 }
+  }
+}

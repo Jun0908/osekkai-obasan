@@ -7,7 +7,8 @@ import type {
   FreeBusyResult,
   InterventionEpisode,
   MetricsResult,
-  Opportunity
+  Opportunity,
+  LiveEvent
 } from "./types.generated";
 
 export interface SessionResult {
@@ -21,6 +22,46 @@ export interface OpportunitiesResult {
   dataMode: DataMode;
   notice: string;
   opportunities: Opportunity[];
+}
+
+export interface SourceRuntimeStatus {
+  id: string;
+  displayName: string;
+  requiredForDemo: boolean;
+  readiness: string;
+  health: string;
+  lastAttemptAt: string | null;
+  lastSuccessAt: string | null;
+  eventCount: number;
+  datasetCount: number;
+  error: string | null;
+  stale: boolean;
+  refreshMinutes: number;
+}
+
+export interface SourceStatusResult {
+  schemaVersion: "1.0";
+  dataMode: "live";
+  generatedAt: string;
+  sources: SourceRuntimeStatus[];
+  counts: { events: number; eligibleEvents: number; opportunities: number; providerErrors: number };
+}
+
+export interface EventMeshResult {
+  schemaVersion: "1.0";
+  dataMode: "live";
+  generatedAt: string;
+  events: LiveEvent[];
+  eligibleEvents: LiveEvent[];
+  excludedEvents: Array<{ eventId?: string; provider?: string; reasons: string[] }>;
+  series: unknown[];
+  communities: unknown[];
+  providerErrors: unknown[];
+  connectionEvidence: unknown[];
+  routeErrors: unknown[];
+  routeCount: number;
+  opportunityExclusions: unknown[];
+  counts: { received: number; merged: number; eligible: number; excluded: number };
 }
 
 export interface InterventionsResult {

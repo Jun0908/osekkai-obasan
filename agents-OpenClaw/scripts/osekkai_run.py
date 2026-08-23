@@ -25,6 +25,7 @@ from osekkai_metrics import calculate_metrics
 from osekkai_opportunity_sync import load_opportunities
 from osekkai_policy import evaluate_policy
 from osekkai_profile import get_or_create_profile_unlocked
+from osekkai_scheduler import sync_before_push
 from osekkai_store import JsonStore, StorageError
 
 
@@ -42,10 +43,37 @@ def decide_unlocked(
     data_mode: str = "demo",
 ) -> dict[str, Any]:
     profile = get_or_create_profile_unlocked(store, user_id, now)
-    freebusy = load_freebusy(data_mode)
+    freebusy = load_freebusy(data_mode, user_id=user_id, now=now)
     opportunities = load_opportunities(data_mode)
     existing = store.list_episodes_unlocked(user_id)
     decision = evaluate_policy(profile, freebusy, opportunities, existing, now)
+    if data_mode == "live" and decision.get("shouldPush"):
+        shortlisted = [
+            item.get("opportunityId")
+            for item in decision.get("rankedOpportunities", [])
+            if isinstance(item, dict)
+        ]
+        opportunity_by_id = {
+            item.get("id"): item for item in opportunities.get("opportunities", []) if isinstance(item, dict)
+        }
+        event_ids = [
+            opportunity_by_id[opportunity_id].get("eventId")
+            for opportunity_id in shortlisted
+            if opportunity_id in opportunity_by_id
+        ]
+        try:
+            current = sync_before_push(event_ids, store=store, now=now)
+            refreshed = load_opportunities("live")
+            refreshed["opportunities"] = [
+                item for item in refreshed["opportunities"]
+                if current.get(str(item.get("eventId")), False)
+            ]
+            decision = evaluate_policy(profile, freebusy, refreshed, existing, now)
+        except Exception:
+            # Revalidation is deliberately fail-closed: an old cached event is
+            # never pushed when its provider cannot confirm current status.
+            unavailable = {**opportunities, "opportunities": []}
+            decision = evaluate_policy(profile, freebusy, unavailable, existing, now)
     sequence = max(
         (
             item["sequence"]
@@ -101,6 +129,12 @@ def decide_unlocked(
         "revisitedAt": None,
         "selfInitiatedAt": None,
     }
+    if data_mode == "live":
+        episode["rankedOpportunities"] = copy.deepcopy(decision.get("rankedOpportunities", [])) if profile.get("memoryConsent") else []
+        if isinstance(episode.get("notification"), dict):
+            episode["notification"]["shownOpportunityIds"] = [
+                item["opportunityId"] for item in decision.get("rankedOpportunities", [])
+            ]
     validate_episode(episode)
     store.save_episode_unlocked(user_id, episode)
     if decision["shouldPush"]:
@@ -128,6 +162,8 @@ def decide_unlocked(
         "dataMode": data_mode,
         "createdAt": timestamp,
     }
+    if data_mode == "live":
+        api_decision["rankedOpportunities"] = copy.deepcopy(decision.get("rankedOpportunities", []))
     return {"decision": api_decision, "episode": episode}
 
 

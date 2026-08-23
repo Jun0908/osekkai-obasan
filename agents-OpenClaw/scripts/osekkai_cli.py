@@ -4,9 +4,11 @@
 from __future__ import annotations
 
 import copy
+import argparse
 import json
 import os
 import sys
+from datetime import timedelta
 from typing import Any, Callable
 
 from osekkai_chat import process_chat_unlocked
@@ -20,7 +22,17 @@ from osekkai_contracts import (
 )
 from osekkai_freebusy import ProviderError, load_freebusy
 from osekkai_metrics import calculate_metrics
+from osekkai_google_credentials import (
+    GoogleCredentialError,
+    GoogleCredentialStore,
+    GoogleOAuthConfig,
+    complete_authorization,
+    create_authorization_request,
+    disconnect_google,
+)
 from osekkai_opportunity_sync import load_opportunities
+from osekkai_scheduler import load_event_mesh, load_source_status, run_sync
+from osekkai_routes import RoutesError, compute_event_route
 from osekkai_profile import (
     apply_explicit_patch,
     clock_now,
@@ -81,7 +93,7 @@ def _error(request_id: str, code: str, message: str) -> dict[str, Any]:
 
 def _decision_response_from_episode(episode: dict[str, Any]) -> dict[str, Any]:
     notification = episode.get("notification")
-    return {
+    result = {
         "schemaVersion": SCHEMA_VERSION,
         "episodeId": episode["id"],
         "policyVersion": episode["policyVersion"],
@@ -99,6 +111,9 @@ def _decision_response_from_episode(episode: dict[str, Any]) -> dict[str, Any]:
         "dataMode": episode["dataMode"],
         "createdAt": episode["createdAt"],
     }
+    if episode.get("dataMode") == "live":
+        result["rankedOpportunities"] = copy.deepcopy(episode.get("rankedOpportunities", []))
+    return result
 
 
 def _compact_idempotency_result(command: str, payload: dict[str, Any], result: Any) -> dict[str, Any]:
@@ -364,6 +379,44 @@ def _dispatch_unlocked(
     if command == "interventions" and payload.get("action") == "record":
         clean = {key: value for key, value in payload.items() if key != "action"}
         return record_outcome_unlocked(store, user_id, clean, now)
+    if command == "calendar-connect":
+        if payload:
+            raise ContractError("calendar-connect payload must be empty")
+        return create_authorization_request(
+            user_id,
+            now=now,
+            config=GoogleOAuthConfig.from_env(),
+            store=GoogleCredentialStore(store.root),
+        )
+    if command == "calendar-callback":
+        return complete_authorization(
+            user_id,
+            state=payload["state"],
+            code=payload["code"],
+            now=now,
+            config=GoogleOAuthConfig.from_env(),
+            store=GoogleCredentialStore(store.root),
+        )
+    if command == "calendar-disconnect":
+        if payload:
+            raise ContractError("calendar-disconnect payload must be empty")
+        return disconnect_google(user_id, GoogleCredentialStore(store.root))
+    if command == "sources-sync":
+        unknown = set(payload) - {"force", "sourceIds"}
+        if unknown or not isinstance(payload.get("force", False), bool):
+            raise ContractError("sources-sync payload is invalid")
+        source_ids = payload.get("sourceIds")
+        if source_ids is not None and (
+            not isinstance(source_ids, list)
+            or not all(isinstance(value, str) and 1 <= len(value) <= 80 for value in source_ids)
+        ):
+            raise ContractError("sources-sync sourceIds are invalid")
+        return run_sync(
+            store=store,
+            now=now,
+            force=payload.get("force", False),
+            source_ids=source_ids,
+        )
     raise ContractError("command is not a mutation or has an invalid action")
 
 
@@ -384,7 +437,7 @@ def _dispatch_read(
     if command == "freebusy":
         if payload:
             raise ContractError("freebusy payload must be empty")
-        return load_freebusy(_data_mode())
+        return load_freebusy(_data_mode(), user_id=user_id, now=now)
     if command == "opportunities":
         if payload:
             raise ContractError("opportunities payload must be empty")
@@ -412,10 +465,64 @@ def _dispatch_read(
                 "retentionDays": days,
                 "removed": store.cleanup_unlocked(user_id, now, days),
             }
+    if command == "sources-status":
+        if payload:
+            raise ContractError("sources-status payload must be empty")
+        return load_source_status(store=store)
+    if command == "events":
+        if payload:
+            raise ContractError("events payload must be empty")
+        return load_event_mesh(store=store)
+    if command == "event-route":
+        mesh = load_event_mesh(store=store)
+        event = next((item for item in mesh["events"] if item.get("id") == payload["eventId"]), None)
+        if event is None:
+            raise BusinessError("EVENT_NOT_FOUND", "指定したEventは現在のLive Event Meshにありません。")
+        starts_at = parse_datetime(event["startsAt"])
+        result = compute_event_route(
+            payload["origin"],
+            event,
+            departure_time=max(now, starts_at - timedelta(hours=1)),
+        )
+        return {"eventId": event["id"], **result}
     raise ContractError("command must be handled as a mutation")
 
 
+def _operator_main(argv: list[str]) -> int:
+    parser = argparse.ArgumentParser(description="Operate the Osekkai live event mesh")
+    parser.add_argument("command", choices=("sources-sync", "sources-status", "opportunities", "events"))
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--live", action="store_true")
+    parser.add_argument("--force", action="store_true")
+    parser.add_argument("--source", action="append", dest="source_ids")
+    args = parser.parse_args(argv)
+    store = JsonStore()
+    if args.command == "sources-sync":
+        value = run_sync(store=store, force=args.force, source_ids=args.source_ids)
+    elif args.command == "sources-status":
+        value = load_source_status(store=store)
+    elif args.command == "events":
+        value = load_event_mesh(store=store)
+    else:
+        if not args.live:
+            parser.error("opportunities requires --live")
+        value = load_opportunities("live")
+    validate_runtime_result("sources-status" if args.command == "sources-status" else args.command, value)
+    if args.json:
+        print(json.dumps(value, ensure_ascii=False, separators=(",", ":")))
+    else:
+        counts = value.get("counts") if isinstance(value, dict) else None
+        print(f"{args.command}: {counts or 'ok'}")
+    return 0
+
+
 def main() -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
+    if len(sys.argv) > 1:
+        return _operator_main(sys.argv[1:])
     request_id = "invalid-request"
     command = "unknown"
     try:
@@ -445,7 +552,9 @@ def main() -> int:
                 store.cleanup_unlocked(user_id, now, _retention_days())
         is_record = command == "interventions" and payload.get("action") == "record"
         mutation = command in {
-            "chat", "profile-update", "decide", "feedback", "demo-seed", "demo-reset"
+            "chat", "profile-update", "decide", "feedback", "demo-seed", "demo-reset",
+            "calendar-connect", "calendar-callback", "calendar-disconnect"
+            , "sources-sync"
         } or is_record
         if is_record and key is None:
             raise ContractError("idempotencyKey is required for interventions record")
@@ -453,6 +562,8 @@ def main() -> int:
             if payload != {"confirm": True}:
                 raise ContractError("profile-delete requires confirm=true")
             with store.user_lock(user_id):
+                if os.environ.get("OSEKKAI_CREDENTIAL_ENCRYPTION_KEY", "").strip():
+                    disconnect_google(user_id, GoogleCredentialStore(store.root))
                 result = {
                     "schemaVersion": SCHEMA_VERSION,
                     "deleted": True,
@@ -508,9 +619,17 @@ def main() -> int:
         _emit(_error(request_id, "STORAGE_UNAVAILABLE", "保存領域を利用できません。"))
         print(f"osekkai request={request_id} command={command} status=storage_error", file=sys.stderr)
         return 3
-    except ProviderError:
-        _emit(_error(request_id, "PROVIDER_UNAVAILABLE", "候補または空き時間を取得できません。"))
+    except RoutesError as exc:
+        _emit(_error(request_id, exc.code, "Google Routesから実移動時間を取得できません。"))
+        print(f"osekkai request={request_id} command={command} status=routes_error code={exc.code}", file=sys.stderr)
+        return 4
+    except ProviderError as exc:
+        _emit(_error(request_id, exc.code, "候補または空き時間を取得できません。"))
         print(f"osekkai request={request_id} command={command} status=provider_error", file=sys.stderr)
+        return 4
+    except GoogleCredentialError:
+        _emit(_error(request_id, "CALENDAR_CONNECTION_FAILED", "Google Calendarを接続できません。"))
+        print(f"osekkai request={request_id} command={command} status=calendar_error", file=sys.stderr)
         return 4
     except Exception:
         _emit(_error(request_id, "INTERNAL_ERROR", "おっせかいエンジンを実行できませんでした。"))

@@ -1,4 +1,6 @@
 import type { JsonObject, JsonValue, OsekkaiSessionView } from './osekkai-contract';
+import { randomUUID } from 'crypto';
+import { NextResponse } from 'next/server';
 import { ensureOsekkaiDemoSeed } from './osekkai-demo-seed';
 import { OsekkaiHttpError } from './osekkai-errors';
 import { getOsekkaiMetrics } from './osekkai-metrics';
@@ -16,15 +18,22 @@ import {
 } from './osekkai-request';
 import {
   decideOsekkaiIntervention,
+  completeGoogleCalendarConnection,
   deleteOsekkaiProfile,
+  disconnectGoogleCalendar,
   getOsekkaiFreebusy,
+  getOsekkaiEvents,
+  getOsekkaiEventRoute,
   getOsekkaiInterventions,
   getOsekkaiOpportunities,
   getOsekkaiProfile,
+  getOsekkaiSourceStatus,
   recordOsekkaiFeedback,
   recordOsekkaiIntervention,
   resetOsekkaiDemo,
   runOsekkaiChat,
+  startGoogleCalendarConnection,
+  syncOsekkaiSources,
   updateOsekkaiProfile,
 } from './osekkai-store';
 import {
@@ -32,7 +41,58 @@ import {
   getOrCreateOsekkaiSession,
   getOsekkaiDataMode,
   issueOsekkaiCsrfToken,
+  requireOsekkaiSession,
 } from './osekkai-user';
+
+type CalendarConnectResult = { authorizationUrl: string; state: string; expiresAt: string };
+
+function calendarLanding(request: Request, status: string): URL {
+  const target = new URL('/osekkai', request.url);
+  target.searchParams.set('calendar', status);
+  return target;
+}
+
+export function calendarConnectGet(request: Request) {
+  return withOsekkaiErrors(async () => {
+    assertSafeGetRequest(request);
+    const session = await getOrCreateOsekkaiSession();
+    const result = await startGoogleCalendarConnection<CalendarConnectResult>(session.userId, randomUUID());
+    return NextResponse.redirect(result.data.authorizationUrl, 302);
+  });
+}
+
+export function calendarCallbackGet(request: Request) {
+  return withOsekkaiErrors(async () => {
+    assertSafeGetRequest(request);
+    const session = await requireOsekkaiSession();
+    const query = new URL(request.url).searchParams;
+    if (query.get('error')) {
+      return NextResponse.redirect(calendarLanding(request, 'denied'), 303);
+    }
+    const state = query.get('state');
+    const code = query.get('code');
+    if (!state || !/^[A-Za-z0-9_-]{32,160}$/.test(state) || !code || code.length > 4096) {
+      throw new OsekkaiHttpError('OAUTH_CALLBACK_INVALID', 'Google認証の応答を確認できません。', 400);
+    }
+    await completeGoogleCalendarConnection(
+      session.userId,
+      { state, code },
+      randomUUID(),
+    );
+    return NextResponse.redirect(calendarLanding(request, 'connected'), 303);
+  });
+}
+
+export function calendarDisconnectPost(request: Request) {
+  return withOsekkaiErrors(async () => {
+    const parsed = await parseMutationRequest(request);
+    if (Object.keys(mutationPayload(parsed.body)).length > 0) {
+      throw new OsekkaiHttpError('VALIDATION_ERROR', 'Calendar切断に入力値は不要です。', 400);
+    }
+    const result = await disconnectGoogleCalendar(parsed.session.userId, parsed.idempotencyKey);
+    return osekkaiSuccess(result.data, result.requestId);
+  });
+}
 
 function mutationPayload(body: JsonObject): JsonObject {
   return withoutTransportFields(body);
@@ -245,6 +305,41 @@ export function opportunitiesGet(request: Request) {
     assertSafeGetRequest(request);
     const session = await getOrCreateOsekkaiSession();
     const result = await getOsekkaiOpportunities(session.userId);
+    return osekkaiSuccess(result.data, result.requestId);
+  });
+}
+
+export function sourcesGet(request: Request) {
+  return withOsekkaiErrors(async () => {
+    assertSafeGetRequest(request);
+    const session = await getOrCreateOsekkaiSession();
+    const result = await getOsekkaiSourceStatus(session.userId);
+    return osekkaiSuccess(result.data, result.requestId);
+  });
+}
+
+export function sourcesPost(request: Request) {
+  return withOsekkaiErrors(async () => {
+    const parsed = await parseMutationRequest(request);
+    const payload = mutationPayload(parsed.body);
+    const result = await syncOsekkaiSources(parsed.session.userId, payload, parsed.idempotencyKey);
+    return osekkaiSuccess(result.data, result.requestId);
+  });
+}
+
+export function eventsGet(request: Request) {
+  return withOsekkaiErrors(async () => {
+    assertSafeGetRequest(request);
+    const session = await getOrCreateOsekkaiSession();
+    const result = await getOsekkaiEvents(session.userId);
+    return osekkaiSuccess(result.data, result.requestId);
+  });
+}
+
+export function eventRoutePost(request: Request) {
+  return withOsekkaiErrors(async () => {
+    const parsed = await parseMutationRequest(request);
+    const result = await getOsekkaiEventRoute(parsed.session.userId, mutationPayload(parsed.body));
     return osekkaiSuccess(result.data, result.requestId);
   });
 }

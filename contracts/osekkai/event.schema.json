@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/event.schema.json",
+  "title": "Normalized live event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "id", "provider", "sourceRecordId", "title", "description",
+    "startsAt", "endsAt", "timezone", "venueName", "address", "latitude", "longitude",
+    "communityId", "seriesId", "status", "registrationStatus", "registrationDeadline",
+    "capacity", "participants", "priceYen", "categories", "sourceUrl", "sourceDataset",
+    "license", "sourceClassification", "sourceUpdatedAt", "fetchedAt", "revalidatedAt",
+    "checksum", "fieldProvenance"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "id": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "provider": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "sourceRecordId": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "title": { "type": "string", "minLength": 1, "maxLength": 240 },
+    "description": { "type": "string", "maxLength": 10000 },
+    "startsAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "endsAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "timezone": { "type": "string", "const": "Asia/Tokyo" },
+    "venueName": { "type": ["string", "null"], "maxLength": 240 },
+    "address": { "type": ["string", "null"], "maxLength": 400 },
+    "latitude": { "type": ["number", "null"], "minimum": -90, "maximum": 90 },
+    "longitude": { "type": ["number", "null"], "minimum": -180, "maximum": 180 },
+    "communityId": { "type": ["string", "null"], "maxLength": 200 },
+    "seriesId": { "type": ["string", "null"], "maxLength": 200 },
+    "status": { "$ref": "common.schema.json#/$defs/eventStatus" },
+    "registrationStatus": { "$ref": "common.schema.json#/$defs/registrationStatus" },
+    "registrationDeadline": { "$ref": "common.schema.json#/$defs/nullableDateTime" },
+    "capacity": { "type": ["integer", "null"], "minimum": 0 },
+    "participants": { "type": ["integer", "null"], "minimum": 0 },
+    "audience": { "type": ["string", "null"], "maxLength": 500 },
+    "priceYen": { "type": ["integer", "null"], "minimum": 0 },
+    "categories": { "type": "array", "uniqueItems": true, "items": { "type": "string", "maxLength": 80 } },
+    "sourceUrl": { "type": "string", "format": "uri" },
+    "sourceDataset": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "license": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "sourceClassification": { "$ref": "common.schema.json#/$defs/sourceClassification" },
+    "sourceLinks": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["provider", "sourceRecordId", "sourceUrl", "fetchedAt", "classification"],
+        "properties": {
+          "provider": { "type": "string", "minLength": 1, "maxLength": 160 },
+          "sourceRecordId": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "sourceUrl": { "type": "string", "format": "uri" },
+          "fetchedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+          "classification": { "$ref": "common.schema.json#/$defs/sourceClassification" }
+        }
+      }
+    },
+    "duplicateEventIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 200 } },
+    "sourceUpdatedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "fetchedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "revalidatedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "checksum": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "fieldProvenance": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "common.schema.json#/$defs/fieldProvenance" }
+    }
+  }
+}

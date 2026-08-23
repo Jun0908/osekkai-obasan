@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
@@ -14,7 +15,7 @@ const osekkaiLinks = [
   { href: '/osekkai', label: 'ホーム', exact: true },
   { href: '/osekkai/chat', label: '話す' },
   { href: '/osekkai/demo', label: 'デモ' },
-  { href: '/osekkai/impact', label: 'ふりかえり' },
+  { href: '/osekkai/map', label: '地図' },
   { href: '/osekkai/settings', label: '設定' },
 ] as const;
 
@@ -36,7 +37,12 @@ function OsekkaiChrome({ children, pathname }: SiteChromeProps & { pathname: str
         <div className={styles.headerInner}>
           <Link className={styles.brand} href="/osekkai" aria-label="おっせかいおばさん ホーム">
             <span className={styles.brandMark} aria-hidden="true">
-              お
+              <Image
+                src="/osekkai/osekkai-place-chat-mark-v1.png"
+                width={160}
+                height={160}
+                alt=""
+              />
             </span>
             <span>
               <span className={styles.brandName}>おっせかいおばさん</span>

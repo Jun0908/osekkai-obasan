@@ -36,6 +36,13 @@ COMMANDS = {
     "demo-seed",
     "demo-reset",
     "cleanup",
+    "calendar-connect",
+    "calendar-callback",
+    "calendar-disconnect",
+    "sources-sync",
+    "sources-status",
+    "events",
+    "event-route",
 }
 
 REASON_CODES = {
@@ -52,6 +59,8 @@ REASON_CODES = {
     "TRAVEL_LIMIT",
     "OVER_BUDGET",
     "SOCIAL_INTENSITY_LIMIT",
+    "CONNECTION_LEVEL",
+    "REGISTRATION_UNAVAILABLE",
     "INVALID_SOURCE",
     "SCORE_BELOW_THRESHOLD",
     "FREE_WINDOW_AVAILABLE",
@@ -155,10 +164,12 @@ def require_iso_datetime(value: Any, name: str) -> str:
     return value
 
 
-def require_int(value: Any, name: str, minimum: int, maximum: int) -> int:
+def require_int(value: Any, name: str, minimum: int, maximum: int | None = None) -> int:
     if isinstance(value, bool) or not isinstance(value, int):
         raise ContractError(f"{name} must be an integer")
-    if value < minimum or value > maximum:
+    if value < minimum:
+        raise ContractError(f"{name} must be at least {minimum}")
+    if maximum is not None and value > maximum:
         raise ContractError(f"{name} must be between {minimum} and {maximum}")
     return value
 
@@ -212,6 +223,8 @@ def validate_command_payload(command: str, payload: dict[str, Any]) -> dict[str,
         "feedback": "feedback-request.schema.json",
         "demo-seed": "demo-reset-request.schema.json",
         "demo-reset": "demo-reset-request.schema.json",
+        "calendar-callback": "calendar-callback-request.schema.json",
+        "event-route": "event-route-request.schema.json",
     }
     schema_name = schema_by_command.get(command)
     if command == "interventions" and payload.get("action") == "record":
@@ -229,6 +242,10 @@ MUTATION_COMMANDS = {
     "feedback",
     "demo-seed",
     "demo-reset",
+    "calendar-connect",
+    "calendar-callback",
+    "calendar-disconnect",
+    "sources-sync",
 }
 
 
@@ -286,7 +303,7 @@ def validate_freebusy(value: Any) -> dict[str, Any]:
         end = require_iso_datetime(item.get("end"), "freeWindow.end")
         if datetime.fromisoformat(end) <= datetime.fromisoformat(start):
             raise ContractError("freeWindow.end must be after start")
-        require_int(item.get("durationMinutes"), "freeWindow.durationMinutes", 1, 10080)
+        require_int(item.get("durationMinutes"), "freeWindow.durationMinutes", 1)
     validate_schema(obj, "freebusy.schema.json")
     return obj
 
@@ -324,6 +341,32 @@ def validate_opportunity(value: Any) -> dict[str, Any]:
     return obj
 
 
+def validate_ranked_opportunities(value: Any, name: str = "rankedOpportunities") -> list[dict[str, Any]]:
+    if value is None:
+        return []
+    if not isinstance(value, list):
+        raise ContractError(f"{name} must be an array")
+    seen: set[str] = set()
+    ranked: list[dict[str, Any]] = []
+    for index, entry in enumerate(value, start=1):
+        item = dict(require_mapping(entry, f"{name}[{index - 1}]"))
+        if item.get("rank") != index:
+            raise ContractError(f"{name} ranks must be contiguous and start at 1")
+        opportunity_id = item.get("opportunityId")
+        if not isinstance(opportunity_id, str) or not opportunity_id or opportunity_id in seen:
+            raise ContractError(f"{name} opportunityId values must be non-empty and unique")
+        seen.add(opportunity_id)
+        ranked.append(item)
+    return ranked
+
+
+def validate_decision(value: Any) -> dict[str, Any]:
+    obj = dict(require_mapping(value, "decision"))
+    validate_schema(obj, "decision.schema.json")
+    validate_ranked_opportunities(obj.get("rankedOpportunities"))
+    return obj
+
+
 def validate_episode(value: Any, *, allow_legacy_sequence: bool = False) -> dict[str, Any]:
     obj = dict(require_mapping(value, "episode"))
     if obj.get("schemaVersion") != SCHEMA_VERSION or obj.get("policyVersion") != POLICY_VERSION:
@@ -346,6 +389,7 @@ def validate_episode(value: Any, *, allow_legacy_sequence: bool = False) -> dict
     if legacy_without_sequence:
         schema_value["sequence"] = 1
     validate_schema(schema_value, "intervention-episode.schema.json")
+    validate_ranked_opportunities(obj.get("rankedOpportunities"))
     return obj
 
 
@@ -373,8 +417,8 @@ def validate_runtime_result(command: str, data: Any) -> Any:
         return data
     if command == "decide":
         obj = require_exact_mapping(data, "decide result", {"decision", "episode"})
-        validate_schema(obj.get("decision"), "decision.schema.json")
-        validate_schema(obj.get("episode"), "intervention-episode.schema.json")
+        validate_decision(obj.get("decision"))
+        validate_episode(obj.get("episode"))
         if obj["decision"]["episodeId"] != obj["episode"]["id"]:
             raise ContractError("decide result episode IDs do not match")
         return data
@@ -474,6 +518,45 @@ def validate_runtime_result(command: str, data: Any) -> Any:
         if not all(isinstance(value, int) and not isinstance(value, bool) and value >= 0 for value in removed.values()):
             raise ContractError("cleanup removed counts are invalid")
         return data
+    if command == "calendar-connect":
+        obj = require_exact_mapping(data, "calendar connect result", {"authorizationUrl", "state", "expiresAt"})
+        if not isinstance(obj["authorizationUrl"], str) or not obj["authorizationUrl"].startswith("https://accounts.google.com/"):
+            raise ContractError("calendar authorizationUrl is invalid")
+        if not isinstance(obj["state"], str) or not IDEMPOTENCY_RE.fullmatch(obj["state"]):
+            raise ContractError("calendar state is invalid")
+        require_iso_datetime(obj["expiresAt"], "calendar connect.expiresAt")
+        return data
+    if command == "calendar-callback":
+        obj = require_exact_mapping(data, "calendar callback result", {"connected", "scope", "expiresAt"})
+        if obj["connected"] is not True or obj["scope"] != "https://www.googleapis.com/auth/calendar.freebusy":
+            raise ContractError("calendar callback result is invalid")
+        require_iso_datetime(obj["expiresAt"], "calendar callback.expiresAt")
+        return data
+    if command == "calendar-disconnect":
+        obj = require_exact_mapping(data, "calendar disconnect result", {"disconnected"})
+        if obj["disconnected"] is not True:
+            raise ContractError("calendar disconnect result is invalid")
+        return data
+    if command in {"sources-sync", "sources-status"}:
+        obj = dict(require_mapping(data, f"{command} result"))
+        if obj.get("schemaVersion") != SCHEMA_VERSION or obj.get("dataMode") != "live":
+            raise ContractError(f"{command} metadata is invalid")
+        require_iso_datetime(obj.get("generatedAt"), f"{command}.generatedAt")
+        if not isinstance(obj.get("sources"), list) or not isinstance(obj.get("counts"), Mapping):
+            raise ContractError(f"{command} values are invalid")
+        return data
+    if command == "events":
+        obj = dict(require_mapping(data, "events result"))
+        if obj.get("schemaVersion") != SCHEMA_VERSION or obj.get("dataMode") != "live":
+            raise ContractError("events metadata is invalid")
+        require_iso_datetime(obj.get("generatedAt"), "events.generatedAt")
+        if not isinstance(obj.get("events"), list):
+            raise ContractError("events must be an array")
+        for event in obj["events"]:
+            validate_schema(event, "event.schema.json")
+        return data
+    if command == "event-route":
+        return validate_schema(data, "event-route-result.schema.json")
     return data
 
 
@@ -502,6 +585,23 @@ def _validate_all() -> dict[str, int]:
     for opportunity in opportunities["opportunities"]:
         validate_schema(opportunity, "opportunity.schema.json")
         validated += 1
+    live_fixture_path = Path(__file__).resolve().parents[1] / "fixtures" / "osekkai" / "live-contracts.json"
+    live_fixture = json.loads(live_fixture_path.read_text(encoding="utf-8"))
+    validate_schema(live_fixture["sourceRegistry"], "source-registry.schema.json")
+    validated += 1
+    for key, schema_name in (
+        ("events", "event.schema.json"),
+        ("series", "event-series.schema.json"),
+        ("communities", "community.schema.json"),
+        ("connectionEvidence", "connection-evidence.schema.json"),
+        ("opportunities", "opportunity.schema.json"),
+    ):
+        for instance in live_fixture[key]:
+            validate_schema(instance, schema_name)
+            validated += 1
+    validate_decision(live_fixture["decision"])
+    validate_episode(live_fixture["episode"])
+    validated += 2
     with tempfile.TemporaryDirectory() as directory:
         store = JsonStore(directory)
         with store.user_lock(user_id):
@@ -520,8 +620,8 @@ def _validate_all() -> dict[str, int]:
             validated += 1
         with store.user_lock(user_id):
             decision = decide_unlocked(store, user_id, now, "demo")
-        validate_schema(decision["decision"], "decision.schema.json")
-        validate_schema(decision["episode"], "intervention-episode.schema.json")
+        validate_decision(decision["decision"])
+        validate_episode(decision["episode"])
         validated += 2
         metrics = calculate_metrics([decision["episode"]], "demo", now)
         validate_schema(metrics, "metrics.schema.json")

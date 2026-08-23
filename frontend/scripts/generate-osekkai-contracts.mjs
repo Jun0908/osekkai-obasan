@@ -21,6 +21,11 @@ const contractFiles = [
   "conversation.schema.json",
   "chat-result.schema.json",
   "freebusy.schema.json",
+  "event.schema.json",
+  "event-series.schema.json",
+  "community.schema.json",
+  "source-registry.schema.json",
+  "connection-evidence.schema.json",
   "opportunity.schema.json",
   "decision.schema.json",
   "intervention-episode.schema.json",
@@ -32,6 +37,9 @@ const contractFiles = [
   "decide-request.schema.json",
   "demo-reset-request.schema.json",
   "profile-delete-request.schema.json",
+  "calendar-callback-request.schema.json",
+  "event-route-request.schema.json",
+  "event-route-result.schema.json",
 ];
 
 const typeRoots = [
@@ -39,6 +47,11 @@ const typeRoots = [
   ["conversation.schema.json", "ConversationTurn"],
   ["chat-result.schema.json", "ChatResult"],
   ["freebusy.schema.json", "FreeBusyResult"],
+  ["event.schema.json", "LiveEvent"],
+  ["event-series.schema.json", "EventSeries"],
+  ["community.schema.json", "Community"],
+  ["source-registry.schema.json", "SourceRegistry"],
+  ["connection-evidence.schema.json", "ConnectionEvidence"],
   ["opportunity.schema.json", "Opportunity"],
   ["decision.schema.json", "DecisionResult"],
   ["intervention-episode.schema.json", "InterventionEpisode"],
@@ -50,6 +63,9 @@ const typeRoots = [
   ["decide-request.schema.json", "DecideRequest"],
   ["demo-reset-request.schema.json", "DemoResetRequest"],
   ["profile-delete-request.schema.json", "ProfileDeleteRequest"],
+  ["calendar-callback-request.schema.json", "CalendarCallbackRequest"],
+  ["event-route-request.schema.json", "EventRouteRequest"],
+  ["event-route-result.schema.json", "EventRouteResult"],
 ];
 
 const validatorRoots = {
@@ -57,6 +73,11 @@ const validatorRoots = {
   rawValidateConversationTurn: "conversation.schema.json",
   rawValidateChatResult: "chat-result.schema.json",
   rawValidateFreeBusyResult: "freebusy.schema.json",
+  rawValidateLiveEvent: "event.schema.json",
+  rawValidateEventSeries: "event-series.schema.json",
+  rawValidateCommunity: "community.schema.json",
+  rawValidateSourceRegistry: "source-registry.schema.json",
+  rawValidateConnectionEvidence: "connection-evidence.schema.json",
   rawValidateOpportunity: "opportunity.schema.json",
   rawValidateDecisionResult: "decision.schema.json",
   rawValidateInterventionEpisode: "intervention-episode.schema.json",
@@ -68,6 +89,9 @@ const validatorRoots = {
   rawValidateDecideRequest: "decide-request.schema.json",
   rawValidateDemoResetRequest: "demo-reset-request.schema.json",
   rawValidateProfileDeleteRequest: "profile-delete-request.schema.json",
+  rawValidateCalendarCallbackRequest: "calendar-callback-request.schema.json",
+  rawValidateEventRouteRequest: "event-route-request.schema.json",
+  rawValidateEventRouteResult: "event-route-result.schema.json",
 };
 
 const schemas = new Map();
@@ -98,11 +122,14 @@ const dependencySchema = {
   title: "OsekkaiContractDependencies",
   type: "object",
   additionalProperties: false,
-  required: ["inferredPreference", "fieldProvenance", "freeWindow"],
+  required: ["inferredPreference", "fieldProvenance", "freeWindow", "evidence", "source", "rankedOpportunity"],
   properties: {
     inferredPreference: { $ref: "common.schema.json#/$defs/inferredPreference" },
     fieldProvenance: { $ref: "common.schema.json#/$defs/fieldProvenance" },
     freeWindow: { $ref: "freebusy.schema.json#/$defs/freeWindow" },
+    evidence: { $ref: "common.schema.json#/$defs/evidence" },
+    source: { $ref: "source-registry.schema.json#/$defs/source" },
+    rankedOpportunity: { $ref: "decision.schema.json#/$defs/rankedOpportunity" },
   },
 };
 const dependencyTypes = await compile(dependencySchema, "OsekkaiContractDependencies", {
@@ -121,7 +148,9 @@ for (const [file, rootName] of typeRoots) {
   // `{ [key: string]: any } & ...`.  The runtime validator still receives the
   // canonical `allOf`; omitting it only for the static shape keeps the closed
   // Episode object useful to TypeScript callers.
-  if (file === "intervention-episode.schema.json") delete schema.allOf;
+  if (["opportunity.schema.json", "decision.schema.json", "intervention-episode.schema.json"].includes(file)) {
+    delete schema.allOf;
+  }
   const block = await compile(schema, rootName, {
     bannerComment: "",
     cwd: contractRoot,
@@ -142,6 +171,9 @@ const compatibilityTypes = `
 export type SchemaVersion = ${JSON.stringify(common.$defs.schemaVersion.const)};
 export type DataMode = ${union(common.$defs.dataMode.enum)};
 export type MetricClassification = ${union(common.$defs.classification.enum)};
+export type SourceClassification = ${union(common.$defs.sourceClassification.enum)};
+export type EventStatus = ${union(common.$defs.eventStatus.enum)};
+export type RegistrationStatus = ${union(common.$defs.registrationStatus.enum)};
 export type SocialIntensity = 0 | 1 | 2 | 3 | 4 | 5;
 export type PushTone = ${union(common.$defs.pushTone.enum)};
 export type ReasonCode = ${union(common.$defs.reasonCode.enum)};
@@ -199,12 +231,32 @@ export const validateChatResult = (value: unknown) =>
   validateWith<import('./types.generated').ChatResult>('ChatResult', rawValidateChatResult, value);
 export const validateFreeBusyResult = (value: unknown) =>
   validateWith<import('./types.generated').FreeBusyResult>('FreeBusyResult', rawValidateFreeBusyResult, value);
+export const validateLiveEvent = (value: unknown) =>
+  validateWith<import('./types.generated').LiveEvent>('LiveEvent', rawValidateLiveEvent, value);
+export const validateEventSeries = (value: unknown) =>
+  validateWith<import('./types.generated').EventSeries>('EventSeries', rawValidateEventSeries, value);
+export const validateCommunity = (value: unknown) =>
+  validateWith<import('./types.generated').Community>('Community', rawValidateCommunity, value);
+export const validateSourceRegistry = (value: unknown) =>
+  validateWith<import('./types.generated').SourceRegistry>('SourceRegistry', rawValidateSourceRegistry, value);
+export const validateConnectionEvidence = (value: unknown) =>
+  validateWith<import('./types.generated').ConnectionEvidence>('ConnectionEvidence', rawValidateConnectionEvidence, value);
 export const validateOpportunity = (value: unknown) =>
   validateWith<import('./types.generated').Opportunity>('Opportunity', rawValidateOpportunity, value);
-export const validateDecisionResult = (value: unknown) =>
-  validateWith<import('./types.generated').DecisionResult>('DecisionResult', rawValidateDecisionResult, value);
-export const validateInterventionEpisode = (value: unknown) =>
-  validateWith<import('./types.generated').InterventionEpisode>('InterventionEpisode', rawValidateInterventionEpisode, value);
+export function validateDecisionResult(value: unknown): ValidationResult<import('./types.generated').DecisionResult> {
+  const result = validateWith<import('./types.generated').DecisionResult>('DecisionResult', rawValidateDecisionResult, value);
+  if (!result.valid || !isRecord(value) || !isValidRanking(value.rankedOpportunities)) return result.valid
+    ? { valid: false, errors: ['DecisionResult.rankedOpportunities must use contiguous ranks and unique opportunity IDs'] }
+    : result;
+  return result;
+}
+export function validateInterventionEpisode(value: unknown): ValidationResult<import('./types.generated').InterventionEpisode> {
+  const result = validateWith<import('./types.generated').InterventionEpisode>('InterventionEpisode', rawValidateInterventionEpisode, value);
+  if (!result.valid || !isRecord(value) || !isValidRanking(value.rankedOpportunities)) return result.valid
+    ? { valid: false, errors: ['InterventionEpisode.rankedOpportunities must use contiguous ranks and unique opportunity IDs'] }
+    : result;
+  return result;
+}
 export const validateMetricsResult = (value: unknown) =>
   validateWith<import('./types.generated').MetricsResult>('MetricsResult', rawValidateMetricsResult, value);
 export const validateChatRequest = (value: unknown) =>
@@ -221,6 +273,12 @@ export const validateDemoResetRequest = (value: unknown) =>
   validateWith<import('./types.generated').DemoResetRequest>('DemoResetRequest', rawValidateDemoResetRequest, value);
 export const validateProfileDeleteRequest = (value: unknown) =>
   validateWith<import('./types.generated').ProfileDeleteRequest>('ProfileDeleteRequest', rawValidateProfileDeleteRequest, value);
+export const validateCalendarCallbackRequest = (value: unknown) =>
+  validateWith<import('./types.generated').CalendarCallbackRequest>('CalendarCallbackRequest', rawValidateCalendarCallbackRequest, value);
+export const validateEventRouteRequest = (value: unknown) =>
+  validateWith<import('./types.generated').EventRouteRequest>('EventRouteRequest', rawValidateEventRouteRequest, value);
+export const validateEventRouteResult = (value: unknown) =>
+  validateWith<import('./types.generated').EventRouteResult>('EventRouteResult', rawValidateEventRouteResult, value);
 
 type JsonRecord = Record<string, unknown>;
 const isRecord = (value: unknown): value is JsonRecord =>
@@ -230,6 +288,18 @@ const isDateTime = (value: unknown): value is string =>
   isString(value) && Number.isFinite(Date.parse(value)) && /(?:Z|[+-]\\d{2}:\\d{2})$/.test(value);
 const isDataMode = (value: unknown) => value === 'demo' || value === 'live';
 const isInteger = (value: unknown) => Number.isInteger(value) && Number(value) >= 0;
+const isValidRanking = (value: unknown) => {
+  if (value === undefined) return true;
+  if (!Array.isArray(value)) return false;
+  const ids = new Set<string>();
+  return value.every((item, index) => {
+    if (!isRecord(item) || item.rank !== index + 1 || !isString(item.opportunityId) || ids.has(item.opportunityId)) {
+      return false;
+    }
+    ids.add(item.opportunityId);
+    return true;
+  });
+};
 const resultValue = <T>(result: ValidationResult<T>) => result.valid;
 const hasExactKeys = (value: JsonRecord, keys: string[]) =>
   Object.keys(value).length === keys.length && keys.every((key) => Object.prototype.hasOwnProperty.call(value, key));

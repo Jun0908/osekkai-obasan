@@ -142,6 +142,11 @@ describe('Python child environment allowlist', () => {
       TEMP: 'C:\\Temp',
       NODE_ENV: 'test',
       OSEKKAI_DEMO_MODE: 'true',
+      GOOGLE_ROUTES_API_KEY: 'server-routes-key',
+      LUMA_ICAL_URL: 'https://calendar.example.test/community.ics',
+      DOORKEEPER_API_TOKEN: 'doorkeeper-token',
+      OSEKKAI_LIVE_ORIGIN_LATITUDE: '35.6812',
+      OSEKKAI_LIVE_ORIGIN_LONGITUDE: '139.7671',
       OSEKKAI_SESSION_SECRET: 'must-not-leak',
       OSEKKAI_SESSION_SECRET_PREVIOUS: 'must-not-leak-either',
       OPENAI_API_KEY: 'must-not-leak',
@@ -151,6 +156,11 @@ describe('Python child environment allowlist', () => {
     expect(env.PATH).toBe('C:\\safe-bin');
     expect(env.SystemRoot).toBe('C:\\Windows');
     expect(env.OSEKKAI_DEMO_MODE).toBe('true');
+    expect(env.GOOGLE_ROUTES_API_KEY).toBe('server-routes-key');
+    expect(env.LUMA_ICAL_URL).toBe('https://calendar.example.test/community.ics');
+    expect(env.DOORKEEPER_API_TOKEN).toBe('doorkeeper-token');
+    expect(env.OSEKKAI_LIVE_ORIGIN_LATITUDE).toBe('35.6812');
+    expect(env.OSEKKAI_LIVE_ORIGIN_LONGITUDE).toBe('139.7671');
     expect(env.PYTHONIOENCODING).toBe('utf-8');
     expect(env.OSEKKAI_DATA_ROOT).toBeTruthy();
     expect(env.OSEKKAI_SESSION_SECRET).toBeUndefined();

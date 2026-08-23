@@ -1,11 +1,12 @@
-# おっせかいおばさん（ねえさん）
+# おっせかいおばさん　おねいさん
 
-PV Movie
+**Current Version — Live Demo Build 2026-08-23**
 
+[スライドを見る](https://canva.link/uro4qx4tm4llm9n) · [PVを見る](https://www.youtube.com/watch?v=me60PvZPABQ)
 
 東京都の孤独課題に対して、利用者を「人とつながる可能性のある実在の場」へ一歩だけ後押しするプロアクティブAIです。
 
-本人の好みをそのまま反復するのではなく、好みに隣接する少し意外なEventから、Calendar、移動時間、料金、対人負荷に収まる1件を選びます。利用者自身が現在地周辺の交流Eventを地図で探す導線も提供します。
+話した好みと反応を覚え、Calendar、移動時間、料金、対人負荷に収まる実在Eventを、選びやすい複数候補へ絞ります。利用者自身は、推薦対象に限らず、現在地周辺で取得できた全Eventを地図で探せます。
 
 ## 解決したいこと
 
@@ -15,92 +16,89 @@ PV Movie
 
 1. 東京都内の最新Eventを複数Sourceから更新
 2. 会話、共同活動、継続参加などのConnection Evidenceを確認
-3. 利用者の好みと、はまりそうな隣接ジャンルを照合
+3. 利用者の好み、参加形式、過去の反応を照合
 4. Google Calendarの空き時間をFreeBusyで確認
 5. Google Routesで実移動時間を確認
-6. 条件に合う1件だけを、おせっかいだが押しつけすぎない言葉で提案
-7. `行ってみる / これは違う / 今回は無理 / 次回も知らせて`から次の提案を学習
+6. 条件に合う複数候補を、おせっかいだが押しつけすぎない言葉と推薦理由付きで提案
+7. `行ってみる / これは違う / 今回は無理 / 次回も知らせて`と参加後の会話から次の提案を学習
 
 単に図書館、公園、展示へ外出させるアプリではありません。孤独の緩和につながる会話・共同活動・再参加の可能性を説明できるEventを対象にします。
 
+## 現在版の体験
+
+最初から長い質問票は出しません。標準設定で始まり、おっせかいおばさんが好みを一度に1つだけ聞きます。ヨガ、ボルダリング、料理、音楽などを話すと、記憶への同意がある場合だけProfile Storeへ根拠付きで蓄積し、複数候補の順位付けへ使います。
+
+Today、Memory、Whyといった内部判断パネルは通常の会話画面に表示しません。保存された好みの確認・個別削除、通知時間、移動時間、予算、言葉の強さは、必要な人だけが設定画面の詳細を開いて変更できます。`今日は何もしない`は安全・Feedbackの選択肢として残しますが、ホームや最初の会話では前面に出しません。
+
+次の実装では`話す`を好み登録だけの画面から、Calendarの空き、実Event、断った理由、参加後の反応を一つの流れで扱う会話面へ拡張します。Demoでは追加設定を求めず、Google CalendarのFreeBusyが薄く、参加可能な実Eventが見つかった時を会話開始のTriggerにします。Calendarから取得するのは空き時間だけで、予定名や「家にいる」といった推測には使いません。詳細Taskは[Plan2.md](Plan2.md#132-実行順task-queue)に記録しています。
+
 ## 現在の実装状態
 
-### 実装済み：P0ローカルデモ
+### 実装・自動検証済み
 
-- Next.jsの`/osekkai` UIと`/api/osekkai` API
-- PythonをownerとするProfile、Policy、保存、判断、Feedback、KPI
-- JSON Schemaを正本とするPython–TypeScript間Contract
-- 匿名Session、記憶同意、Quiet Hours、休止、全削除、保持期間
-- 固定fixtureによる再現可能なオフラインデモ
-- 合成Free Window、合成移動時間、過去Open Data snapshotを明示したP0表示
+- Next.jsの`/osekkai` UI、`/api/osekkai` API、匿名Session、記憶・通知同意、休止、全削除
+- PythonをownerとするProfile、Distance Profile、Policy、Safety Guardrail、判断記録、Feedback、KPI
+- JSON Schema 24件を正本とするPython–TypeScript Contractと生成validator
+- 東京都Open Data CKAN、許可されたLu.ma iCal、Doorkeeper API、公共文化施設公式SiteのProvider adapter
+- Event / Series / Community / Source Registry、重複統合、鮮度・募集状態、Connection Evidence
+- Calendar OAuthのstate・PKCE・匿名session紐付け、暗号化token、FreeBusyだけを使うCalendar adapter
+- Google Routesの徒歩・公共交通・住所解決、往復・滞在・bufferを含む実現可能性判定
+- Sourceごとの更新間隔、lock、retry/backoff、障害分離、PUSH直前再検証を行うScheduler
+- 優先順位付きの複数候補、根拠、Source状態、CTAを表示するLive Demo UI
+- 現在地または地域名から、取得した全Eventを探せるMapと一覧fallback
+- Map上の明示操作でBrowser Geolocationを一時取得し、選択EventのRoutes計算にだけ使う位置情報導線
+- 再現可能なP0オフラインデモと、Live Provider fixtureを使う統合テスト
 
-### これから実装：Live Demo
+### 2026-08-23の実接続確認
 
-- 東京都Open Data CKAN、Lu.ma、Doorkeeper、公共文化施設などの最新Event同期
-- Event / Series / Community / Source Registryと重複・鮮度管理
-- 孤独解消につながるConnection EvidenceとPersonal Fit判定
-- Google OAuthとCalendar FreeBusy実接続
-- Google Routesによる徒歩・公共交通の実移動時間
-- OpenClaw Schedulerによる定期更新とPUSH直前再検証
-- 現在地または指定地域から探せるGoogle Maps Event Map
-- Live Source、最終更新時刻、交流根拠を示すJudge向け1件PUSH画面
+- Google Cloud Billingの有効化、Calendar OAuth / FreeBusy、Google Routes / Geocoding、Google Maps JavaScriptの実接続を確認
+- 許可されたLu.ma iCalから50 Event、Doorkeeper APIから25 EventをLive取得
+- Credential不要経路では東京都CKAN 5 dataset、江東区文化コミュニティ財団公式Site 169開催回を取得
+- 実Provider 4系統から239 Eventを統合し、鮮度・募集状態・Connection Evidenceで91件を適格化、Google Routesで6件の実移動時間を確認（強制同期は約10秒）
+- 実Google FreeBusy、実Routes、好みを使うPolicyの通し確認で、標準設定から優先順位付き3候補を生成
+- 料金がSourceで確認できないEventは無料と推定せず`料金未確認`と表示し、遠すぎる経路や根拠不足のEventは推薦から除外
+- Sourceの強制再同期を毎画面表示から外し、通常表示は保存済みLive Cacheを読む
 
-詳細な依存関係、対象ファイル、完了条件、検証方法は[Plan2.md](Plan2.md#131-task運用ルール)を正本とします。現在のTaskが完了するまで、Live接続済みとは扱いません。
+### 次に実装するVersion
 
-## 都知事杯5評価基準に対する設計
+個別ProviderとGoogle実接続、および実データを使う複数候補生成までは完了しています。次は`話す`を、好みの初回登録、Calendarの疎な期間から始まる先回り会話、断った理由に応じた一度だけの再提案、参加後のさりげない確認まで続く会話面へ拡張します。その後、審査で使うBrowser sessionで最終リハーサルを行います。
 
-都知事杯の公式5評価基準を、機能の有無ではなく「課題解決までつながっているか」を確認する設計レビューに使います。リリース判定では各基準を20点、合計100点で内部採点しますが、**これは公式の配点ではなく、本チームの内部チェック用です**。
+詳細な依存関係、完了条件、検証記録は[Plan2.md](Plan2.md#131-task運用ルール)を正本とします。Credentialがない機能を接続済みとは表現しません。
 
-### 1. データ活用
+## 設計の考え方
 
-東京都Open DataはEvent一覧を飾るためではなく、開催日時、場所、主催、対象、継続性などを推薦判断へ実際に使います。CalendarとMapsは「行けるか」を確かめる制約であり、それだけで推薦を成立させません。Event / Series / Community / Source、Connection Evidence、本人のDistance Profileを統合し、「近い人気Event」ではなく「この人が関係を作れる可能性のある場」という新しい判断を作ります。
+東京都Open Dataは画面を飾る一覧ではなく、開催日時、場所、主催、対象、継続性を判断する土台です。そこへLu.ma、Doorkeeper、公共施設公式情報などの現在データを重ね、Event / Series / Community、Connection Evidence、本人の反応を統合します。CalendarとMapsは「実際に行けるか」を確かめる制約であり、それだけで推薦を成立させません。Source URL、取得時刻、欠損、stale、canceled、sold outも残し、データの弱点を隠しません。
 
-Source URL、取得時刻、欠損、stale、canceled、sold outも表示・除外理由として保持し、データの弱点を隠しません。本人の同意と匿名・集計を前提に、参加を妨げた時間、距離、料金、交流形式や、地域ごとの接点不足を東京都・主催者へ返せる設計にします。
+中心にあるのはEvent検索ではなく、本人ごとに「どんな誘われ方なら一歩動けるか」を学ぶDistance Profileです。好みだけでなく、少人数か大人数か、会話か共同作業か、許容できる移動、断った理由、参加後の感想を少しずつ覚えます。候補を一つへ決めつけず、理由の異なる複数案と断れる選択肢を残します。
 
-### 2. アイデア力
+判断経路は`Conversation Memory → Distance Profile → Live Data → Connection判定 → FreeBusy → Routes → Safety Guardrail → PUSH Policy → Feedback`としてつながっています。不透明な自動最適化を最初から入れず、明示Policy、Feedback蓄積、オフライン評価、安全制約付き最適化の順に育てます。
 
-中心にある発明はEvent推薦そのものではなく、本人ごとに「おせっかいの距離感」を学ぶDistance Profileです。「誰かとつながりたいが、探す・決める・失敗するのは面倒」という矛盾を、候補を1件に絞り、断り方まで用意することで解きます。好み、少しずらした提案、反応、参加、再参加を継続的に学び、単発の検索体験ではなく関係形成まで伴走します。
+成果はClickだけでは測りません。参加、再参加、自発的な外出、同じCommunityとの継続接点を追い、本人同意が得られる段階で孤独尺度も扱います。実測、推計、仮定を分離し、個人の変化を東京都全体の金額へ安易に外挿しません。匿名・集計できる段階では、時間、距離、料金、交流形式による参加障壁や、接点が不足する地域を施策改善へ返せます。
 
-### 3. 技術力
-
-技術要素は独立したデモ機能ではなく、次の判断経路として接続します。
-
-`Conversation Memory → Distance Profile → Live Open Data検索 → Connection判定 → Free/Busy → 地理・時間制約 → Safety Guardrail → PUSH Policy → Feedback`
-
-P0でConversation Memory、Distance Profile、PUSH Policy、Safety Guardrailと監査可能な判断記録を実装し、Live DemoではOpen Data同期、Google Free/Busy、Google Routes、Event Mapを接続します。Contextual Bandit / JITAIは、最初から不透明な自動最適化を行わず、明示Policy、Feedback蓄積、オフライン評価、安全制約付き最適化の順で段階導入します。既存資産をContractでつなぎ、実際に動く一連のDemoで検証します。
-
-### 4. ソーシャルインパクト
-
-PAINを「Eventを知らない」ではなく、孤独時に大きくなる検索、比較、予定調整、移動、初参加の心理的負担として捉えます。Clickや参加数だけで成功とせず、参加、再参加、自発的な外出、継続接点に加え、本人同意のある妥当な孤独尺度を段階的に測ります。
-
-効果検証では、推薦を受けなかった期間・異なる介入強度との比較など、因果効果を確認できる設計を事前に定めます。金銭換算は実測、推計、仮定を分離し、東京都全体へ安易に外挿しません。個人の変化を匿名・集計し、接点が不足する地域・時間帯・参加形式を東京都施策の改善へつなげます。
-
-### 5. サービスデザイン
-
-本人を画面上で「孤独な人」とラベル付けしません。通知頻度、Quiet Hours、言葉の強さ、移動時間、料金、対人負荷、休止を本人が調整でき、`これは違う / 今回は無理 / 次回も知らせて`で距離感を修正できます。1件PUSHとEvent Mapの併用により、検索負担を減らしながら本人の主体性を残します。
-
-利用を続けさせることだけを成功にせず、本人が自分から外出・再参加できるようになり通知が不要になることも成功とします。CalendarはFreeBusyだけを使い、正確な現在地を永続保存せず、記憶同意、削除、保持期間、緊急時のSafety導線を製品機能として扱います。
+画面上で本人を「孤独な人」と決めつけません。通知頻度、Quiet Hours、言葉の強さ、移動時間、料金、対人負荷、休止を本人が変更でき、記憶は確認・個別削除・全削除できます。利用を続けさせることだけを成功とせず、本人が自分から参加先を見つけられるようになり、おせっかいが不要になることも成功として扱います。
 
 ## Event Mapの目標
 
-`/osekkai/map`では、現在地または駅名・地域名から、参加可能な交流Eventを自分でも探せるようにします。
+`/osekkai/map`では、現在地または駅名・地域名から、選択期間内に取得できた全Eventを自分でも探せるようにします。PUSHはConnection Evidenceで厳選しますが、Mapは推薦外のEventも隠しません。
 
-- `今日 / 今週末 / 30分以内 / ひとり参加可 / 継続あり / Networking / みんなで食事`で絞り込み
-- Markerから開催時刻、実移動時間、料金、募集状態、交流根拠、Source、更新時刻を確認
-- Policyが選んだ1件を`おばさんのおすすめ`として区別
-- 交流根拠のない施設、expired、canceled、sold out、stale Eventは表示しない
+- 既定表示は`すべて`。`今日 / 今週末 / 30分以内 / ひとり参加可 / 継続あり / Networking / みんなで食事 / おすすめのみ`で任意に絞り込み
+- Markerから開催時刻、実移動時間、料金、募集状態、Connection Level、交流根拠、Source、更新時刻を確認
+- Policyが選んだ複数候補を順位と推薦理由付きで表示し、他のEventと区別
+- Connection EvidenceがないEventも`交流根拠未確認`または`推薦対象外`として表示
+- sold out、canceled、expired、stale、情報欠損も状態を付けて表示し、申込CTAを無効化
+- 同一Eventの複数Sourceは1つのMarkerへ統合し、すべてのSourceを詳細で確認可能
 - 正確な現在地は明示操作時だけ利用し、Profileやlogへ永続保存しない
 
-このMapは`TASK-145`として計画済みで、現時点では未実装です。
+Mapは`/osekkai/map`に実装済みです。Maps keyがない、読込に失敗した、または座標解決できない場合も、同じ全Eventを一覧fallbackで閲覧できます。
 
 ## 利用予定のデータ
 
 | Source | 用途 | Plan2上の扱い |
 |---|---|---|
-| 東京都Open Data CKAN | 東京都・自治体が公開する最新Event | 必須Provider |
-| Lu.ma公開Event | Community、趣味、Networking | 必須Provider |
-| Doorkeeper公開Event | 継続Community、勉強会 | 必須Provider |
-| 公共文化施設の公式情報 | ワークショップ、交流・参加型企画 | 必須Provider |
+| 東京都Open Data CKAN | 東京都・自治体が公開する最新Event | 必須・Credential不要・同期確認済み |
+| Lu.ma公開Event | Community、趣味、Networking | 必須・許可されたiCalから同期確認済み |
+| Doorkeeper公開Event | 継続Community、勉強会 | 必須・APIから同期確認済み |
+| 公共文化施設の公式情報 | ワークショップ、交流・参加型企画 | 必須・KCF公式Site同期確認済み |
 | connpass | 技術Community | Optional |
 | Peatix | 主催者許諾のある取込導線 | Optional。無断scrapingを前提にしない |
 | 共食・食事会Provider | みんなで食べる接点 | 規約と取得方法を確認後にOptional接続 |
@@ -140,14 +138,93 @@ Node.js 20.9以上、npm、Python 3.11以上を使用します。リポジトリ
 ```powershell
 python -m pip install -r agents-OpenClaw\requirements.txt
 Set-Location frontend
-Copy-Item .env.example .env.local
+Copy-Item .env.example .env
 npm.cmd ci
 npm.cmd run dev
 ```
 
-ブラウザで`http://localhost:3000/`を開くと`/osekkai`へ移動します。P0デモは`http://localhost:3000/osekkai/demo`です。
+ブラウザで`http://localhost:3000/`を開くと`/osekkai`へ移動します。`/osekkai/demo`がJudge用Demo、`/osekkai/map`が全Event Mapです。
 
-`.env.local`の既定値`OSEKKAI_DEMO_MODE=true`では、外部APIや外部LLMを使いません。Google Calendar、Routes、Maps、Live Provider用Credentialは、該当Taskの実装と環境変数追加が完了してから設定します。
+`.env`の既定値`OSEKKAI_DEMO_MODE=true`は外部接続を使わない再現用P0です。Live Demoは次の設定後に`OSEKKAI_DEMO_MODE=false`へ変更します。既に`.env`がある場合は上書きせず、そのファイルを編集してください。
+
+## Live Demo設定
+
+### 1. Google Cloud
+
+1. 使用するGoogle Cloud projectへBilling Accountをリンクする
+2. Calendar API、Routes API、Geocoding API、Maps JavaScript APIを有効化する
+3. OAuth consent screenを構成し、Web application OAuth Clientを作る
+4. Authorized redirect URIへ`http://localhost:3000/api/osekkai/calendar/callback`を完全一致で登録する
+5. Routes/Geocoding用のserver keyとMaps JavaScript用のbrowser keyを分ける
+6. server keyは使用APIとserver側の制限、browser keyはMaps JavaScript APIとHTTP referrerへ制限する
+
+本アプリが要求するCalendar scopeは`https://www.googleapis.com/auth/calendar.freebusy`だけです。予定のtitle、description、location、attendeesは要求・保存しません。
+
+Demo projectではBilling Accountのリンクと必要APIの有効化を確認済みです。別projectへ移す場合だけ1〜6を再実施してください。課金を伴う紐付けをアプリから自動実行しません。
+
+### 2. `.env`
+
+`frontend/.env.example`を`frontend/.env`へコピーし、少なくとも次を設定します。秘密値はcommitしません。
+
+```dotenv
+OSEKKAI_DEMO_MODE=false
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_REDIRECT_URI=http://localhost:3000/api/osekkai/calendar/callback
+OSEKKAI_CREDENTIAL_ENCRYPTION_KEY=...
+GOOGLE_ROUTES_API_KEY=...
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=...
+OSEKKAI_LIVE_ORIGIN_LATITUDE=35.xxxx
+OSEKKAI_LIVE_ORIGIN_LONGITUDE=139.xxxx
+LUMA_ICAL_URL=https://...
+DOORKEEPER_API_TOKEN=...
+```
+
+暗号化keyはPowerShellから生成できます。
+
+```powershell
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+`OSEKKAI_LIVE_ORIGIN_*`はJudge Demo用の大まかな出発地点です。Mapで利用者が明示取得する正確な現在地とは別で、Browserの座標はProfileやlogへ保存しません。
+
+### 3. Live同期と確認
+
+`frontend/.env`はPython CLIへ自動読込されないため、CLI単体で運用する場合は同じ値をprocess environmentへ設定します。Webアプリから実行する場合はNext.js bridgeが必要な値だけをallowlistでPythonへ渡します。
+
+```powershell
+Set-Location agents-OpenClaw
+python scripts/osekkai_cli.py sources-sync --json --force
+python scripts/osekkai_cli.py sources-status --json
+python scripts/osekkai_cli.py events --json
+python scripts/osekkai_cli.py opportunities --live --json
+```
+
+Webを起動したら、`/osekkai/settings`でGoogle Calendarを接続し、`/osekkai/demo`の`最新Eventから提案して`を押します。Mapは`/osekkai/map`で`OpenClawで最新に更新`を押します。
+
+Schedulerは上の`source-sync`を各Sourceのrefresh間隔より短い外部cron/Task Schedulerから呼べます。内部でinterval判定、Source lock、bounded retry/backoffを行うため、1 Sourceの停止で他Sourceを止めません。PUSH直前にも選ばれたEventだけを再検証し、stale、取消、満席、検証不能なら推薦から外します。
+
+Google設定の一次資料:
+
+- [Cloud Billingをprojectへ有効化・変更](https://docs.cloud.google.com/billing/docs/how-to/modify-project)
+- [Web server OAuthとredirect URI](https://developers.google.com/identity/protocols/oauth2/web-server)
+- [Calendar FreeBusy queryとscope](https://developers.google.com/workspace/calendar/api/v3/reference/freebusy/query)
+- [Routes APIの利用とBilling](https://developers.google.com/maps/documentation/routes/usage-and-billing)
+- [Maps API keyの制限](https://developers.google.com/maps/api-security-best-practices)
+
+## Source運用・Attribution・既知の制約
+
+Source定義の正本は`agents-OpenClaw/config/osekkai_sources.json`です。各EventにSource URL、取得・更新・再検証時刻、classification、checksumを保存し、画面から原典へ戻れるようにします。
+
+- 東京都Open Dataはdatasetごとのlicenseと提供者表記を引き継ぎます。catalogの検索結果だけでEventを捏造しません
+- Lu.maは利用者または主催者から利用許可を得たiCal URLだけを取り込みます。公開ページの無断scrapingはしません
+- DoorkeeperはAPI tokenと[利用規約](https://www.doorkeeper.jp/terms)に従い、Event/CommunityのSourceへlink backします
+- KCFは公式講座ページの事実項目を取得し、公益財団法人江東区文化コミュニティ財団を表示して原文へlink backします。本番継続運用前に取得頻度と利用条件を主催者へ再確認します
+- Peatix、共食Service、connpassは取得権限が確定していないため、Live Demo必須経路へ混ぜません
+
+Providerの規約や画面構造は変更されます。parser失敗、429、timeout、Credential不足はSource単位の状態として表示し、最後に正常取得したEventを無期限にLive扱いしません。Mapにはstale等の状態を付けて残せますが、PUSHは再検証できない時点でfail closedです。
+
+現在のJSON file store、instance-local rate limit、外部cronはハッカソンDemo規模の構成です。複数instanceの本番運用では共有DB/queue/rate limit、監視、backup、Google OAuth consent screenの公開要件、Providerとの利用合意を別途整備する必要があります。
 
 ## 検証
 

@@ -1,10 +1,10 @@
 /* Generated from /contracts/osekkai. Do not edit. */
-export const OSEKKAI_CONTRACT_HASH = "ea1b21980bf0697f7c6e6a1cf0789c457f4b41e08fa095bcb1918c61a48fbeae" as const;
+export const OSEKKAI_CONTRACT_HASH = "8fe80f135e70b1fbe400b0596ebe487662df46f4000d7250b8af2c5a82db5701" as const;
 export const OSEKKAI_CONTRACTS = [
   {
     "file": "contracts/osekkai/common.schema.json",
     "id": "https://osekkai.local/contracts/common.schema.json",
-    "sha256": "355f45868a3f33977d1725602686403ccda4de317b610d422080ddb6713f2d37"
+    "sha256": "d8507dc846069ebfc60de5fed2540fe488199dd6b4f651ba8af78dcbf5438dcc"
   },
   {
     "file": "contracts/osekkai/distance-profile.schema.json",
@@ -27,19 +27,44 @@ export const OSEKKAI_CONTRACTS = [
     "sha256": "020a49d1129dc34eb9ec3a0b16fd1d8eec3a25014d4f1f814ed8ce80146db7cc"
   },
   {
+    "file": "contracts/osekkai/event.schema.json",
+    "id": "https://osekkai.local/contracts/event.schema.json",
+    "sha256": "8187ed97377f28890bfdbac968f5433d7ed47e7ce4168d72bc8cb39d2ceab4cc"
+  },
+  {
+    "file": "contracts/osekkai/event-series.schema.json",
+    "id": "https://osekkai.local/contracts/event-series.schema.json",
+    "sha256": "b4bdeee0e6ccc0f35c0c4983c5ec5f00a5f93e2423572241640c2c0520945c0f"
+  },
+  {
+    "file": "contracts/osekkai/community.schema.json",
+    "id": "https://osekkai.local/contracts/community.schema.json",
+    "sha256": "73faa9de5faf3aab41e1b2fd97c443fead8197c325be4a11bf7433af615c4603"
+  },
+  {
+    "file": "contracts/osekkai/source-registry.schema.json",
+    "id": "https://osekkai.local/contracts/source-registry.schema.json",
+    "sha256": "f81f64ac050254a1dc416c6dc9f4ffe1d2d4b8eb595761942e53df208a926273"
+  },
+  {
+    "file": "contracts/osekkai/connection-evidence.schema.json",
+    "id": "https://osekkai.local/contracts/connection-evidence.schema.json",
+    "sha256": "fc6679eb591225257da4f5a9be574691c4a73388e706da37301e06bd86a9c2ca"
+  },
+  {
     "file": "contracts/osekkai/opportunity.schema.json",
     "id": "https://osekkai.local/contracts/opportunity.schema.json",
-    "sha256": "5691cfa8a5e7c4ec56b0ea882d27144494cf42a64754a4fb369a279e6bad2422"
+    "sha256": "1ee0c9e6add50cc78a371e4d316c4e47eb5cceec27c1e3be45ac229a755fd69a"
   },
   {
     "file": "contracts/osekkai/decision.schema.json",
     "id": "https://osekkai.local/contracts/decision.schema.json",
-    "sha256": "5fe2775a5fd841779a9c0d8c8fe832a1cf72016ac52c05edfeb3ccd9c615b704"
+    "sha256": "68c5b45aff15efac16608bcf4fbdabedc55c435f81778e0fcde106572a3859b2"
   },
   {
     "file": "contracts/osekkai/intervention-episode.schema.json",
     "id": "https://osekkai.local/contracts/intervention-episode.schema.json",
-    "sha256": "e90cd926224b34c60f454d2101e8514d9029d20859d1f60be97deb1379908d73"
+    "sha256": "4238d69d6f43d42320db70c784320f1474c6a930618c9c239e4bdcfe1f609886"
   },
   {
     "file": "contracts/osekkai/metrics.schema.json",
@@ -80,5 +105,20 @@ export const OSEKKAI_CONTRACTS = [
     "file": "contracts/osekkai/profile-delete-request.schema.json",
     "id": "https://osekkai.local/contracts/profile-delete-request.schema.json",
     "sha256": "6e823849262d1c91b04c50d167220dfb97f43c7ff4fce0f75f57c3574b686feb"
+  },
+  {
+    "file": "contracts/osekkai/calendar-callback-request.schema.json",
+    "id": "https://osekkai.local/contracts/calendar-callback-request.schema.json",
+    "sha256": "fe70db89dda85506b9152072f507b6f70c9d32cddf283f9ea63dd353d57fe0f0"
+  },
+  {
+    "file": "contracts/osekkai/event-route-request.schema.json",
+    "id": "https://osekkai.local/contracts/event-route-request.schema.json",
+    "sha256": "0ee2c857f57d70419a6484045f990b00f2213e8a42ea3a6cf04203708a6c3778"
+  },
+  {
+    "file": "contracts/osekkai/event-route-result.schema.json",
+    "id": "https://osekkai.local/contracts/event-route-result.schema.json",
+    "sha256": "fd32ecd3bbc0ea96a6a3b045672989a92f878bd671292a5d337846cdf66273a4"
   }
 ] as const;

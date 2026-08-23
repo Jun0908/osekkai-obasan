@@ -53,6 +53,9 @@ venv/
 
 # media
 outputs/
+/.playwright-mcp/
+/live-demo-*.png
+/map-*.png
 
 # Preserved legacy Tomo-san assets. Kept locally for recovery, never tracked.
 /archive/tomo-san/

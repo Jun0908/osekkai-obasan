@@ -4,6 +4,37 @@
   "title": "Opportunity",
   "type": "object",
   "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "required": ["dataMode"],
+        "properties": { "dataMode": { "const": "live" } }
+      },
+      "then": {
+        "required": [
+          "eventId", "communityId", "seriesId", "futureOccurrences", "capacity", "participants",
+          "status", "registrationStatus", "registrationDeadline", "sourceClassification",
+          "sourceUpdatedAt", "fetchedAt", "revalidatedAt", "connectionEvidence"
+        ],
+        "properties": {
+          "eventId": true,
+          "communityId": true,
+          "seriesId": true,
+          "futureOccurrences": true,
+          "capacity": true,
+          "participants": true,
+          "status": true,
+          "registrationStatus": true,
+          "registrationDeadline": true,
+          "sourceClassification": true,
+          "sourceUpdatedAt": true,
+          "fetchedAt": true,
+          "revalidatedAt": true,
+          "connectionEvidence": true
+        }
+      }
+    }
+  ],
   "required": [
     "schemaVersion", "id", "title", "startsAt", "endsAt", "address", "priceYen",
     "socialIntensity", "conversationRequired", "soloFriendly", "provider", "sourceType",
@@ -14,6 +45,9 @@
     "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
     "id": { "type": "string", "minLength": 1, "maxLength": 160 },
     "sourceRecordId": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "eventId": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "communityId": { "type": ["string", "null"], "maxLength": 200 },
+    "seriesId": { "type": ["string", "null"], "maxLength": 200 },
     "title": { "type": "string", "minLength": 1, "maxLength": 240 },
     "description": { "type": "string", "maxLength": 3000 },
     "startsAt": { "$ref": "common.schema.json#/$defs/dateTime" },
@@ -21,23 +55,46 @@
     "address": { "type": "string", "minLength": 1, "maxLength": 300 },
     "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
     "longitude": { "type": "number", "minimum": -180, "maximum": 180 },
-    "priceYen": { "type": "integer", "minimum": 0 },
+    "priceYen": { "type": ["integer", "null"], "minimum": 0 },
     "socialIntensity": { "$ref": "common.schema.json#/$defs/socialIntensity" },
     "conversationRequired": { "type": "string", "enum": ["none", "low", "medium", "high"] },
     "soloFriendly": { "type": "boolean" },
     "recurring": { "type": "boolean" },
+    "futureOccurrences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["eventId", "startsAt", "endsAt", "sourceUrl"],
+        "properties": {
+          "eventId": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "startsAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+          "endsAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+          "sourceUrl": { "type": "string", "format": "uri" }
+        }
+      }
+    },
+    "capacity": { "type": ["integer", "null"], "minimum": 0 },
+    "participants": { "type": ["integer", "null"], "minimum": 0 },
+    "status": { "$ref": "common.schema.json#/$defs/eventStatus" },
+    "registrationStatus": { "$ref": "common.schema.json#/$defs/registrationStatus" },
+    "registrationDeadline": { "$ref": "common.schema.json#/$defs/nullableDateTime" },
     "flexibleVisit": { "type": "boolean" },
     "visitDurationMinutes": { "type": "integer", "minimum": 1, "maximum": 1440 },
     "roleAvailable": { "type": ["boolean", "null"] },
     "roleDescription": { "type": ["string", "null"], "maxLength": 500 },
     "categories": { "type": "array", "uniqueItems": true, "items": { "type": "string", "maxLength": 80 } },
     "provider": { "type": "string", "minLength": 1, "maxLength": 160 },
-    "sourceType": { "type": "string", "enum": ["open_data", "organizer_verified", "ai_derived"] },
+    "sourceType": { "type": "string", "enum": ["open_data", "live_provider", "organizer_verified", "ai_derived", "private_user_data"] },
+    "sourceClassification": { "$ref": "common.schema.json#/$defs/sourceClassification" },
     "sourceUrl": { "type": "string", "format": "uri" },
     "datasetUrl": { "type": "string", "format": "uri" },
     "sourceDataset": { "type": "string", "minLength": 1, "maxLength": 300 },
     "license": { "type": "string", "minLength": 1, "maxLength": 160 },
     "capturedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "sourceUpdatedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "fetchedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "revalidatedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
     "checksum": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "sourceTrust": { "type": "number", "minimum": 0, "maximum": 1 },
     "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
@@ -51,15 +108,26 @@
       "minProperties": 1,
       "additionalProperties": { "$ref": "common.schema.json#/$defs/fieldProvenance" }
     },
+    "connectionEvidence": { "$ref": "connection-evidence.schema.json" },
     "travelEstimate": {
       "type": "object",
       "additionalProperties": false,
       "required": ["mode", "minutes", "source"],
       "properties": {
-        "mode": { "type": "string", "enum": ["walk", "transit", "bicycle"] },
-        "minutes": { "type": "integer", "minimum": 0, "maximum": 360 },
-        "source": { "type": "string", "enum": ["synthetic_demo", "maps_verified"] }
-      }
+        "mode": { "type": "string", "enum": ["walk", "transit", "bicycle", "unknown"] },
+        "minutes": { "type": ["integer", "null"], "minimum": 0, "maximum": 360 },
+        "source": { "type": "string", "enum": ["synthetic_demo", "maps_verified", "unavailable"] },
+        "computedAt": { "$ref": "common.schema.json#/$defs/nullableDateTime" },
+        "distanceMeters": { "type": ["integer", "null"], "minimum": 0 },
+        "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "source": { "const": "unavailable" } } },
+          "then": { "properties": { "minutes": { "type": "null" } } },
+          "else": { "properties": { "minutes": { "type": "integer" } } }
+        }
+      ]
     }
   }
 }

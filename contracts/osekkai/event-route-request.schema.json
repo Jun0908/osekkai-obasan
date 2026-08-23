@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/event-route-request.schema.json",
+  "title": "EventRouteRequest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "origin"],
+  "properties": {
+    "eventId": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["latitude", "longitude"],
+      "properties": {
+        "latitude": { "type": "number", "minimum": -90, "maximum": 90 },
+        "longitude": { "type": "number", "minimum": -180, "maximum": 180 }
+      }
+    }
+  }
+}

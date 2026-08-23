@@ -23,6 +23,31 @@
       "type": "string",
       "enum": ["measured", "reference_estimate", "demo", "unverified"]
     },
+    "sourceClassification": {
+      "type": "string",
+      "enum": [
+        "raw_open_data",
+        "live_provider",
+        "ai_derived",
+        "organizer_verified",
+        "private_user_data",
+        "synthetic_demo"
+      ]
+    },
+    "eventStatus": {
+      "type": "string",
+      "enum": ["scheduled", "canceled", "sold_out", "registration_closed", "ended", "unknown"]
+    },
+    "registrationStatus": {
+      "type": "string",
+      "enum": ["open", "waitlist", "sold_out", "closed", "not_required", "unknown"]
+    },
+    "nullableDateTime": {
+      "oneOf": [
+        { "$ref": "#/$defs/dateTime" },
+        { "type": "null" }
+      ]
+    },
     "socialIntensity": {
       "type": "integer",
       "minimum": 0,
@@ -48,6 +73,8 @@
         "TRAVEL_LIMIT",
         "OVER_BUDGET",
         "SOCIAL_INTENSITY_LIMIT",
+        "CONNECTION_LEVEL",
+        "REGISTRATION_UNAVAILABLE",
         "INVALID_SOURCE",
         "SCORE_BELOW_THRESHOLD",
         "FREE_WINDOW_AVAILABLE",
@@ -71,6 +98,37 @@
         "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
         "evidenceField": { "type": "string", "minLength": 1, "maxLength": 160 },
         "evidence": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "text", "url", "classification", "capturedAt", "confidence"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "recurrence",
+            "future_occurrence",
+            "solo_friendly",
+            "beginner_friendly",
+            "structured_conversation",
+            "shared_meal",
+            "group_work",
+            "role_available",
+            "community_path",
+            "capacity",
+            "registration",
+            "personal_fit",
+            "risk"
+          ]
+        },
+        "text": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "url": { "type": "string", "format": "uri" },
+        "classification": { "$ref": "#/$defs/sourceClassification" },
+        "capturedAt": { "$ref": "#/$defs/dateTime" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "evidenceField": { "type": ["string", "null"], "maxLength": 160 }
       }
     },
     "inferredPreference": {

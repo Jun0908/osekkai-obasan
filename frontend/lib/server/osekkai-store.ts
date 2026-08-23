@@ -50,10 +50,75 @@ export function getOsekkaiFreebusy<T = unknown>(userId: string): Promise<Osekkai
   return invokeOsekkaiCommand<T>({ command: OSEKKAI_COMMANDS.freebusy, userId });
 }
 
+export function startGoogleCalendarConnection<T = unknown>(
+  userId: string,
+  idempotencyKey: string,
+): Promise<OsekkaiCommandResult<T>> {
+  return invokeOsekkaiCommand<T>({
+    command: OSEKKAI_COMMANDS.calendarConnect,
+    userId,
+    payload: {},
+    idempotencyKey,
+  });
+}
+
+export function completeGoogleCalendarConnection<T = unknown>(
+  userId: string,
+  payload: JsonObject,
+  idempotencyKey: string,
+): Promise<OsekkaiCommandResult<T>> {
+  return invokeOsekkaiCommand<T>({
+    command: OSEKKAI_COMMANDS.calendarCallback,
+    userId,
+    payload,
+    idempotencyKey,
+  });
+}
+
+export function disconnectGoogleCalendar<T = unknown>(
+  userId: string,
+  idempotencyKey: string,
+): Promise<OsekkaiCommandResult<T>> {
+  return invokeOsekkaiCommand<T>({
+    command: OSEKKAI_COMMANDS.calendarDisconnect,
+    userId,
+    payload: {},
+    idempotencyKey,
+  });
+}
+
 export function getOsekkaiOpportunities<T = unknown>(
   userId: string,
 ): Promise<OsekkaiCommandResult<T>> {
   return invokeOsekkaiCommand<T>({ command: OSEKKAI_COMMANDS.opportunities, userId });
+}
+
+export function getOsekkaiSourceStatus<T = unknown>(userId: string): Promise<OsekkaiCommandResult<T>> {
+  return invokeOsekkaiCommand<T>({ command: OSEKKAI_COMMANDS.sourcesStatus, userId });
+}
+
+export function syncOsekkaiSources<T = unknown>(
+  userId: string,
+  payload: JsonObject,
+  idempotencyKey: string,
+): Promise<OsekkaiCommandResult<T>> {
+  return invokeOsekkaiCommand<T>({
+    command: OSEKKAI_COMMANDS.sourcesSync,
+    userId,
+    payload,
+    idempotencyKey,
+  });
+}
+
+export function getOsekkaiEvents<T = unknown>(userId: string): Promise<OsekkaiCommandResult<T>> {
+  return invokeOsekkaiCommand<T>({ command: OSEKKAI_COMMANDS.events, userId });
+}
+
+export function getOsekkaiEventRoute<T = unknown>(
+  userId: string,
+  payload: JsonObject,
+): Promise<OsekkaiCommandResult<T>> {
+  return invokeOsekkaiCommand<T>({ command: OSEKKAI_COMMANDS.eventRoute, userId, payload });
 }
 
 export function decideOsekkaiIntervention<T = unknown>(

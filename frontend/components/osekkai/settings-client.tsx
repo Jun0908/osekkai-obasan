@@ -11,7 +11,12 @@ import {
   newIdempotencyKey,
   osekkaiRequest,
 } from './api-client';
-import { normalizeProfile, type ProfileView } from './models';
+import {
+  formatDateTime,
+  normalizeProfile,
+  type PreferenceMemory,
+  type ProfileView,
+} from './models';
 import { InlineNotice, LoadingBlock, ModeBadge, PageIntro } from './ui';
 
 type SettingsForm = Pick<
@@ -34,7 +39,7 @@ const defaultForm: SettingsForm = {
   quietEnd: '08:00',
   maxPushesPerWeek: 2,
   preferredTone: 'gentle',
-  maxTravelMinutes: 30,
+  maxTravelMinutes: 40,
   maxBudgetYen: 2000,
   maxSocialIntensity: 2,
 };
@@ -60,6 +65,59 @@ const tones = [
   { value: 'quiet', label: '短く静かに', sample: '近くで、30分だけ。' },
 ] as const;
 
+function MemorySettingsItem({ item, onDeleteEvidence, onDeletePreference, deletingKey }: {
+  item: PreferenceMemory;
+  onDeleteEvidence: (id: string) => void;
+  onDeletePreference: (key: string) => void;
+  deletingKey: string;
+}) {
+  return (
+    <li className={styles.memoryItem}>
+      <div>
+        <div className={styles.memoryTitleRow}>
+          <strong>{item.label}</strong>
+          {typeof item.confidence === 'number' ? (
+            <span>確からしさ {Math.round(item.confidence * 100)}%</span>
+          ) : null}
+        </div>
+        <p>{item.value}</p>
+        {item.evidence.length ? (
+          <ul className={styles.memoryEvidenceList} aria-label={`${item.label}の保存根拠`}>
+            {item.evidence.map((evidence) => (
+              <li key={evidence.id}>
+                <small>
+                  きっかけ: 「{evidence.text}」
+                  {evidence.createdAt ? (
+                    <>・<time dateTime={evidence.createdAt}>{formatDateTime(evidence.createdAt)}</time></>
+                  ) : null}
+                </small>
+                <button
+                  className={styles.ghostDangerButton}
+                  type="button"
+                  onClick={() => onDeleteEvidence(evidence.id)}
+                  disabled={Boolean(deletingKey)}
+                  aria-label={`${item.label}の根拠「${evidence.text}」を削除`}
+                >
+                  {deletingKey === `evidence:${evidence.id}` ? '削除中…' : 'この根拠を削除'}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+      <button
+        className={styles.ghostDangerButton}
+        type="button"
+        onClick={() => onDeletePreference(item.key)}
+        disabled={Boolean(deletingKey)}
+        aria-label={`${item.label}の推定項目をすべて削除`}
+      >
+        {deletingKey === `preference:${item.key}` ? '削除中…' : '項目を削除'}
+      </button>
+    </li>
+  );
+}
+
 async function fetchSettingsSnapshot() {
   const [raw, session] = await Promise.all([
     osekkaiRequest('/profile'),
@@ -75,7 +133,9 @@ export default function SettingsClient() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [pausing, setPausing] = useState(false);
+  const [deletingKey, setDeletingKey] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [calendarMessage, setCalendarMessage] = useState('予定名・説明・場所・参加者は取得しません。');
   const [deleteText, setDeleteText] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleted, setDeleted] = useState(false);
@@ -168,6 +228,47 @@ export default function SettingsClient() {
     }
   };
 
+  const deletePreference = async (key: string) => {
+    setDeletingKey(`preference:${key}`);
+    setError('');
+    try {
+      const raw = await osekkaiRequest('/profile', {
+        method: 'PATCH',
+        mutation: true,
+        body: {
+          operation: 'remove_inferred_preference',
+          inferredPreferenceKey: key,
+          idempotencyKey: newIdempotencyKey('memory-delete'),
+        },
+      });
+      setProfile(normalizeProfile(raw));
+    } catch (reason) {
+      setError(friendlyApiError(reason));
+    } finally {
+      setDeletingKey('');
+    }
+  };
+
+  const deleteEvidence = async (evidenceId: string) => {
+    setDeletingKey(`evidence:${evidenceId}`);
+    setError('');
+    try {
+      const raw = await osekkaiRequest('/profile', {
+        method: 'PATCH',
+        mutation: true,
+        body: {
+          removeEvidenceId: evidenceId,
+          idempotencyKey: newIdempotencyKey('evidence-delete'),
+        },
+      });
+      setProfile(normalizeProfile(raw));
+    } catch (reason) {
+      setError(friendlyApiError(reason));
+    } finally {
+      setDeletingKey('');
+    }
+  };
+
   const deleteProfile = async () => {
     if (deleteText !== '削除') return;
     setDeleting(true);
@@ -211,11 +312,11 @@ export default function SettingsClient() {
   return (
     <>
       <PageIntro
-        eyebrow="YOUR BOUNDARIES"
-        title="距離と記憶の設定"
+        eyebrow="SETTINGS"
+        title="設定"
         aside={<ModeBadge mode={mode} />}
       >
-        <p>あとから何度でも変えられます。初期値は、声をかけすぎない安全側です。</p>
+        <p>標準設定で始めています。必要なところだけ、あとから変更できます。</p>
       </PageIntro>
 
       {error ? <InlineNotice tone="error"><p>{error}</p></InlineNotice> : null}
@@ -257,14 +358,18 @@ export default function SettingsClient() {
               />
             </label>
           </div>
-          {!form.pushConsent ? (
-            <InlineNotice tone="info" title="いまは声かけオフ">
-              <p>会話はできます。こちらから行動を促す提案はしません。</p>
-            </InlineNotice>
-          ) : null}
         </section>
 
-        <section className={styles.settingsSection} aria-labelledby="timing-heading">
+        <details className={styles.settingsAdvanced}>
+          <summary>
+            <span>
+              <strong>詳細設定を変更する</strong>
+              <small>通知時間・移動時間・予算・おっせかいの強さ</small>
+            </span>
+            <span aria-hidden="true">＋</span>
+          </summary>
+
+          <section className={styles.settingsSection} aria-labelledby="timing-heading">
           <div className={styles.settingsSectionHeader}>
             <span className={styles.settingsIcon} aria-hidden="true">◷</span>
             <div>
@@ -317,9 +422,9 @@ export default function SettingsClient() {
               {pausing ? '設定中…' : '今週は休む'}
             </button>
           </div>
-        </section>
+          </section>
 
-        <section className={styles.settingsSection} aria-labelledby="distance-heading">
+          <section className={styles.settingsSection} aria-labelledby="distance-heading">
           <div className={styles.settingsSectionHeader}>
             <span className={styles.settingsIcon} aria-hidden="true">↔</span>
             <div>
@@ -361,9 +466,9 @@ export default function SettingsClient() {
               ))}
             </div>
           </fieldset>
-        </section>
+          </section>
 
-        <section className={styles.settingsSection} aria-labelledby="feasible-heading">
+          <section className={styles.settingsSection} aria-labelledby="feasible-heading">
           <div className={styles.settingsSectionHeader}>
             <span className={styles.settingsIcon} aria-hidden="true">⌖</span>
             <div>
@@ -403,7 +508,8 @@ export default function SettingsClient() {
               </span>
             </label>
           </div>
-        </section>
+          </section>
+        </details>
 
         <div className={styles.saveBar}>
           <p>変更内容は、保存するまで反映されません。</p>
@@ -412,6 +518,28 @@ export default function SettingsClient() {
           </button>
         </div>
       </form>
+
+      <section className={styles.settingsSection} aria-labelledby="calendar-heading">
+        <div className={styles.settingsSectionHeader}>
+          <span className={styles.settingsIcon} aria-hidden="true">□</span>
+          <div>
+            <p className={styles.eyebrow}>GOOGLE FREE/BUSY</p>
+            <h2 id="calendar-heading">動ける空き時間をつなぐ</h2>
+            <p>{calendarMessage}</p>
+          </div>
+        </div>
+        <div className={styles.privacyActions}>
+          <a className={styles.primaryButton} href="/api/osekkai/calendar/connect">Google Calendarを接続</a>
+          <button className={styles.secondaryButton} type="button" onClick={async () => {
+            try {
+              await osekkaiRequest('/calendar/disconnect', { method: 'POST', mutation: true, body: {} });
+              setCalendarMessage('Google Calendarとの接続を削除しました。');
+            } catch (reason) {
+              setCalendarMessage(friendlyApiError(reason));
+            }
+          }}>接続を解除</button>
+        </div>
+      </section>
 
       <section className={styles.privacySection}>
         <div>
@@ -422,11 +550,29 @@ export default function SettingsClient() {
           </p>
         </div>
         <div className={styles.privacyActions}>
-          <Link className={styles.secondaryButton} href="/osekkai/chat">覚えている内容を見る</Link>
+          <Link className={styles.secondaryButton} href="/osekkai/chat">好みを追加する</Link>
           <button className={styles.dangerButton} type="button" onClick={() => setDeleteOpen((current) => !current)}>
             すべての記憶と履歴を削除
           </button>
         </div>
+        <details className={styles.memorySettingsDisclosure}>
+          <summary>保存された好みを確認・削除</summary>
+          {profile?.inferred.length ? (
+            <ul className={styles.memoryList}>
+              {profile.inferred.map((item) => (
+                <MemorySettingsItem
+                  key={item.key}
+                  item={item}
+                  onDeleteEvidence={(id) => void deleteEvidence(id)}
+                  onDeletePreference={(key) => void deletePreference(key)}
+                  deletingKey={deletingKey}
+                />
+              ))}
+            </ul>
+          ) : (
+            <p className={styles.mutedPlaceholder}>保存された好みはまだありません。</p>
+          )}
+        </details>
         {deleteOpen ? (
           <div className={styles.deleteConfirmation} role="group" aria-labelledby="delete-title">
             <div>

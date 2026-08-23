@@ -16,7 +16,11 @@ import { isValidOsekkaiUserId } from './osekkai-user';
 
 const DEFAULT_TIMEOUT_MS = 15_000;
 const MAX_TIMEOUT_MS = 120_000;
-const MAX_STDOUT_BYTES = 1024 * 1024;
+// The complete live Event Mesh intentionally includes non-recommended,
+// canceled, sold-out, and evidence-unknown events for the map. JsonStore
+// already caps its canonical file at 2 MiB; allow envelope overhead without
+// truncating that bounded, server-owned response.
+const MAX_STDOUT_BYTES = 3 * 1024 * 1024;
 const MAX_STDERR_BYTES = 256 * 1024;
 
 export type InvokeOsekkaiOptions = {
@@ -65,6 +69,18 @@ async function fileExists(target: string): Promise<boolean> {
 async function pythonBin(): Promise<string> {
   const explicit = process.env.OPENCLAW_PYTHON_BIN?.trim();
   if (explicit) {
+    if (process.platform === 'win32' && ['python', 'python3'].includes(explicit.toLowerCase())) {
+      const pyenvRoot = process.env.PYENV_ROOT || process.env.PYENV_HOME || process.env.PYENV;
+      if (pyenvRoot) {
+        try {
+          const version = (await fs.readFile(path.join(pyenvRoot, 'version'), 'utf8')).trim().split(/\s+/)[0];
+          const resolved = path.join(pyenvRoot, 'versions', version, 'python.exe');
+          if (version && await fileExists(resolved)) return resolved;
+        } catch {
+          // Fall through to an explicit command or bundled environment.
+        }
+      }
+    }
     return explicit;
   }
 
@@ -92,6 +108,21 @@ const CHILD_ENV_KEYS = [
   'OSEKKAI_FIXTURE_ROOT',
   'OSEKKAI_FIXED_NOW',
   'OSEKKAI_POLICY_PATH',
+  'OSEKKAI_CONNECTION_POLICY_PATH',
+  'OSEKKAI_LIVE_OPPORTUNITIES_PATH',
+  'OSEKKAI_FREEBUSY_HORIZON_DAYS',
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
+  'GOOGLE_REDIRECT_URI',
+  'OSEKKAI_CREDENTIAL_ENCRYPTION_KEY',
+  'GOOGLE_ROUTES_API_KEY',
+  'GOOGLE_MAPS_API_KEY',
+  'LUMA_ICAL_URL',
+  'DOORKEEPER_API_TOKEN',
+  'OSEKKAI_LIVE_ORIGIN_LATITUDE',
+  'OSEKKAI_LIVE_ORIGIN_LONGITUDE',
+  'OSEKKAI_MAX_ROUTE_CANDIDATES',
+  'OSEKKAI_ROUTES_TIMEOUT_SECONDS',
 ] as const;
 
 function readEnvCaseInsensitive(source: NodeJS.ProcessEnv, key: string): string | undefined {
@@ -286,15 +317,14 @@ async function runCliWithPermit<T>(
         );
         return;
       }
-      if (code !== 0) {
-        finishReject(exitError(code, request.requestId));
-        return;
-      }
-
       let parsed: unknown;
       try {
         parsed = JSON.parse(Buffer.concat(stdoutChunks).toString('utf8'));
       } catch {
+        if (code !== 0) {
+          finishReject(exitError(code, request.requestId));
+          return;
+        }
         finishReject(
           new OsekkaiHttpError(
             'PYTHON_INVALID_JSON',
@@ -303,6 +333,19 @@ async function runCliWithPermit<T>(
             request.requestId,
           ),
         );
+        return;
+      }
+
+      // The CLI intentionally exits non-zero for a public-safe provider error.
+      // Preserve that structured envelope so callers can surface an actionable
+      // code such as CALENDAR_NOT_CONNECTED instead of flattening it to a 502.
+      if (code !== 0) {
+        if (isCliResponse<T>(parsed, request.requestId) && !parsed.ok) {
+          settled = true;
+          resolve(parsed);
+          return;
+        }
+        finishReject(exitError(code, request.requestId));
         return;
       }
 

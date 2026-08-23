@@ -6,6 +6,7 @@ const apiMocks = vi.hoisted(() => ({
   getOsekkaiSession: vi.fn(),
   osekkaiRequest: vi.fn(),
 }));
+const navigationMocks = vi.hoisted(() => ({ push: vi.fn() }));
 
 vi.mock('./api-client', () => ({
   clearOsekkaiSession: apiMocks.clearOsekkaiSession,
@@ -13,6 +14,9 @@ vi.mock('./api-client', () => ({
   getOsekkaiSession: apiMocks.getOsekkaiSession,
   newIdempotencyKey: (prefix: string) => `${prefix}-test-id`,
   osekkaiRequest: apiMocks.osekkaiRequest,
+}));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: navigationMocks.push }),
 }));
 
 import ChatClient from './chat-client';
@@ -52,9 +56,10 @@ describe('Osekkai client components', () => {
     });
     apiMocks.osekkaiRequest.mockReset();
     apiMocks.clearOsekkaiSession.mockReset();
+    navigationMocks.push.mockReset();
   });
 
-  it('Chat displays every evidence item and deletes only the selected evidence', async () => {
+  it('Chat asks one hobby question without exposing internal profile panels', async () => {
     apiMocks.osekkaiRequest.mockImplementation(async (path: string) => {
       if (path === '/profile') return profile;
       throw new Error(`unexpected path: ${path}`);
@@ -62,8 +67,31 @@ describe('Osekkai client components', () => {
 
     render(<ChatClient />);
 
-    expect(await screen.findByText(/大人数は疲れる/)).toBeInTheDocument();
-    expect(screen.getByText(/話さずに過ごしたい/)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'あんた、何が好きなのよ。' })).toBeInTheDocument();
+    expect(screen.getByText('ヨガをやってみたい')).toBeInTheDocument();
+    expect(screen.getByText('ボルダリングが好き')).toBeInTheDocument();
+    expect(screen.queryByText(/大人数は疲れる/)).not.toBeInTheDocument();
+    expect(screen.queryByText('Memory')).not.toBeInTheDocument();
+    expect(screen.queryByText('Why')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'ボルダリングが好き' }));
+    expect(screen.getByRole('textbox', { name: '好きなこと・やってみたいこと' }))
+      .toHaveValue('ボルダリングが好き');
+  });
+
+  it('Settings keeps learned preferences private until opened and deletes selected evidence', async () => {
+    apiMocks.osekkaiRequest.mockImplementation(async (path: string) => {
+      if (path === '/profile') return profile;
+      throw new Error(`unexpected path: ${path}`);
+    });
+
+    render(<SettingsClient />);
+
+    const disclosure = await screen.findByText('保存された好みを確認・削除');
+    expect(screen.queryByText(/大人数は疲れる/)).not.toBeVisible();
+    fireEvent.click(disclosure);
+    expect(screen.getByText(/大人数は疲れる/)).toBeVisible();
+    expect(screen.getByText(/話さずに過ごしたい/)).toBeVisible();
 
     fireEvent.click(screen.getByRole('button', {
       name: '会話の少なさの根拠「話さずに過ごしたい」を削除',
@@ -85,6 +113,34 @@ describe('Osekkai client components', () => {
         body: expect.objectContaining({ operation: 'remove_inferred_preference' }),
       }),
     );
+  });
+
+  it('Chat gets explicit push consent before opening the live recommendations', async () => {
+    apiMocks.osekkaiRequest.mockImplementation(async (path: string, options?: { method?: string }) => {
+      if (path === '/profile' && options?.method === 'PATCH') return { ...profile, pushConsent: true };
+      if (path === '/profile') return profile;
+      if (path === '/chat') return { reply: 'ボルダリングね。ええやん。', safety: { requiresHumanSupport: false } };
+      throw new Error(`unexpected path: ${path}`);
+    });
+
+    render(<ChatClient />);
+    const composer = await screen.findByRole('textbox', { name: '好きなこと・やってみたいこと' });
+    fireEvent.change(composer, { target: { value: 'ボルダリングが好き' } });
+    fireEvent.click(screen.getByRole('button', { name: '送る' }));
+    fireEvent.click(await screen.findByRole('button', { name: /この好みで提案を受け取る/ }));
+
+    await waitFor(() => {
+      expect(apiMocks.osekkaiRequest).toHaveBeenCalledWith('/profile', {
+        method: 'PATCH',
+        mutation: true,
+        body: {
+          operation: 'update_settings',
+          updates: { pushConsent: true },
+          idempotencyKey: 'push-consent-test-id',
+        },
+      });
+      expect(navigationMocks.push).toHaveBeenCalledWith('/osekkai/demo');
+    });
   });
 
   it('Settings keeps memory and push consent independent and requires the exact delete word', async () => {

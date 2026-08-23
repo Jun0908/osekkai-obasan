@@ -6,6 +6,8 @@ import {
   validateDecideResponse,
   validateDemoResetResponse,
   validateDistanceProfile,
+  validateEventRouteResult,
+  validateLiveEvent,
   validateFeedbackResponse,
   validateFreeBusyResult,
   validateInterventionsResult,
@@ -131,6 +133,17 @@ function validatePayload<T>(path: string, method: string, value: unknown): T {
     result = validateMetricsResult(value);
   } else if (path === '/demo/reset') {
     result = validateDemoResetResponse(value);
+  } else if (path === '/sources') {
+    const valid = isObject(value) && value.schemaVersion === '1.0' && value.dataMode === 'live' &&
+      typeof value.generatedAt === 'string' && Array.isArray(value.sources) && isObject(value.counts);
+    if (!valid) throw invalidResponse();
+  } else if (path === '/events') {
+    const valid = isObject(value) && value.schemaVersion === '1.0' && value.dataMode === 'live' &&
+      typeof value.generatedAt === 'string' && Array.isArray(value.events) &&
+      value.events.every((event) => validateLiveEvent(event).valid);
+    if (!valid) throw invalidResponse();
+  } else if (path === '/routes') {
+    result = validateEventRouteResult(value);
   }
   return result ? (assertValid(result) as T) : (value as T);
 }

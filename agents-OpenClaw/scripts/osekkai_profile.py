@@ -15,6 +15,7 @@ from osekkai_store import JsonStore
 
 JST = ZoneInfo("Asia/Tokyo")
 DEFAULT_MAX_SOCIAL_INTENSITY = 2
+DEFAULT_MAX_TRAVEL_MINUTES = 40
 
 
 def _stored_pre_inference_value(profile: dict[str, Any], key: str, default: Any) -> Any:
@@ -57,6 +58,17 @@ def reconcile_inferred_derived_values(profile: dict[str, Any], keys: set[str]) -
             and 0 <= inferred_value <= 5
             else baseline
         )
+    if "preferredCategories" in keys:
+        baseline = _stored_pre_inference_value(profile, "preferredCategories", [])
+        baseline = _validate_string_list(baseline, "preferredCategories") if isinstance(baseline, list) else []
+        entry = inferred.get("preferredCategories")
+        inferred_value = entry.get("value") if isinstance(entry, dict) else []
+        inferred_categories = (
+            _validate_string_list(inferred_value, "preferredCategories")
+            if isinstance(inferred_value, list)
+            else []
+        )
+        profile["preferredCategories"] = sorted(set([*baseline, *inferred_categories]))
 
 
 def parse_datetime(value: str) -> datetime:
@@ -90,7 +102,7 @@ def default_profile(user_id: str, now: datetime) -> dict[str, Any]:
         "quietHours": {"start": "21:00", "end": "08:00", "timezone": "Asia/Tokyo"},
         "maxPushesPerWeek": 2,
         "preferredTone": "gentle",
-        "maxTravelMinutes": 30,
+        "maxTravelMinutes": DEFAULT_MAX_TRAVEL_MINUTES,
         "maxBudgetYen": 2000,
         "maxSocialIntensity": DEFAULT_MAX_SOCIAL_INTENSITY,
         "socialBattery": None,
@@ -117,6 +129,15 @@ def get_or_create_profile_unlocked(store: JsonStore, user_id: str, now: datetime
     profile = store.load_profile_unlocked(user_id)
     if profile is None:
         profile = default_profile(user_id, now)
+        store.save_profile_unlocked(user_id, profile)
+    elif (
+        profile.get("maxTravelMinutes") == 30
+        and "maxTravelMinutes" not in profile.get("explicitPreferences", {})
+    ):
+        # The original demo default was 30 minutes. Move untouched profiles to
+        # the current Tokyo standard while preserving every explicit setting.
+        profile["maxTravelMinutes"] = DEFAULT_MAX_TRAVEL_MINUTES
+        profile["updatedAt"] = now.isoformat()
         store.save_profile_unlocked(user_id, profile)
     return profile
 
@@ -200,7 +221,12 @@ def apply_explicit_patch(profile: dict[str, Any], patch: Any, now: datetime) -> 
                 raise ContractError("preferredTone is invalid")
             result[key] = value
         elif key == "maxTravelMinutes":
-            result[key] = require_int(value, key, 0, 240)
+            validated = require_int(value, key, 0, 240)
+            result[key] = validated
+            result.setdefault("explicitPreferences", {})[key] = {
+                "value": validated,
+                "source": "user_setting",
+            }
         elif key == "maxBudgetYen":
             result[key] = require_int(value, key, 0, 1_000_000)
         elif key == "maxSocialIntensity":
@@ -211,7 +237,22 @@ def apply_explicit_patch(profile: dict[str, Any], patch: Any, now: datetime) -> 
                 "source": "user_setting",
             }
         elif key in {"preferredCategories", "avoidedCategories"}:
-            result[key] = _validate_string_list(value, key)
+            validated = _validate_string_list(value, key)
+            if key == "preferredCategories":
+                result.setdefault("explicitPreferences", {})[key] = {
+                    "value": validated,
+                    "source": "user_setting",
+                }
+                inferred_entry = result.get("inferredPreferences", {}).get(key, {})
+                inferred_value = inferred_entry.get("value", []) if isinstance(inferred_entry, dict) else []
+                inferred_categories = (
+                    _validate_string_list(inferred_value, key)
+                    if isinstance(inferred_value, list)
+                    else []
+                )
+                result[key] = sorted(set([*validated, *inferred_categories]))
+            else:
+                result[key] = validated
     result["updatedAt"] = now.isoformat()
     return result
 
@@ -274,9 +315,24 @@ def apply_inferred_delta(
                     "source": "pre_inference",
                 }
             result[key] = min(result.get(key, 5), require_int(value, key, 0, 5))
+        elif key == "preferredCategories":
+            categories = _validate_string_list(value, key)
+            explicit = result.setdefault("explicitPreferences", {})
+            if key not in explicit:
+                explicit[key] = {
+                    "value": _validate_string_list(result.get(key, []), key),
+                    "source": "pre_inference",
+                }
+            existing = result.get(key, [])
+            result[key] = sorted(set([*_validate_string_list(existing, key), *categories]))
         inferred = result.setdefault("inferredPreferences", {})
         entry = inferred.setdefault(key, {"value": value, "confidence": confidence, "evidence": []})
-        entry["value"] = value
+        if key == "preferredCategories":
+            previous = entry.get("value", [])
+            previous = _validate_string_list(previous, key) if isinstance(previous, list) else []
+            entry["value"] = sorted(set([*previous, *_validate_string_list(value, key)]))
+        else:
+            entry["value"] = value
         entry["confidence"] = max(float(entry.get("confidence", 0.0)), confidence)
         entry.setdefault("evidence", []).append(
             {"id": evidence_id, "text": safe_evidence, "createdAt": now.isoformat()}

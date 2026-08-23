@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/connection-evidence.schema.json",
+  "title": "Connection evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "eventId", "connectionLevel", "soloFriendly", "beginnerFriendly",
+    "recurring", "structuredConversation", "sharedMeal", "groupWork", "roleAvailable",
+    "futureOccurrenceCount", "solicitationRisk", "evidence", "model", "evaluatedAt"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "eventId": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "connectionLevel": { "type": "integer", "minimum": 0, "maximum": 3 },
+    "soloFriendly": { "type": "string", "enum": ["yes", "no", "unknown"] },
+    "beginnerFriendly": { "type": "string", "enum": ["yes", "no", "unknown"] },
+    "recurring": { "type": "string", "enum": ["yes", "no", "unknown"] },
+    "structuredConversation": { "type": "string", "enum": ["yes", "no", "unknown"] },
+    "sharedMeal": { "type": "string", "enum": ["yes", "no", "unknown"] },
+    "groupWork": { "type": "string", "enum": ["yes", "no", "unknown"] },
+    "roleAvailable": { "type": "string", "enum": ["yes", "no", "unknown"] },
+    "futureOccurrenceCount": { "type": "integer", "minimum": 0 },
+    "solicitationRisk": { "type": "string", "enum": ["low", "medium", "high", "unknown"] },
+    "evidence": { "type": "array", "minItems": 1, "items": { "$ref": "common.schema.json#/$defs/evidence" } },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["method", "version", "confidence"],
+      "properties": {
+        "method": { "type": "string", "enum": ["rules", "ai", "organizer_verified"] },
+        "version": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "evaluatedAt": { "$ref": "common.schema.json#/$defs/dateTime" }
+  }
+}

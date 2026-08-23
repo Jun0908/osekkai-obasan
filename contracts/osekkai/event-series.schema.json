@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/event-series.schema.json",
+  "title": "Event series",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion", "id", "provider", "communityId", "title", "recurrenceText",
+    "futureOccurrenceIds", "sourceUrl", "sourceClassification", "sourceUpdatedAt",
+    "fetchedAt", "revalidatedAt", "evidence"
+  ],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "id": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "provider": { "type": "string", "minLength": 1, "maxLength": 160 },
+    "communityId": { "type": ["string", "null"], "maxLength": 200 },
+    "title": { "type": "string", "minLength": 1, "maxLength": 240 },
+    "recurrenceText": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "futureOccurrenceIds": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 200 } },
+    "sourceUrl": { "type": "string", "format": "uri" },
+    "sourceClassification": { "$ref": "common.schema.json#/$defs/sourceClassification" },
+    "sourceUpdatedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "fetchedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "revalidatedAt": { "$ref": "common.schema.json#/$defs/dateTime" },
+    "evidence": { "type": "array", "minItems": 1, "items": { "$ref": "common.schema.json#/$defs/evidence" } }
+  }
+}

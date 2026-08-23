@@ -8,6 +8,7 @@ from helpers import AGENT_ROOT, NOW, USER_ID
 from osekkai_contracts import (
     ContractError,
     validate_command_payload,
+    validate_decision,
     validate_episode,
     validate_envelope,
     validate_freebusy,
@@ -38,6 +39,42 @@ class ContractTests(unittest.TestCase):
     def test_normalized_opportunity_is_valid(self):
         value = self.fixture("opportunities.normalized.json")["opportunities"][0]
         self.assertEqual(validate_opportunity(value)["verificationStatus"], "source_snapshot")
+
+    def test_same_live_fixture_validates_new_models_and_ranked_candidates(self):
+        fixture = self.fixture("live-contracts.json")
+        from osekkai_contracts import validate_schema
+
+        validate_schema(fixture["sourceRegistry"], "source-registry.schema.json")
+        for key, schema in (
+            ("events", "event.schema.json"),
+            ("series", "event-series.schema.json"),
+            ("communities", "community.schema.json"),
+            ("connectionEvidence", "connection-evidence.schema.json"),
+            ("opportunities", "opportunity.schema.json"),
+        ):
+            for value in fixture[key]:
+                validate_schema(value, schema)
+        decision = validate_decision(fixture["decision"])
+        self.assertEqual([item["rank"] for item in decision["rankedOpportunities"]], [1, 2])
+
+    def test_live_candidate_requires_freshness_source_and_connection_evidence(self):
+        fixture = self.fixture("live-contracts.json")
+        for missing in ("sourceUpdatedAt", "revalidatedAt", "connectionEvidence", "status"):
+            invalid = copy.deepcopy(fixture["opportunities"][0])
+            del invalid[missing]
+            with self.assertRaises(ContractError, msg=missing):
+                validate_opportunity(invalid)
+
+    def test_ranked_candidates_reject_gaps_and_duplicate_ids(self):
+        fixture = self.fixture("live-contracts.json")
+        invalid = copy.deepcopy(fixture["decision"])
+        invalid["rankedOpportunities"][1]["rank"] = 3
+        with self.assertRaises(ContractError):
+            validate_decision(invalid)
+        invalid = copy.deepcopy(fixture["decision"])
+        invalid["rankedOpportunities"][1]["opportunityId"] = invalid["rankedOpportunities"][0]["opportunityId"]
+        with self.assertRaises(ContractError):
+            validate_decision(invalid)
 
     def test_unknown_reason_code_is_rejected(self):
         with self.assertRaises(ContractError):

@@ -18,6 +18,13 @@ export const OSEKKAI_COMMANDS = {
   demoSeed: 'demo-seed',
   demoReset: 'demo-reset',
   cleanup: 'cleanup',
+  calendarConnect: 'calendar-connect',
+  calendarCallback: 'calendar-callback',
+  calendarDisconnect: 'calendar-disconnect',
+  sourcesSync: 'sources-sync',
+  sourcesStatus: 'sources-status',
+  events: 'events',
+  eventRoute: 'event-route',
 } as const;
 
 export type OsekkaiCommand = (typeof OSEKKAI_COMMANDS)[keyof typeof OSEKKAI_COMMANDS];
@@ -31,6 +38,10 @@ export const OSEKKAI_MUTATING_COMMANDS: ReadonlySet<OsekkaiCommand> = new Set([
   OSEKKAI_COMMANDS.demoSeed,
   OSEKKAI_COMMANDS.demoReset,
   OSEKKAI_COMMANDS.cleanup,
+  OSEKKAI_COMMANDS.calendarConnect,
+  OSEKKAI_COMMANDS.calendarCallback,
+  OSEKKAI_COMMANDS.calendarDisconnect,
+  OSEKKAI_COMMANDS.sourcesSync,
 ]);
 
 export function isOsekkaiMutation(

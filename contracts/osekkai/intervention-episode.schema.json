@@ -18,6 +18,7 @@
           "candidateIdsAfterFilter": { "type": "array", "maxItems": 0 },
           "excludedCandidates": { "type": "array", "maxItems": 0 },
           "selectedOpportunity": { "type": "null" },
+          "rankedOpportunities": { "type": "array", "maxItems": 0 },
           "notification": { "type": "null" }
         }
       }
@@ -61,6 +62,12 @@
       }
     },
     "selectedOpportunity": { "oneOf": [{ "$ref": "opportunity.schema.json" }, { "type": "null" }] },
+    "rankedOpportunities": {
+      "type": "array",
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": { "$ref": "decision.schema.json#/$defs/rankedOpportunity" }
+    },
     "notification": {
       "oneOf": [
         {

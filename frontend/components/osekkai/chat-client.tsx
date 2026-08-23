@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 
 import styles from '@/app/osekkai/osekkai.module.css';
@@ -11,140 +12,49 @@ import {
   type JsonObject,
 } from './api-client';
 import {
-  batteryBand,
   firstRecord,
-  formatDateTime,
-  isRecord,
   normalizeProfile,
   readBoolean,
-  readNumber,
   readString,
-  type PreferenceMemory,
   type ProfileView,
 } from './models';
-import { InlineNotice, LoadingBlock, PageIntro } from './ui';
+import { InlineNotice, PageIntro } from './ui';
 
 type ChatTurn = {
   id: string;
   speaker: 'you' | 'osekkai';
   text: string;
-  remembered?: boolean;
-  hint?: string;
-  confidence?: number;
-  learned?: string[];
 };
 
 const initialTurn: ChatTurn = {
   id: 'welcome',
   speaker: 'osekkai',
-  text: '今日は、どんな一日だった？ 何かを決めなくていいから、ひとことだけでも聞かせて。',
+  text: 'あんた、何が好きなのよ。最近やってみたいこと、ひとつ教えて。',
 };
 
 const starters = [
-  '今週疲れた。何もしたくない',
-  '少し外に出たいが、話したくない',
-  '今日はそっとしておいて',
+  'ヨガをやってみたい',
+  'ボルダリングが好き',
+  '料理しながら人と話したい',
+  '音楽好きと知り合いたい',
 ];
 
 async function fetchProfileView(): Promise<ProfileView> {
   return normalizeProfile(await osekkaiRequest('/profile'));
 }
 
-function summarizeDelta(raw: unknown) {
-  if (!isRecord(raw)) return [];
-  const labels: Record<string, string> = {
-    socialBattery: 'Social Battery',
-    maxSocialIntensity: '人との関わりの強さ',
-    preferredTone: '話し方',
-    pauseUntil: 'お休み期間',
-    preferredCategories: '好きかもしれないこと',
-    avoidedCategories: '避けたいこと',
-  };
-  return Object.entries(raw).map(([key, value]) => {
-    const detail = isRecord(value) && 'value' in value ? value.value : value;
-    const printable = Array.isArray(detail) ? detail.join('、') : String(detail ?? '更新');
-    return `${labels[key] ?? key}: ${printable}`;
-  });
-}
-
-function MemoryItem({ item, onDeleteEvidence, onDeletePreference, deletingKey }: {
-  item: PreferenceMemory;
-  onDeleteEvidence: (id: string) => void;
-  onDeletePreference: (key: string) => void;
-  deletingKey: string;
-}) {
-  return (
-    <li className={styles.memoryItem}>
-      <div>
-        <div className={styles.memoryTitleRow}>
-          <strong>{item.label}</strong>
-          {typeof item.confidence === 'number' ? (
-            <span>確からしさ {Math.round(item.confidence * 100)}%</span>
-          ) : null}
-        </div>
-        <p>{item.value}</p>
-        {item.evidence.length ? (
-          <ul className={styles.memoryEvidenceList} aria-label={`${item.label}の保存根拠`}>
-            {item.evidence.map((evidence) => (
-              <li key={evidence.id}>
-                <small>
-                  きっかけ: 「{evidence.text}」
-                  {evidence.createdAt ? (
-                    <>・<time dateTime={evidence.createdAt}>{formatDateTime(evidence.createdAt)}</time></>
-                  ) : null}
-                </small>
-                <button
-                  className={styles.ghostDangerButton}
-                  type="button"
-                  onClick={() => onDeleteEvidence(evidence.id)}
-                  disabled={Boolean(deletingKey)}
-                  aria-label={`${item.label}の根拠「${evidence.text}」を削除`}
-                >
-                  {deletingKey === `evidence:${evidence.id}` ? '削除中…' : 'この根拠を削除'}
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
-      </div>
-      <button
-        className={styles.ghostDangerButton}
-        type="button"
-        onClick={() => onDeletePreference(item.key)}
-        disabled={Boolean(deletingKey)}
-        aria-label={`${item.label}の推定項目をすべて削除`}
-      >
-        {deletingKey === `preference:${item.key}` ? '削除中…' : '項目を削除'}
-      </button>
-    </li>
-  );
-}
-
 export default function ChatClient() {
+  const router = useRouter();
   const [profile, setProfile] = useState<ProfileView>();
   const [turns, setTurns] = useState<ChatTurn[]>([initialTurn]);
   const [message, setMessage] = useState('');
   const [remember, setRemember] = useState(false);
-  const [loadingProfile, setLoadingProfile] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [deletingKey, setDeletingKey] = useState('');
+  const [consenting, setConsenting] = useState(false);
+  const [enablingRecommendations, setEnablingRecommendations] = useState(false);
   const [error, setError] = useState('');
   const [safetySupport, setSafetySupport] = useState(false);
   const statusRef = useRef<HTMLDivElement>(null);
-
-  const loadProfile = async () => {
-    setLoadingProfile(true);
-    try {
-      const next = await fetchProfileView();
-      setProfile(next);
-      setRemember(next.memoryConsent);
-      setError('');
-    } catch (reason) {
-      setError(friendlyApiError(reason));
-    } finally {
-      setLoadingProfile(false);
-    }
-  };
 
   useEffect(() => {
     let active = true;
@@ -157,15 +67,39 @@ export default function ChatClient() {
       })
       .catch((reason: unknown) => {
         if (active) setError(friendlyApiError(reason));
-      })
-      .finally(() => {
-        if (active) setLoadingProfile(false);
       });
 
     return () => {
       active = false;
     };
   }, []);
+
+  const updateRemember = async (checked: boolean) => {
+    if (!checked || profile?.memoryConsent) {
+      setRemember(checked);
+      return;
+    }
+    setConsenting(true);
+    setError('');
+    try {
+      const raw = await osekkaiRequest('/profile', {
+        method: 'PATCH',
+        mutation: true,
+        body: {
+          operation: 'update_settings',
+          updates: { memoryConsent: true },
+          idempotencyKey: newIdempotencyKey('memory-consent'),
+        },
+      });
+      const next = normalizeProfile(raw);
+      setProfile(next);
+      setRemember(true);
+    } catch (reason) {
+      setError(friendlyApiError(reason));
+    } finally {
+      setConsenting(false);
+    }
+  };
 
   const sendMessage = async (event: FormEvent) => {
     event.preventDefault();
@@ -176,7 +110,6 @@ export default function ChatClient() {
       id: newIdempotencyKey('turn-user'),
       speaker: 'you',
       text,
-      remembered: remember,
     };
     setTurns((current) => [...current, userTurn]);
     setMessage('');
@@ -197,7 +130,6 @@ export default function ChatClient() {
       const safety = firstRecord(result.safety);
       const reply = readString(result, 'reply', 'replyText', 'message')
         ?? 'うまく言葉にできなかったみたい。もう一度、短く聞かせてもらえる？';
-      const learned = remember ? summarizeDelta(result.profileDelta) : [];
       setSafetySupport(readBoolean(safety, false, 'requiresHumanSupport'));
       setTurns((current) => [
         ...current,
@@ -205,14 +137,8 @@ export default function ChatClient() {
           id: newIdempotencyKey('turn-osekkai'),
           speaker: 'osekkai',
           text: reply,
-          hint: readString(result, 'interventionHint'),
-          confidence: readNumber(result, 'confidence'),
-          learned,
         },
       ]);
-      if (remember) {
-        await loadProfile();
-      }
       window.requestAnimationFrame(() => statusRef.current?.focus());
     } catch (reason) {
       setError(friendlyApiError(reason));
@@ -223,62 +149,60 @@ export default function ChatClient() {
     }
   };
 
-  const deletePreference = async (key: string) => {
-    setDeletingKey(`preference:${key}`);
+  const receiveRecommendations = async () => {
+    setEnablingRecommendations(true);
     setError('');
     try {
-      const raw = await osekkaiRequest('/profile', {
-        method: 'PATCH',
-        mutation: true,
-        body: {
-          operation: 'remove_inferred_preference',
-          inferredPreferenceKey: key,
-          idempotencyKey: newIdempotencyKey('memory-delete'),
-        },
-      });
-      setProfile(normalizeProfile(raw));
+      const updates: Record<string, boolean> = {};
+      if (!profile?.pushConsent) updates.pushConsent = true;
+      if (!profile?.memoryConsent) updates.memoryConsent = true;
+      if (Object.keys(updates).length) {
+        const raw = await osekkaiRequest('/profile', {
+          method: 'PATCH',
+          mutation: true,
+          body: {
+            operation: 'update_settings',
+            updates,
+            idempotencyKey: newIdempotencyKey('push-consent'),
+          },
+        });
+        setProfile(normalizeProfile(raw));
+      }
+      const latestUserText = [...turns].reverse().find((turn) => turn.speaker === 'you')?.text;
+      if (!remember && latestUserText) {
+        await osekkaiRequest('/chat', {
+          method: 'POST',
+          mutation: true,
+          body: {
+            message: latestUserText,
+            remember: true,
+            idempotencyKey: newIdempotencyKey('recommendation-preference'),
+          },
+        });
+        setRemember(true);
+      }
+      router.push('/osekkai/demo');
     } catch (reason) {
       setError(friendlyApiError(reason));
     } finally {
-      setDeletingKey('');
+      setEnablingRecommendations(false);
     }
   };
 
-  const deleteEvidence = async (evidenceId: string) => {
-    setDeletingKey(`evidence:${evidenceId}`);
-    setError('');
-    try {
-      const raw = await osekkaiRequest('/profile', {
-        method: 'PATCH',
-        mutation: true,
-        body: {
-          removeEvidenceId: evidenceId,
-          idempotencyKey: newIdempotencyKey('evidence-delete'),
-        },
-      });
-      setProfile(normalizeProfile(raw));
-    } catch (reason) {
-      setError(friendlyApiError(reason));
-    } finally {
-      setDeletingKey('');
-    }
-  };
-
-  const battery = batteryBand(profile?.socialBattery ?? null);
-  const latestAgentTurn = [...turns].reverse().find((turn) => turn.speaker === 'osekkai' && turn.hint);
+  const hasAnswered = turns.some((turn) => turn.speaker === 'you');
 
   return (
     <>
       <PageIntro
         eyebrow="CONVERSATION"
-        title="今日は、どのくらいの距離がいい？"
+        title="あんた、何が好きなのよ。"
         aside={
           <Link className={styles.smallTextLink} href="/osekkai/settings">
-            記憶と通知を設定
+            設定
           </Link>
         }
       >
-        <p>答えたくないことは、答えなくて大丈夫。提案を受けるための面談ではありません。</p>
+        <p>検索条件を並べなくて大丈夫。好きなことか、次にやってみたいことを、ひとつだけ。</p>
       </PageIntro>
 
       {safetySupport ? (
@@ -290,14 +214,14 @@ export default function ChatClient() {
         </InlineNotice>
       ) : null}
 
-      <div className={styles.chatLayout}>
+      <div className={styles.focusedChatLayout}>
         <section className={styles.chatPanel} aria-labelledby="chat-heading">
           <div className={styles.panelHeader}>
             <div>
-              <p className={styles.eyebrow}>TALK, DON&apos;T PERFORM</p>
-              <h2 id="chat-heading">話すだけの場所</h2>
+              <p className={styles.eyebrow}>ONE QUESTION AT A TIME</p>
+              <h2 id="chat-heading">好みをひとつ教えて</h2>
             </div>
-            <span className={styles.privatePill}>匿名セッション</span>
+            <span className={styles.privatePill}>一問ずつ</span>
           </div>
 
           <div className={styles.chatLog} aria-live="polite" aria-relevant="additions">
@@ -308,22 +232,6 @@ export default function ChatClient() {
               >
                 <p className={styles.messageSpeaker}>{turn.speaker === 'you' ? 'あなた' : 'おっせかいおばさん'}</p>
                 <p>{turn.text}</p>
-                {turn.speaker === 'you' ? (
-                  <small>{turn.remembered ? 'この会話から学習します' : 'この会話は記憶しません'}</small>
-                ) : null}
-                {turn.learned?.length ? (
-                  <div className={styles.learnedDelta}>
-                    <strong>今回わかったかもしれないこと</strong>
-                    <ul>{turn.learned.map((item) => <li key={item}>{item}</li>)}</ul>
-                    <span>設定画面や右の記憶から、いつでも消せます。</span>
-                  </div>
-                ) : null}
-                {turn.hint === 'do_not_push' ? (
-                  <div className={styles.noProposal}>
-                    <span aria-hidden="true">—</span>
-                    <p><strong>今回は提案しません。</strong>あなたの「今は動かない」を優先しました。</p>
-                  </div>
-                ) : null}
               </article>
             ))}
             {submitting ? (
@@ -333,19 +241,19 @@ export default function ChatClient() {
               </div>
             ) : null}
             <div ref={statusRef} tabIndex={-1} className={styles.srOnly}>
-              {latestAgentTurn ? '返事が届きました' : ''}
+              {hasAnswered ? '返事が届きました' : ''}
             </div>
           </div>
 
           <form className={styles.chatComposer} onSubmit={sendMessage}>
             <label className={styles.composerLabel} htmlFor="osekkai-message">
-              いまの気持ちをひとこと
+              好きなこと・やってみたいこと
             </label>
             <textarea
               id="osekkai-message"
               value={message}
               onChange={(event) => setMessage(event.target.value)}
-              placeholder="例：今日は静かに過ごしたい"
+              placeholder="例：ボルダリングをやってみたい"
               rows={3}
               maxLength={1000}
               disabled={submitting}
@@ -354,11 +262,11 @@ export default function ChatClient() {
               <label className={styles.rememberControl}>
                 <input
                   type="checkbox"
-                  checked={!remember}
-                  onChange={(event) => setRemember(!event.target.checked)}
-                  disabled={submitting || !profile?.memoryConsent}
+                  checked={remember}
+                  onChange={(event) => void updateRemember(event.target.checked)}
+                  disabled={submitting || consenting || !profile}
                 />
-                <span>{profile?.memoryConsent ? 'これは覚えないで' : '記憶への同意がオフ'}</span>
+                <span>{consenting ? '設定中…' : 'この好みを次の提案に使う'}</span>
               </label>
               <span className={styles.characterCount}>{message.length} / 1000</span>
               <button className={styles.primaryButton} type="submit" disabled={submitting || !message.trim()}>
@@ -373,81 +281,21 @@ export default function ChatClient() {
               </button>
             ))}
           </div>
+          {hasAnswered && !submitting ? (
+            <div className={styles.chatNextAction}>
+              <p>この好みを次の提案に使い、条件が合う時のおっせかいをオンにします。設定でいつでも戻せます。</p>
+              <button
+                className={styles.primaryButton}
+                type="button"
+                disabled={enablingRecommendations || !profile}
+                onClick={() => void receiveRecommendations()}
+              >
+                {enablingRecommendations ? '設定中…' : 'この好みで提案を受け取る'} <span aria-hidden="true">→</span>
+              </button>
+            </div>
+          ) : null}
           {error ? <InlineNotice tone="error"><p>{error}</p></InlineNotice> : null}
         </section>
-
-        <aside className={styles.chatSidebar} aria-label="現在の距離感プロフィール">
-          {loadingProfile ? <LoadingBlock label="距離感を確認しています" /> : (
-            <>
-              <section className={styles.batteryCard}>
-                <div className={styles.panelHeaderCompact}>
-                  <div>
-                    <p className={styles.eyebrow}>TODAY</p>
-                    <h2>Social Battery</h2>
-                  </div>
-                  <strong className={styles.batteryValue}>
-                    {profile?.socialBattery === null || profile?.socialBattery === undefined
-                      ? '—'
-                      : profile.socialBattery}
-                  </strong>
-                </div>
-                <div
-                  className={styles.batteryTrack}
-                  role="meter"
-                  aria-label="Social Battery"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={profile?.socialBattery ?? undefined}
-                  aria-valuetext={battery.label}
-                >
-                  <span style={{ width: `${profile?.socialBattery ?? 0}%` }} />
-                </div>
-                <p>{battery.label}</p>
-                <small>空き時間だけからは推定しません。</small>
-              </section>
-
-              <section className={styles.memoryCard}>
-                <div className={styles.panelHeaderCompact}>
-                  <div>
-                    <p className={styles.eyebrow}>MEMORY</p>
-                    <h2>覚えていること</h2>
-                  </div>
-                  <span>{profile?.inferred.length ?? 0}件</span>
-                </div>
-                {!profile?.memoryConsent ? (
-                  <InlineNotice tone="info">
-                    <p>記憶への同意はオフです。設定でオンにするまで、会話と推定は保存しません。</p>
-                  </InlineNotice>
-                ) : null}
-                {profile?.inferred.length ? (
-                  <ul className={styles.memoryList}>
-                    {profile.inferred.map((item) => (
-                      <MemoryItem
-                        key={item.key}
-                        item={item}
-                        deletingKey={deletingKey}
-                        onDeleteEvidence={deleteEvidence}
-                        onDeletePreference={deletePreference}
-                      />
-                    ))}
-                  </ul>
-                ) : (
-                  <div className={styles.compactEmpty}>
-                    <p>まだ覚えていることはありません。</p>
-                    <span>会話からの推定は、確からしさと根拠を付けて表示します。</span>
-                  </div>
-                )}
-              </section>
-
-              <section className={styles.whyCard}>
-                <p className={styles.eyebrow}>WHY</p>
-                <h2>なぜ提案した／しなかった？</h2>
-                <p>判断の理由コードと、使った情報をあとから確認できます。</p>
-                <Link href="/osekkai/impact">判断の履歴を見る <span aria-hidden="true">→</span></Link>
-              </section>
-            </>
-          )}
-        </aside>
       </div>
     </>
   );

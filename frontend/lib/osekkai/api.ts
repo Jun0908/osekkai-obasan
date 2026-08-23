@@ -14,15 +14,18 @@ import type {
   DistanceProfile,
   FreeBusyResult,
   MetricsResult,
+  EventRouteResult,
 } from './types.generated';
 import type {
   DecideResponse,
   DemoResetResponse,
   FeedbackResponse,
+  EventMeshResult,
   InterventionsResult,
   OpportunitiesResult,
   ProfileDeleteResponse,
   RecordOutcomeResponse,
+  SourceStatusResult,
   SessionResult,
 } from './types';
 
@@ -54,6 +57,20 @@ export const osekkaiApi = {
     }),
   freebusy: () => osekkaiRequest<FreeBusyResult>('/freebusy'),
   opportunities: () => osekkaiRequest<OpportunitiesResult>('/opportunities'),
+  eventRoute: (eventId: string, latitude: number, longitude: number) =>
+    osekkaiRequest<EventRouteResult>('/routes', {
+      method: 'POST',
+      mutation: true,
+      body: { eventId, origin: { latitude, longitude } },
+    }),
+  events: () => osekkaiRequest<EventMeshResult>('/events'),
+  sources: () => osekkaiRequest<SourceStatusResult>('/sources'),
+  syncSources: (force = false) =>
+    osekkaiRequest<SourceStatusResult>('/sources', {
+      method: 'POST',
+      mutation: true,
+      body: { force },
+    }),
   decide: () =>
     osekkaiRequest<DecideResponse>('/decide', {
       method: 'POST',
@@ -91,4 +108,3 @@ export const osekkaiApi = {
 export function resetOsekkaiClientSessionForTests(): void {
   clearOsekkaiSession();
 }
-

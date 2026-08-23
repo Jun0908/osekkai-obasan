@@ -25,11 +25,36 @@ TIRED_MARKERS = ("疲れた", "つかれた", "しんどい", "exhausted", "tire
 OUTSIDE_MARKERS = ("少し外に出たい", "外に出たい", "散歩したい", "go outside")
 NO_TALK_MARKERS = ("話したくない", "会話したくない", "喋りたくない", "don't want to talk")
 DO_NOT_REMEMBER_MARKERS = ("これは覚えないで", "覚えないで", "don't remember")
+INTEREST_CUES = ("好き", "したい", "やりたい", "始めたい", "興味", "行きたい", "参加したい")
+INTEREST_NEGATIONS = ("嫌い", "興味ない", "したくない", "やりたくない", "行きたくない")
+INTEREST_GROUPS = (
+    ("ダンス・健康", ("ヨガ", "ピラティス", "ダンス", "フィットネス", "ランニング", "運動")),
+    ("趣味・実用", ("ボルダリング", "クライミング", "料理", "手芸", "クラフト", "写真", "陶芸", "diy")),
+    ("音楽・演劇", ("音楽", "演奏", "ライブ", "楽器", "演劇", "舞台")),
+    ("文学・歴史", ("読書", "本", "文学", "歴史", "俳句", "短歌")),
+    ("国際理解・語学", ("英語", "語学", "国際交流", "海外", "中国語", "韓国語")),
+    ("区民参加・ボランティア", ("ボランティア", "地域活動", "まちづくり", "地域交流")),
+)
 
 
 def _contains(message: str, markers: tuple[str, ...]) -> bool:
     normalized = message.casefold()
     return any(marker.casefold() in normalized for marker in markers)
+
+
+def _interest_categories(message: str) -> tuple[list[str], list[str]]:
+    normalized = " ".join(message.casefold().split())
+    if _contains(normalized, INTEREST_NEGATIONS):
+        return [], []
+    has_interest_cue = _contains(normalized, INTEREST_CUES)
+    categories: list[str] = []
+    labels: list[str] = []
+    for category, markers in INTEREST_GROUPS:
+        matched = next((marker for marker in markers if marker.casefold() in normalized), None)
+        if matched and (has_interest_cue or len(normalized) <= 30):
+            categories.append(category)
+            labels.append(matched)
+    return categories, labels
 
 
 def process_chat_unlocked(
@@ -55,6 +80,7 @@ def process_chat_unlocked(
     tired = _contains(message, TIRED_MARKERS)
     wants_outside = _contains(message, OUTSIDE_MARKERS)
     no_talk = _contains(message, NO_TALK_MARKERS)
+    interest_categories, interest_labels = _interest_categories(message)
 
     delta: dict[str, Any] = {}
     confidence = 0.55
@@ -71,6 +97,11 @@ def process_chat_unlocked(
         current_receptivity = 0.8
         intervention_hint = "consider_push"
         confidence = max(confidence, 0.88)
+    if interest_categories:
+        delta["preferredCategories"] = interest_categories
+        current_receptivity = 0.85
+        intervention_hint = "consider_push"
+        confidence = max(confidence, 0.86)
     if explicit_no_action:
         current_receptivity = 0.0
         intervention_hint = "do_not_push"
@@ -127,8 +158,10 @@ def process_chat_unlocked(
         reply = "少し外へ出たい気持ちは受け取ったよ。会話がほとんど要らない場所だけ、条件が合う時に一件まで探すね。"
     elif tired:
         reply = "疲れているのね。今日は距離を詰めず、無理に予定を増やさないでおくわ。"
+    elif interest_labels:
+        reply = f"{interest_labels[0]}ね。ええやん。その好みから、今ある交流Eventを探してみるわ。"
     else:
-        reply = "話してくれてありがとう。近づきすぎないよう、希望がはっきりした範囲だけ受け取るね。"
+        reply = "もうちょい具体的に聞かせて。最近やってみたいこと、ひとつだけある？"
 
     public_delta = delta if remember else {}
     return {

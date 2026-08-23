@@ -1,12 +1,12 @@
 import type { Metadata } from 'next';
 
-import DemoClient from '@/components/osekkai/demo-client';
+import LiveDemoClient from '@/components/osekkai/live-demo-client';
 
 export const metadata: Metadata = {
-  title: '12段階デモ | おっせかいおばさん',
-  description: '声をかけない判断から、1件の提案、参加・再訪までを再現するオフラインデモです。',
+  title: 'Live Demo | おっせかいおばさん',
+  description: '東京都の最新Event、Google Calendar、Google Routesから複数候補を提案するLive Demoです。',
 };
 
 export default function DemoPage() {
-  return <DemoClient />;
+  return <LiveDemoClient />;
 }

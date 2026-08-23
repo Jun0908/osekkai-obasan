@@ -13,6 +13,7 @@ from osekkai_profile import (
     apply_inferred_delta,
     clock_now,
     default_profile,
+    get_or_create_profile_unlocked,
     remove_evidence,
     remove_inferred_preference,
 )
@@ -39,6 +40,21 @@ class ProfileTests(unittest.TestCase):
         self.assertFalse(profile["memoryConsent"])
         self.assertFalse(profile["pushConsent"])
         self.assertIsNone(profile["socialBattery"])
+        self.assertEqual(profile["maxTravelMinutes"], 40)
+
+    def test_old_untouched_travel_default_migrates_but_explicit_value_is_preserved(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = JsonStore(directory)
+            old = default_profile(USER_ID, NOW - timedelta(days=1))
+            old["maxTravelMinutes"] = 30
+            with store.user_lock(USER_ID):
+                store.save_profile_unlocked(USER_ID, old)
+                migrated = get_or_create_profile_unlocked(store, USER_ID, NOW)
+                explicit = apply_explicit_patch(migrated, {"maxTravelMinutes": 30}, NOW)
+                store.save_profile_unlocked(USER_ID, explicit)
+                preserved = get_or_create_profile_unlocked(store, USER_ID, NOW + timedelta(minutes=1))
+        self.assertEqual(migrated["maxTravelMinutes"], 40)
+        self.assertEqual(preserved["maxTravelMinutes"], 30)
 
     def test_explicit_patch_is_whitelisted_and_separate(self):
         profile = default_profile(USER_ID, NOW)
@@ -66,6 +82,48 @@ class ProfileTests(unittest.TestCase):
         self.assertTrue(removed)
         self.assertEqual(cleaned["inferredPreferences"], {})
         self.assertIsNone(cleaned["socialBattery"])
+
+    def test_hobby_conversation_accumulates_categories_used_by_ranking(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = JsonStore(directory)
+            with store.user_lock(USER_ID):
+                profile = default_profile(USER_ID, NOW)
+                profile["memoryConsent"] = True
+                store.save_profile_unlocked(USER_ID, profile)
+                yoga = process_chat_unlocked(
+                    store,
+                    USER_ID,
+                    {"message": "ヨガをやってみたい", "remember": True},
+                    NOW,
+                )
+                climbing = process_chat_unlocked(
+                    store,
+                    USER_ID,
+                    {"message": "ボルダリングが好き", "remember": True},
+                    NOW + timedelta(minutes=1),
+                )
+            self.assertEqual(yoga["profileDelta"]["preferredCategories"], ["ダンス・健康"])
+            self.assertIn("ヨガ", yoga["reply"])
+            self.assertEqual(
+                climbing["profile"]["preferredCategories"],
+                ["ダンス・健康", "趣味・実用"],
+            )
+            self.assertEqual(climbing["interventionHint"], "consider_push")
+
+    def test_removing_hobby_evidence_restores_explicit_categories_only(self):
+        profile = default_profile(USER_ID, NOW)
+        profile = apply_explicit_patch(profile, {"preferredCategories": ["音楽・演劇"]}, NOW)
+        inferred = apply_inferred_delta(
+            profile,
+            {"preferredCategories": ["ダンス・健康"]},
+            0.86,
+            "ヨガをやってみたい",
+            NOW,
+        )
+        evidence_id = inferred["inferredPreferences"]["preferredCategories"]["evidence"][0]["id"]
+        cleaned, removed = remove_evidence(inferred, evidence_id, NOW)
+        self.assertTrue(removed)
+        self.assertEqual(cleaned["preferredCategories"], ["音楽・演劇"])
 
     def test_deleting_inference_restores_pre_inference_social_intensity(self):
         profile = default_profile(USER_ID, NOW)

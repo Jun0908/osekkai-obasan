@@ -10,10 +10,11 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 from osekkai_contracts import ContractError, validate_opportunity
 from osekkai_freebusy import ProviderError
+from osekkai_store import JsonStore
 
 
 def fixture_root() -> Path:
@@ -102,10 +103,27 @@ def _verify_normalized(opportunity: dict[str, Any], raw: dict[str, Any], row: li
 
 def load_opportunities(data_mode: str = "demo") -> dict[str, Any]:
     if data_mode == "live":
+        configured = os.environ.get("OSEKKAI_LIVE_OPPORTUNITIES_PATH", "").strip()
+        default_live = JsonStore().root / "opportunities" / "live-opportunities.json"
+        live_path = Path(configured).expanduser().resolve() if configured else default_live
+        if live_path.exists():
+            try:
+                value = json.loads(live_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise ProviderError("live opportunities cache could not be loaded") from exc
+            if set(value) != {"schemaVersion", "dataMode", "notice", "opportunities"}:
+                raise ProviderError("live opportunities cache has invalid fields")
+            if value.get("schemaVersion") != "1.0" or value.get("dataMode") != "live" or not isinstance(value.get("opportunities"), list):
+                raise ProviderError("live opportunities cache has invalid metadata")
+            for opportunity in value["opportunities"]:
+                validate_opportunity(opportunity)
+                if opportunity.get("verificationStatus") not in {"source_verified", "organizer_verified"}:
+                    raise ProviderError("live opportunities cache contains an unverified candidate")
+            return copy.deepcopy(value)
         return {
             "schemaVersion": "1.0",
             "dataMode": "live",
-            "notice": "live Open Data provider is not configured in P0",
+            "notice": "Live sync has not produced a verified opportunity cache yet.",
             "opportunities": [],
         }
     if data_mode != "demo":
@@ -135,3 +153,132 @@ def normalize_snapshot() -> dict[str, Any]:
     """
 
     return load_opportunities("demo")
+
+
+def events_to_opportunities(
+    events: list[Mapping[str, Any]],
+    *,
+    connection_by_event_id: Mapping[str, Mapping[str, Any]],
+    route_by_event_id: Mapping[str, Mapping[str, Any]],
+    series_by_id: Mapping[str, Mapping[str, Any]] | None = None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Materialize PUSH candidates only after Evidence and Maps are available."""
+
+    series_map = series_by_id or {}
+    event_by_id = {str(event.get("id")): event for event in events}
+    opportunities: list[dict[str, Any]] = []
+    excluded: list[dict[str, Any]] = []
+    for event_value in events:
+        event = dict(event_value)
+        event_id = str(event.get("id") or "")
+        reasons: list[str] = []
+        connection = connection_by_event_id.get(event_id)
+        route = route_by_event_id.get(event_id)
+        if connection is None:
+            reasons.append("CONNECTION_EVIDENCE_MISSING")
+        if route is None or route.get("source") != "maps_verified" or not isinstance(route.get("minutes"), int):
+            reasons.append("MAPS_ROUTE_MISSING")
+        elif int(route["minutes"]) > 360:
+            reasons.append("MAPS_ROUTE_TOO_LONG")
+        address = (route or {}).get("resolvedAddress") or event.get("address") or event.get("venueName")
+        if not address:
+            reasons.append("LOCATION_MISSING")
+        if event.get("status") != "scheduled" or event.get("registrationStatus") not in {"open", "not_required"}:
+            reasons.append("REGISTRATION_UNAVAILABLE")
+        if reasons:
+            excluded.append({"eventId": event_id, "reasons": reasons})
+            continue
+        series = series_map.get(str(event.get("seriesId"))) if event.get("seriesId") else None
+        future_occurrences = []
+        for future_id in (series or {}).get("futureOccurrenceIds", []):
+            future = event_by_id.get(str(future_id))
+            if future and future["id"] != event_id:
+                future_occurrences.append(
+                    {"eventId": future["id"], "startsAt": future["startsAt"], "endsAt": future["endsAt"], "sourceUrl": future["sourceUrl"]}
+                )
+        duration = max(1, int((datetime.fromisoformat(event["endsAt"]) - datetime.fromisoformat(event["startsAt"])).total_seconds() // 60))
+        classification = event["sourceClassification"]
+        source_type = {
+            "raw_open_data": "open_data",
+            "live_provider": "live_provider",
+            "organizer_verified": "organizer_verified",
+            "ai_derived": "ai_derived",
+            "private_user_data": "private_user_data",
+            "synthetic_demo": "ai_derived",
+        }[classification]
+        level = int(connection["connectionLevel"])
+        route_value = {
+            "mode": route["mode"],
+            "minutes": route["minutes"],
+            "source": "maps_verified",
+            "computedAt": route.get("computedAt"),
+            "distanceMeters": route.get("distanceMeters"),
+            "confidence": route.get("confidence", 1),
+        }
+        opportunity = {
+            "schemaVersion": "1.0",
+            "id": f"opportunity-{event_id}",
+            "sourceRecordId": event["sourceRecordId"],
+            "eventId": event_id,
+            "communityId": event.get("communityId"),
+            "seriesId": event.get("seriesId"),
+            "title": event["title"],
+            "description": event.get("description", ""),
+            "startsAt": event["startsAt"],
+            "endsAt": event["endsAt"],
+            "address": str(address),
+            "latitude": route.get("latitude", event.get("latitude")),
+            "longitude": route.get("longitude", event.get("longitude")),
+            "priceYen": event.get("priceYen"),
+            "socialIntensity": min(5, max(0, level)),
+            "conversationRequired": "medium" if connection.get("structuredConversation") == "yes" else "low",
+            "soloFriendly": connection.get("soloFriendly") == "yes",
+            "recurring": bool(event.get("seriesId")),
+            "futureOccurrences": future_occurrences,
+            "capacity": event.get("capacity"),
+            "participants": event.get("participants"),
+            "status": event["status"],
+            "registrationStatus": event["registrationStatus"],
+            "registrationDeadline": event.get("registrationDeadline"),
+            "flexibleVisit": False,
+            "visitDurationMinutes": duration,
+            "roleAvailable": None if connection.get("roleAvailable") == "unknown" else connection.get("roleAvailable") == "yes",
+            "roleDescription": None,
+            "categories": event.get("categories", []),
+            "provider": event["provider"],
+            "sourceType": source_type,
+            "sourceClassification": classification,
+            "sourceUrl": event["sourceUrl"],
+            "sourceDataset": event["sourceDataset"],
+            "license": event["license"],
+            "capturedAt": event["fetchedAt"],
+            "sourceUpdatedAt": event["sourceUpdatedAt"],
+            "fetchedAt": event["fetchedAt"],
+            "revalidatedAt": event["revalidatedAt"],
+            "checksum": event["checksum"],
+            "sourceTrust": 0.95,
+            "confidence": connection["model"]["confidence"],
+            "dataMode": "live",
+            "verificationStatus": "organizer_verified" if classification == "organizer_verified" else "source_verified",
+            "fieldProvenance": {
+                **event["fieldProvenance"],
+                "connectionEvidence": {
+                    "classification": "ai_derived" if connection["model"]["method"] != "organizer_verified" else "organizer_verified",
+                    "confidence": connection["model"]["confidence"],
+                    "evidence": connection["evidence"][0]["text"],
+                    "sourceUrl": connection["evidence"][0]["url"],
+                    "capturedAt": connection["evaluatedAt"],
+                },
+                "travelEstimate": {
+                    "classification": "source_verified",
+                    "confidence": route.get("confidence", 1),
+                    "evidence": "Google Routes API response",
+                    "capturedAt": route.get("computedAt"),
+                },
+            },
+            "connectionEvidence": copy.deepcopy(connection),
+            "travelEstimate": route_value,
+        }
+        validate_opportunity(opportunity)
+        opportunities.append(opportunity)
+    return opportunities, excluded

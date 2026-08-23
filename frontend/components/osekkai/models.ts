@@ -174,7 +174,7 @@ export function normalizeProfile(raw: unknown): ProfileView {
     quietEnd: readString(quiet, 'end') ?? '08:00',
     maxPushesPerWeek: readNumber(explicit, 'maxPushesPerWeek') ?? 2,
     preferredTone: readString(explicit, 'preferredTone') ?? 'gentle',
-    maxTravelMinutes: readNumber(explicit, 'maxTravelMinutes') ?? 30,
+    maxTravelMinutes: readNumber(explicit, 'maxTravelMinutes') ?? 40,
     maxBudgetYen: readNumber(explicit, 'maxBudgetYen') ?? 2000,
     maxSocialIntensity: readNumber(explicit, 'maxSocialIntensity') ?? 2,
     socialBattery,

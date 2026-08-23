@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import copy
 import hashlib
+import os
+import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 from helpers import demo_inputs
 from osekkai_freebusy import _walk_keys
@@ -32,7 +36,15 @@ class ProviderFixtureTests(unittest.TestCase):
         self.assertEqual(opportunity["travelEstimate"]["source"], "synthetic_demo")
 
     def test_live_mode_never_reuses_snapshot(self):
-        result = load_opportunities("live")
+        # A developer may have a real live cache in the default store. Point this
+        # test at a deliberately absent cache so it verifies the demo/live
+        # boundary without depending on or deleting that local provider data.
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ,
+            {"OSEKKAI_LIVE_OPPORTUNITIES_PATH": str(Path(directory) / "absent-live.json")},
+            clear=False,
+        ):
+            result = load_opportunities("live")
         self.assertEqual(result["dataMode"], "live")
         self.assertEqual(result["opportunities"], [])
 

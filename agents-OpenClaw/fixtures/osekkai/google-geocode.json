@@ -1,0 +1,9 @@
+{
+  "status": "OK",
+  "results": [
+    {
+      "formatted_address": "日本、〒135-0016 東京都江東区東陽4丁目11-3",
+      "geometry": { "location": { "latitude": 35.6729, "longitude": 139.8170 } }
+    }
+  ]
+}

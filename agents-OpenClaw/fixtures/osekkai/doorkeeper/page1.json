@@ -1,0 +1,28 @@
+[
+  {
+    "event": {
+      "id": 101,
+      "title": "月例ボードゲーム会 第1回",
+      "description": "初心者テーブルで少人数の共同ゲームをします。",
+      "starts_at": "2026-09-06T13:00:00+09:00",
+      "ends_at": "2026-09-06T15:00:00+09:00",
+      "registration_closes_at": "2026-09-06T10:00:00+09:00",
+      "venue_name": "門前仲町コミュニティスペース",
+      "address": "東京都江東区門前仲町1丁目",
+      "lat": 35.6719,
+      "long": 139.7956,
+      "ticket_limit": 6,
+      "participants": 3,
+      "waitlisted": 0,
+      "price": 500,
+      "public_url": "https://www.doorkeeper.jp/events/101",
+      "updated_at": "2026-08-23T08:05:00+09:00",
+      "topics": ["boardgame", "beginner"],
+      "group": {
+        "id": 77,
+        "name": "東京ボードゲーム初心者会",
+        "public_url": "https://example.doorkeeper.jp/"
+      }
+    }
+  }
+]

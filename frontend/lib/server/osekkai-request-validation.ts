@@ -1,7 +1,9 @@
 import {
   type ValidationResult,
   validateChatRequest,
+  validateCalendarCallbackRequest,
   validateDecideRequest,
+  validateEventRouteRequest,
   validateDemoResetRequest,
   validateFeedbackRequest,
   validateInterventionRecordRequest,
@@ -92,7 +94,21 @@ export function validateOsekkaiCommandPayload(
     case OSEKKAI_COMMANDS.interventions:
       return payload.action === 'record'
         ? acceptGenerated(validateInterventionRecordRequest(payload), payload, requestId)
-        : validateReadPayload(command, payload, requestId);
+          : validateReadPayload(command, payload, requestId);
+    case OSEKKAI_COMMANDS.calendarCallback:
+      return acceptGenerated(validateCalendarCallbackRequest(payload), payload, requestId);
+    case OSEKKAI_COMMANDS.eventRoute:
+      return acceptGenerated(validateEventRouteRequest(payload), payload, requestId);
+    case OSEKKAI_COMMANDS.sourcesSync: {
+      const keys = Object.keys(payload);
+      const validKeys = keys.every((key) => key === 'force' || key === 'sourceIds');
+      const validForce = payload.force === undefined || typeof payload.force === 'boolean';
+      const validSources = payload.sourceIds === undefined || (
+        Array.isArray(payload.sourceIds) &&
+        payload.sourceIds.every((value) => typeof value === 'string' && value.length >= 1 && value.length <= 80)
+      );
+      return validKeys && validForce && validSources ? payload : rejectRequest(requestId);
+    }
     default:
       return validateReadPayload(command, payload, requestId);
   }

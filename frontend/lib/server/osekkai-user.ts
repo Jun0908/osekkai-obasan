@@ -134,7 +134,10 @@ type OsekkaiCookieStore = Awaited<Awaited<ReturnType<typeof cookies>>>;
 function setSessionCookie(cookieStore: OsekkaiCookieStore, session: OsekkaiSession): void {
   cookieStore.set(OSEKKAI_SESSION_COOKIE, encodeOsekkaiSession(session), {
     httpOnly: true,
-    sameSite: 'strict',
+    // OAuth callbacks are top-level cross-site navigations. Lax sends this
+    // signed anonymous-session cookie for that GET; every state-changing API
+    // still requires same-origin plus the separate CSRF token.
+    sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: '/api/osekkai',
     maxAge: SESSION_MAX_AGE_SECONDS,
@@ -173,7 +176,7 @@ export async function clearOsekkaiSession(): Promise<void> {
   const cookieStore = await cookies();
   cookieStore.set(OSEKKAI_SESSION_COOKIE, '', {
     httpOnly: true,
-    sameSite: 'strict',
+    sameSite: 'lax',
     secure: process.env.NODE_ENV === 'production',
     path: '/api/osekkai',
     maxAge: 0,

@@ -1,0 +1,526 @@
+{
+  "sourceRegistry": {
+    "schemaVersion": "1.0",
+    "generatedAt": "2026-08-23T08:15:00+09:00",
+    "sources": [
+      {
+        "id": "luma_tokyo",
+        "displayName": "Lu.ma Tokyo",
+        "kind": "live_provider",
+        "accessMethod": "ical",
+        "baseUrl": "https://lu.ma/tokyo",
+        "termsUrl": "https://lu.ma/terms",
+        "license": "Provider terms",
+        "attribution": "Lu.ma event organizer data",
+        "enabled": true,
+        "authorized": true,
+        "refreshMinutes": 15,
+        "staleAfterMinutes": 120,
+        "credentialEnv": ["LUMA_ICAL_URL"],
+        "storagePolicy": "normalized_only",
+        "requiredForDemo": true
+      }
+    ]
+  },
+  "communities": [
+    {
+      "schemaVersion": "1.0",
+      "id": "community-tokyo-craft",
+      "provider": "luma_tokyo",
+      "name": "Tokyo Craft Beginners",
+      "description": "初心者が小さな共同制作を楽しむ月例コミュニティ。",
+      "organizerName": "Tokyo Craft",
+      "eventSeriesIds": ["series-monthly-craft"],
+      "futureEventIds": ["event-craft-202609", "event-craft-202610"],
+      "communityUrl": "https://lu.ma/tokyo",
+      "sourceClassification": "live_provider",
+      "sourceUpdatedAt": "2026-08-23T08:00:00+09:00",
+      "fetchedAt": "2026-08-23T08:14:00+09:00",
+      "revalidatedAt": "2026-08-23T08:15:00+09:00",
+      "evidence": [
+        {
+          "kind": "community_path",
+          "text": "同じ主催者が翌月回を公開しています。",
+          "url": "https://lu.ma/tokyo",
+          "classification": "live_provider",
+          "capturedAt": "2026-08-23T08:14:00+09:00",
+          "confidence": 1,
+          "evidenceField": "calendar"
+        }
+      ]
+    }
+  ],
+  "series": [
+    {
+      "schemaVersion": "1.0",
+      "id": "series-monthly-craft",
+      "provider": "luma_tokyo",
+      "communityId": "community-tokyo-craft",
+      "title": "月例クラフト初心者会",
+      "recurrenceText": "毎月開催。翌月回を公開済み。",
+      "futureOccurrenceIds": ["event-craft-202609", "event-craft-202610"],
+      "sourceUrl": "https://lu.ma/tokyo",
+      "sourceClassification": "live_provider",
+      "sourceUpdatedAt": "2026-08-23T08:00:00+09:00",
+      "fetchedAt": "2026-08-23T08:14:00+09:00",
+      "revalidatedAt": "2026-08-23T08:15:00+09:00",
+      "evidence": [
+        {
+          "kind": "future_occurrence",
+          "text": "翌月回が同じSeriesで公開されています。",
+          "url": "https://lu.ma/tokyo",
+          "classification": "live_provider",
+          "capturedAt": "2026-08-23T08:14:00+09:00",
+          "confidence": 1,
+          "evidenceField": "future_occurrences"
+        }
+      ]
+    }
+  ],
+  "events": [
+    {
+      "schemaVersion": "1.0",
+      "id": "event-craft-202609",
+      "provider": "luma_tokyo",
+      "sourceRecordId": "luma-craft-202609",
+      "title": "月例クラフト初心者会",
+      "description": "8名で小物を共同制作する初心者向けの会。ひとり参加歓迎。",
+      "startsAt": "2026-09-05T14:00:00+09:00",
+      "endsAt": "2026-09-05T16:00:00+09:00",
+      "timezone": "Asia/Tokyo",
+      "venueName": "清澄白河アトリエ",
+      "address": "東京都江東区清澄2丁目",
+      "latitude": 35.6821,
+      "longitude": 139.8006,
+      "communityId": "community-tokyo-craft",
+      "seriesId": "series-monthly-craft",
+      "status": "scheduled",
+      "registrationStatus": "open",
+      "registrationDeadline": "2026-09-05T12:00:00+09:00",
+      "capacity": 8,
+      "participants": 5,
+      "priceYen": 1000,
+      "categories": ["craft", "beginner"],
+      "sourceUrl": "https://lu.ma/tokyo",
+      "sourceDataset": "Lu.ma Tokyo calendar",
+      "license": "Provider terms",
+      "sourceClassification": "live_provider",
+      "sourceUpdatedAt": "2026-08-23T08:00:00+09:00",
+      "fetchedAt": "2026-08-23T08:14:00+09:00",
+      "revalidatedAt": "2026-08-23T08:15:00+09:00",
+      "checksum": "1111111111111111111111111111111111111111111111111111111111111111",
+      "fieldProvenance": {
+        "title": {
+          "classification": "source_verified",
+          "sourceUrl": "https://lu.ma/tokyo",
+          "capturedAt": "2026-08-23T08:14:00+09:00"
+        }
+      }
+    },
+    {
+      "schemaVersion": "1.0",
+      "id": "event-boardgame-202609",
+      "provider": "doorkeeper",
+      "sourceRecordId": "doorkeeper-boardgame-202609",
+      "title": "少人数ボードゲーム交流会",
+      "description": "初心者テーブルがある6名の定期交流会。",
+      "startsAt": "2026-09-06T13:00:00+09:00",
+      "endsAt": "2026-09-06T15:00:00+09:00",
+      "timezone": "Asia/Tokyo",
+      "venueName": "門前仲町コミュニティスペース",
+      "address": "東京都江東区門前仲町1丁目",
+      "latitude": 35.6719,
+      "longitude": 139.7956,
+      "communityId": null,
+      "seriesId": null,
+      "status": "scheduled",
+      "registrationStatus": "open",
+      "registrationDeadline": "2026-09-06T10:00:00+09:00",
+      "capacity": 6,
+      "participants": 3,
+      "priceYen": 500,
+      "categories": ["boardgame", "social"],
+      "sourceUrl": "https://www.doorkeeper.jp/",
+      "sourceDataset": "Doorkeeper Public API",
+      "license": "Provider terms",
+      "sourceClassification": "live_provider",
+      "sourceUpdatedAt": "2026-08-23T08:05:00+09:00",
+      "fetchedAt": "2026-08-23T08:14:00+09:00",
+      "revalidatedAt": "2026-08-23T08:15:00+09:00",
+      "checksum": "2222222222222222222222222222222222222222222222222222222222222222",
+      "fieldProvenance": {
+        "title": {
+          "classification": "source_verified",
+          "sourceUrl": "https://www.doorkeeper.jp/",
+          "capturedAt": "2026-08-23T08:14:00+09:00"
+        }
+      }
+    }
+  ],
+  "connectionEvidence": [
+    {
+      "schemaVersion": "1.0",
+      "eventId": "event-craft-202609",
+      "connectionLevel": 3,
+      "soloFriendly": "yes",
+      "beginnerFriendly": "yes",
+      "recurring": "yes",
+      "structuredConversation": "yes",
+      "sharedMeal": "no",
+      "groupWork": "yes",
+      "roleAvailable": "yes",
+      "futureOccurrenceCount": 1,
+      "solicitationRisk": "low",
+      "evidence": [
+        {
+          "kind": "solo_friendly",
+          "text": "ひとり参加歓迎と主催者ページに記載。",
+          "url": "https://lu.ma/tokyo",
+          "classification": "live_provider",
+          "capturedAt": "2026-08-23T08:14:00+09:00",
+          "confidence": 1,
+          "evidenceField": "description"
+        },
+        {
+          "kind": "future_occurrence",
+          "text": "翌月回が公開済み。",
+          "url": "https://lu.ma/tokyo",
+          "classification": "live_provider",
+          "capturedAt": "2026-08-23T08:14:00+09:00",
+          "confidence": 1,
+          "evidenceField": "calendar"
+        }
+      ],
+      "model": { "method": "rules", "version": "connection-v1", "confidence": 0.96 },
+      "evaluatedAt": "2026-08-23T08:15:00+09:00"
+    },
+    {
+      "schemaVersion": "1.0",
+      "eventId": "event-boardgame-202609",
+      "connectionLevel": 2,
+      "soloFriendly": "unknown",
+      "beginnerFriendly": "yes",
+      "recurring": "unknown",
+      "structuredConversation": "yes",
+      "sharedMeal": "no",
+      "groupWork": "yes",
+      "roleAvailable": "no",
+      "futureOccurrenceCount": 0,
+      "solicitationRisk": "low",
+      "evidence": [
+        {
+          "kind": "beginner_friendly",
+          "text": "初心者テーブルありと公開説明に記載。",
+          "url": "https://www.doorkeeper.jp/",
+          "classification": "live_provider",
+          "capturedAt": "2026-08-23T08:14:00+09:00",
+          "confidence": 1,
+          "evidenceField": "description"
+        }
+      ],
+      "model": { "method": "rules", "version": "connection-v1", "confidence": 0.82 },
+      "evaluatedAt": "2026-08-23T08:15:00+09:00"
+    }
+  ],
+  "opportunities": [
+    {
+      "schemaVersion": "1.0",
+      "id": "opportunity-craft-202609",
+      "sourceRecordId": "luma-craft-202609",
+      "eventId": "event-craft-202609",
+      "communityId": "community-tokyo-craft",
+      "seriesId": "series-monthly-craft",
+      "title": "月例クラフト初心者会",
+      "description": "8名で小物を共同制作する初心者向けの会。ひとり参加歓迎。",
+      "startsAt": "2026-09-05T14:00:00+09:00",
+      "endsAt": "2026-09-05T16:00:00+09:00",
+      "address": "東京都江東区清澄2丁目",
+      "latitude": 35.6821,
+      "longitude": 139.8006,
+      "priceYen": 1000,
+      "socialIntensity": 3,
+      "conversationRequired": "medium",
+      "soloFriendly": true,
+      "recurring": true,
+      "futureOccurrences": [
+        {
+          "eventId": "event-craft-202610",
+          "startsAt": "2026-10-03T14:00:00+09:00",
+          "endsAt": "2026-10-03T16:00:00+09:00",
+          "sourceUrl": "https://lu.ma/tokyo"
+        }
+      ],
+      "capacity": 8,
+      "participants": 5,
+      "status": "scheduled",
+      "registrationStatus": "open",
+      "registrationDeadline": "2026-09-05T12:00:00+09:00",
+      "flexibleVisit": false,
+      "visitDurationMinutes": 120,
+      "roleAvailable": true,
+      "roleDescription": "共同制作で小さな作業を担当できます。",
+      "categories": ["craft", "beginner"],
+      "provider": "luma_tokyo",
+      "sourceType": "live_provider",
+      "sourceClassification": "live_provider",
+      "sourceUrl": "https://lu.ma/tokyo",
+      "sourceDataset": "Lu.ma Tokyo calendar",
+      "license": "Provider terms",
+      "capturedAt": "2026-08-23T08:14:00+09:00",
+      "sourceUpdatedAt": "2026-08-23T08:00:00+09:00",
+      "fetchedAt": "2026-08-23T08:14:00+09:00",
+      "revalidatedAt": "2026-08-23T08:15:00+09:00",
+      "checksum": "1111111111111111111111111111111111111111111111111111111111111111",
+      "sourceTrust": 0.95,
+      "confidence": 0.94,
+      "dataMode": "live",
+      "verificationStatus": "source_verified",
+      "fieldProvenance": {
+        "title": {
+          "classification": "source_verified",
+          "sourceUrl": "https://lu.ma/tokyo",
+          "capturedAt": "2026-08-23T08:14:00+09:00"
+        }
+      },
+      "connectionEvidence": {
+        "schemaVersion": "1.0",
+        "eventId": "event-craft-202609",
+        "connectionLevel": 3,
+        "soloFriendly": "yes",
+        "beginnerFriendly": "yes",
+        "recurring": "yes",
+        "structuredConversation": "yes",
+        "sharedMeal": "no",
+        "groupWork": "yes",
+        "roleAvailable": "yes",
+        "futureOccurrenceCount": 1,
+        "solicitationRisk": "low",
+        "evidence": [
+          {
+            "kind": "solo_friendly",
+            "text": "ひとり参加歓迎と主催者ページに記載。",
+            "url": "https://lu.ma/tokyo",
+            "classification": "live_provider",
+            "capturedAt": "2026-08-23T08:14:00+09:00",
+            "confidence": 1,
+            "evidenceField": "description"
+          }
+        ],
+        "model": { "method": "rules", "version": "connection-v1", "confidence": 0.96 },
+        "evaluatedAt": "2026-08-23T08:15:00+09:00"
+      },
+      "travelEstimate": {
+        "mode": "walk",
+        "minutes": 8,
+        "source": "maps_verified",
+        "computedAt": "2026-08-23T08:15:00+09:00",
+        "distanceMeters": 620,
+        "confidence": 1
+      }
+    },
+    {
+      "schemaVersion": "1.0",
+      "id": "opportunity-boardgame-202609",
+      "sourceRecordId": "doorkeeper-boardgame-202609",
+      "eventId": "event-boardgame-202609",
+      "communityId": null,
+      "seriesId": null,
+      "title": "少人数ボードゲーム交流会",
+      "description": "初心者テーブルがある6名の定期交流会。",
+      "startsAt": "2026-09-06T13:00:00+09:00",
+      "endsAt": "2026-09-06T15:00:00+09:00",
+      "address": "東京都江東区門前仲町1丁目",
+      "latitude": 35.6719,
+      "longitude": 139.7956,
+      "priceYen": 500,
+      "socialIntensity": 3,
+      "conversationRequired": "medium",
+      "soloFriendly": false,
+      "recurring": false,
+      "futureOccurrences": [],
+      "capacity": 6,
+      "participants": 3,
+      "status": "scheduled",
+      "registrationStatus": "open",
+      "registrationDeadline": "2026-09-06T10:00:00+09:00",
+      "flexibleVisit": false,
+      "visitDurationMinutes": 120,
+      "roleAvailable": false,
+      "roleDescription": null,
+      "categories": ["boardgame", "social"],
+      "provider": "doorkeeper",
+      "sourceType": "live_provider",
+      "sourceClassification": "live_provider",
+      "sourceUrl": "https://www.doorkeeper.jp/",
+      "sourceDataset": "Doorkeeper Public API",
+      "license": "Provider terms",
+      "capturedAt": "2026-08-23T08:14:00+09:00",
+      "sourceUpdatedAt": "2026-08-23T08:05:00+09:00",
+      "fetchedAt": "2026-08-23T08:14:00+09:00",
+      "revalidatedAt": "2026-08-23T08:15:00+09:00",
+      "checksum": "2222222222222222222222222222222222222222222222222222222222222222",
+      "sourceTrust": 0.9,
+      "confidence": 0.82,
+      "dataMode": "live",
+      "verificationStatus": "source_verified",
+      "fieldProvenance": {
+        "title": {
+          "classification": "source_verified",
+          "sourceUrl": "https://www.doorkeeper.jp/",
+          "capturedAt": "2026-08-23T08:14:00+09:00"
+        }
+      },
+      "connectionEvidence": {
+        "schemaVersion": "1.0",
+        "eventId": "event-boardgame-202609",
+        "connectionLevel": 2,
+        "soloFriendly": "unknown",
+        "beginnerFriendly": "yes",
+        "recurring": "unknown",
+        "structuredConversation": "yes",
+        "sharedMeal": "no",
+        "groupWork": "yes",
+        "roleAvailable": "no",
+        "futureOccurrenceCount": 0,
+        "solicitationRisk": "low",
+        "evidence": [
+          {
+            "kind": "beginner_friendly",
+            "text": "初心者テーブルありと公開説明に記載。",
+            "url": "https://www.doorkeeper.jp/",
+            "classification": "live_provider",
+            "capturedAt": "2026-08-23T08:14:00+09:00",
+            "confidence": 1,
+            "evidenceField": "description"
+          }
+        ],
+        "model": { "method": "rules", "version": "connection-v1", "confidence": 0.82 },
+        "evaluatedAt": "2026-08-23T08:15:00+09:00"
+      },
+      "travelEstimate": {
+        "mode": "transit",
+        "minutes": 18,
+        "source": "maps_verified",
+        "computedAt": "2026-08-23T08:15:00+09:00",
+        "distanceMeters": 3400,
+        "confidence": 1
+      }
+    }
+  ],
+  "decision": {
+    "schemaVersion": "1.0",
+    "episodeId": "44444444-4444-4444-8444-444444444444",
+    "policyVersion": "osekkai-p0-v1",
+    "decision": "suggest_light_social",
+    "shouldPush": true,
+    "reasonCodes": ["FREE_WINDOW_AVAILABLE", "WITHIN_TRAVEL_LIMIT", "UNDER_BUDGET"],
+    "score": 0.91,
+    "selectedOpportunity": null,
+    "rankedOpportunities": [
+      {
+        "rank": 1,
+        "score": 0.91,
+        "opportunityId": "opportunity-craft-202609",
+        "recommendationReasons": [
+          {
+            "code": "continuity",
+            "text": "月例で次回も同じCommunityに会えます。",
+            "evidenceUrl": "https://lu.ma/tokyo",
+            "classification": "live_provider"
+          },
+          {
+            "code": "travel_fit",
+            "text": "Google Routesで徒歩8分です。",
+            "evidenceUrl": null,
+            "classification": "private_user_data"
+          }
+        ],
+        "exclusionReasons": []
+      },
+      {
+        "rank": 2,
+        "score": 0.78,
+        "opportunityId": "opportunity-boardgame-202609",
+        "recommendationReasons": [
+          {
+            "code": "adjacent_interest",
+            "text": "手を動かす趣味から少しずらした共同ゲームです。",
+            "evidenceUrl": null,
+            "classification": "ai_derived"
+          }
+        ],
+        "exclusionReasons": []
+      }
+    ],
+    "excludedCandidates": [],
+    "notification": { "text": "あんた、今度の初心者会ちょうど空いてるで。", "tone": "casual" },
+    "dataMode": "live",
+    "createdAt": "2026-08-23T08:15:00+09:00"
+  },
+  "episode": {
+    "schemaVersion": "1.0",
+    "id": "44444444-4444-4444-8444-444444444444",
+    "userId": "00000000-0000-4000-8000-000000000001",
+    "sequence": 1,
+    "policyVersion": "osekkai-p0-v1",
+    "decision": "suggest_light_social",
+    "shouldPush": true,
+    "reasonCodes": ["FREE_WINDOW_AVAILABLE", "WITHIN_TRAVEL_LIMIT", "UNDER_BUDGET"],
+    "score": 0.91,
+    "profileSnapshot": null,
+    "freeWindowSnapshot": null,
+    "candidateIdsBeforeFilter": ["opportunity-craft-202609", "opportunity-boardgame-202609"],
+    "candidateIdsAfterFilter": ["opportunity-craft-202609", "opportunity-boardgame-202609"],
+    "excludedCandidates": [],
+    "selectedOpportunity": null,
+    "rankedOpportunities": [
+      {
+        "rank": 1,
+        "score": 0.91,
+        "opportunityId": "opportunity-craft-202609",
+        "recommendationReasons": [
+          {
+            "code": "continuity",
+            "text": "月例で次回も同じCommunityに会えます。",
+            "evidenceUrl": "https://lu.ma/tokyo",
+            "classification": "live_provider"
+          }
+        ],
+        "exclusionReasons": []
+      },
+      {
+        "rank": 2,
+        "score": 0.78,
+        "opportunityId": "opportunity-boardgame-202609",
+        "recommendationReasons": [
+          {
+            "code": "adjacent_interest",
+            "text": "手を動かす趣味から少しずらした共同ゲームです。",
+            "evidenceUrl": null,
+            "classification": "ai_derived"
+          }
+        ],
+        "exclusionReasons": []
+      }
+    ],
+    "notification": {
+      "text": "あんた、今度の初心者会ちょうど空いてるで。",
+      "tone": "casual",
+      "shownOpportunityIds": ["opportunity-craft-202609", "opportunity-boardgame-202609"]
+    },
+    "pushedAt": "2026-08-23T08:15:00+09:00",
+    "noPushAt": null,
+    "actionResponse": null,
+    "actionResponseAt": null,
+    "distanceFeedback": null,
+    "distanceFeedbackAt": null,
+    "attendedAt": null,
+    "revisitedAt": null,
+    "selfInitiatedAt": null,
+    "dataMode": "live",
+    "metricClassification": "measured",
+    "minimalRecord": false,
+    "createdAt": "2026-08-23T08:15:00+09:00",
+    "updatedAt": "2026-08-23T08:15:00+09:00"
+  }
+}

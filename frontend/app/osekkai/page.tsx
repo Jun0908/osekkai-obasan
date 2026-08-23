@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 
 import HubStatus from '@/components/osekkai/hub-status';
@@ -15,102 +16,107 @@ export default function OsekkaiHomePage() {
           </div>
           <h1>おっせかいおばさん</h1>
           <p className={styles.heroCopy}>
-            近づきすぎず、離れすぎず。
+            あんた、何が好きなのよ。
             <br />
-            あなたが一歩動ける瞬間だけ、
+            好きなことを、ひとつ話すだけ。
             <br />
-            東京がおっせかいする。
+            東京の“次も会える場所”を探すで。
           </p>
           <p className={styles.heroSubcopy}>
-            何かをさせるためではなく、あなたに合う距離を覚えるための会話から始めます。
-            「今日はそっとして」も、たいせつな答えです。
+            ヨガ、ボルダリング、料理、音楽。話した好みと反応を覚えて、
+            本人にはまりそうな交流Eventを複数提案します。
           </p>
           <div className={styles.heroActions}>
             <Link className={styles.primaryButtonLarge} href="/osekkai/chat">
-              話してみる
+              好みを話す
               <span aria-hidden="true">→</span>
             </Link>
             <Link className={styles.secondaryButtonLarge} href="/osekkai/demo">
-              デモの空き時間を使う
+              Live Demoを見る
             </Link>
           </div>
-          <button className={styles.disabledCalendarButton} type="button" disabled>
-            <span className={styles.calendarGlyph} aria-hidden="true">□</span>
-            Google Calendarをつなぐ
-            <span className={styles.comingSoon}>P1で対応</span>
-          </button>
         </div>
 
-        <div className={styles.heroVisual} aria-label="近づきすぎない、ちょうどいい距離のイメージ">
+        <div className={styles.heroVisual} aria-label="好みを聞いて交流イベントへ背中を押す、おっせかいおばさん">
           <div className={styles.orbitOuter}>
-            <span className={styles.orbitLabelTop}>そっと見守る</span>
+            <span className={styles.orbitLabelTop}>好みを聞く</span>
             <span className={styles.orbitDotOne} />
             <span className={styles.orbitDotTwo} />
             <div className={styles.orbitMiddle}>
-              <span className={styles.orbitLabelSide}>いまだけ一歩</span>
-              <div className={styles.orbitCenter}>
-                <span aria-hidden="true">お</span>
-                <small>あなたのペース</small>
+              <span className={styles.orbitLabelSide}>人と会える</span>
+              <div className={styles.obasanLogoStage}>
+                <Image
+                  className={styles.obasanLogoHero}
+                  src="/osekkai/osekkai-obasan-logo-v1.png"
+                  width={1248}
+                  height={1248}
+                  alt=""
+                  priority
+                />
+                <span className={styles.logoOSeal} aria-hidden="true">
+                  <b>お</b>
+                  <small>おせっかい</small>
+                </span>
               </div>
             </div>
           </div>
-          <p>声をかけない判断も、記録して学びます。</p>
+          <p>話すたび、反応するたび、提案があなたに近づきます。</p>
         </div>
       </section>
 
       <section className={styles.trustStrip} aria-label="デモのデータについて">
         <div>
-          <span className={styles.trustIcon} aria-hidden="true">◷</span>
-          <p><strong>予定の中身は見ません</strong><span>使うのは空いている時間だけ</span></p>
-        </div>
-        <div>
-          <span className={styles.trustIcon} aria-hidden="true">◇</span>
-          <p><strong>候補を作りません</strong><span>出典を確認できるものだけ</span></p>
-        </div>
-        <div>
           <span className={styles.trustIcon} aria-hidden="true">↺</span>
-          <p><strong>いつでも変えられます</strong><span>記憶の閲覧・削除・休止に対応</span></p>
+          <p><strong>東京の最新Event</strong><span>OpenClawが複数Sourceを更新</span></p>
+        </div>
+        <div>
+          <span className={styles.trustIcon} aria-hidden="true">◷</span>
+          <p><strong>Calendarは空き時間だけ</strong><span>予定名や参加者は取得しません</span></p>
+        </div>
+        <div>
+          <span className={styles.trustIcon} aria-hidden="true">◎</span>
+          <p><strong>実際に行ける距離</strong><span>Google Routesで移動時間を確認</span></p>
         </div>
       </section>
 
       <section className={styles.section}>
         <div className={styles.sectionHeading}>
-          <p className={styles.eyebrow}>HOW IT KEEPS ITS DISTANCE</p>
-          <h2>急がない、決めつけない、追いかけない。</h2>
-          <p>会話と本人の設定を優先し、提案する前に「今日は何もしない」を選べます。</p>
+          <p className={styles.eyebrow}>HOW RECOMMENDATIONS GET BETTER</p>
+          <h2>好きなことから、次に会える場所へ。</h2>
+          <p>検索条件を並べる代わりに、ひとつ話す。あとは最新Event、空き時間、実移動を裏で合わせます。</p>
         </div>
         <div className={styles.threeCards}>
           <article className={styles.featureCard}>
             <span className={styles.cardNumber}>01</span>
             <div className={styles.featureGlyph} aria-hidden="true">“</div>
-            <h3>ことばから距離を知る</h3>
-            <p>疲れ具合や、話したい・話したくない気持ちを、本人が直せる仮説として扱います。</p>
+            <h3>好みをひとつ聞く</h3>
+            <p>ヨガ、料理、音楽など、好きなことや次にやってみたいことから探し始めます。</p>
             <Link href="/osekkai/chat">会話の画面へ <span aria-hidden="true">→</span></Link>
           </article>
           <article className={styles.featureCard}>
             <span className={styles.cardNumber}>02</span>
             <div className={styles.featureGlyph} aria-hidden="true">◷</div>
-            <h3>動ける余白だけを見る</h3>
-            <p>CalendarではFree/Busyだけを使い、予定のタイトル・場所・参加者は取得しません。</p>
-            <Link href="/osekkai/demo">オフラインデモを見る <span aria-hidden="true">→</span></Link>
+            <h3>東京の“今”と合わせる</h3>
+            <p>最新Event、Calendarの空き、Google Routesの実移動時間を一度に確認します。</p>
+            <Link href="/osekkai/demo">Live Demoを見る <span aria-hidden="true">→</span></Link>
           </article>
           <article className={styles.featureCard}>
             <span className={styles.cardNumber}>03</span>
             <div className={styles.featureGlyph} aria-hidden="true">◎</div>
-            <h3>理由ごと、1件だけ伝える</h3>
-            <p>時間・移動・予算・人との関わり方を確かめ、合わなければ何も提案しません。</p>
-            <Link href="/osekkai/impact">判断の理由を見る <span aria-hidden="true">→</span></Link>
+            <h3>交流が続く候補を、複数提案</h3>
+            <p>本人にはまりそうな候補を、継続性と交流の根拠が強い順に伝えます。</p>
+            <Link href="/osekkai/map">東京の全Eventを見る <span aria-hidden="true">→</span></Link>
           </article>
         </div>
       </section>
 
       <section className={styles.demoInvitation}>
         <div>
-          <p className={styles.eyebrow}>2 MINUTE DEMO</p>
-          <h2>「疲れた」から始まる、12の小さな場面。</h2>
+          <p className={styles.eyebrow}>60 SECOND LIVE DEMO</p>
+          <h2>いま東京にある、“次も会える場所”を。</h2>
           <p>
-            最初は提案せず、後日、会話不要の候補をひとつだけ。承諾・距離評価・再訪までを、
-            外部APIなしで何度でも再現できます。
+            OpenClawの最新Event、Google Calendarの空き、Google Routesの実移動時間をつなぎ、
+            交流が続く根拠を持つ複数候補まで一気に進みます。
           </p>
         </div>
         <Link className={styles.inkButton} href="/osekkai/demo">

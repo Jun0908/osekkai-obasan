@@ -4,6 +4,8 @@ import {
   validateDecideResponse,
   validateDemoResetResponse,
   validateDistanceProfile,
+  validateEventRouteResult,
+  validateLiveEvent,
   validateFeedbackResponse,
   validateFreeBusyResult,
   validateInterventionEpisode,
@@ -75,6 +77,46 @@ function validateDemoSeedResult(value: unknown): ValidationResult<unknown> {
     : { valid: false, errors: ['DemoSeedResult is invalid'] };
 }
 
+function validateCalendarConnectResult(value: unknown): ValidationResult<unknown> {
+  const valid = isRecord(value) && hasExactKeys(value, ['authorizationUrl', 'state', 'expiresAt']) &&
+    typeof value.authorizationUrl === 'string' && value.authorizationUrl.startsWith('https://accounts.google.com/') &&
+    typeof value.state === 'string' && /^[A-Za-z0-9_-]{32,160}$/.test(value.state) &&
+    typeof value.expiresAt === 'string' && Number.isFinite(Date.parse(value.expiresAt));
+  return valid ? { valid: true, value } : { valid: false, errors: ['CalendarConnectResult is invalid'] };
+}
+
+function validateCalendarCallbackResult(value: unknown): ValidationResult<unknown> {
+  const valid = isRecord(value) && hasExactKeys(value, ['connected', 'scope', 'expiresAt']) &&
+    value.connected === true && value.scope === 'https://www.googleapis.com/auth/calendar.freebusy' &&
+    typeof value.expiresAt === 'string' && Number.isFinite(Date.parse(value.expiresAt));
+  return valid ? { valid: true, value } : { valid: false, errors: ['CalendarCallbackResult is invalid'] };
+}
+
+function validateCalendarDisconnectResult(value: unknown): ValidationResult<unknown> {
+  const valid = isRecord(value) && hasExactKeys(value, ['disconnected']) && value.disconnected === true;
+  return valid ? { valid: true, value } : { valid: false, errors: ['CalendarDisconnectResult is invalid'] };
+}
+
+function validateSourceStatusResult(value: unknown): ValidationResult<unknown> {
+  const valid = isRecord(value) && value.schemaVersion === '1.0' && value.dataMode === 'live' &&
+    typeof value.generatedAt === 'string' && Number.isFinite(Date.parse(value.generatedAt)) &&
+    Array.isArray(value.sources) && value.sources.every((source) =>
+      isRecord(source) && typeof source.id === 'string' && typeof source.displayName === 'string' &&
+      typeof source.readiness === 'string' && typeof source.health === 'string' &&
+      typeof source.eventCount === 'number' && typeof source.stale === 'boolean'
+    ) && isRecord(value.counts);
+  return valid ? { valid: true, value } : { valid: false, errors: ['SourceStatusResult is invalid'] };
+}
+
+function validateEventMeshResult(value: unknown): ValidationResult<unknown> {
+  const valid = isRecord(value) && value.schemaVersion === '1.0' && value.dataMode === 'live' &&
+    typeof value.generatedAt === 'string' && Number.isFinite(Date.parse(value.generatedAt)) &&
+    Array.isArray(value.events) && value.events.every((event) => validateLiveEvent(event).valid) &&
+    Array.isArray(value.eligibleEvents) && Array.isArray(value.excludedEvents) &&
+    Array.isArray(value.series) && Array.isArray(value.communities) && Array.isArray(value.providerErrors);
+  return valid ? { valid: true, value } : { valid: false, errors: ['EventMeshResult is invalid'] };
+}
+
 function hasExactKeys(
   value: Record<string, unknown>,
   keys: readonly string[],
@@ -119,6 +161,19 @@ function resultForCommand(
     case OSEKKAI_COMMANDS.cleanup:
       // cleanup is a maintenance-only CLI command and has no public JSON Schema.
       return validateCleanupResult(value);
+    case OSEKKAI_COMMANDS.calendarConnect:
+      return validateCalendarConnectResult(value);
+    case OSEKKAI_COMMANDS.calendarCallback:
+      return validateCalendarCallbackResult(value);
+    case OSEKKAI_COMMANDS.calendarDisconnect:
+      return validateCalendarDisconnectResult(value);
+    case OSEKKAI_COMMANDS.sourcesSync:
+    case OSEKKAI_COMMANDS.sourcesStatus:
+      return validateSourceStatusResult(value);
+    case OSEKKAI_COMMANDS.events:
+      return validateEventMeshResult(value);
+    case OSEKKAI_COMMANDS.eventRoute:
+      return validateEventRouteResult(value);
   }
 }
 

@@ -1,17 +1,23 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import freebusyFixture from "../../../agents-OpenClaw/fixtures/osekkai/freebusy.json";
+import liveContractsFixture from "../../../agents-OpenClaw/fixtures/osekkai/live-contracts.json";
 import opportunitiesFixture from "../../../agents-OpenClaw/fixtures/osekkai/opportunities.normalized.json";
 import profileFixture from "../../../agents-OpenClaw/fixtures/osekkai/profile.json";
 import { osekkaiApi, resetOsekkaiClientSessionForTests } from "./api";
 import {
   validateDecideResponse,
+  validateCommunity,
+  validateConnectionEvidence,
   validateDecisionResult,
   validateDistanceProfile,
   validateFreeBusyResult,
+  validateEventSeries,
+  validateLiveEvent,
   validateMetricsResult,
   validateOpportunity,
-  validateSessionResult
+  validateSessionResult,
+  validateSourceRegistry
 } from "./validators.generated";
 
 const profile = {
@@ -84,6 +90,30 @@ describe("Osekkai generated validators", () => {
         checksum: `sha256:${opportunity.checksum}`
       }).valid
     ).toBe(false);
+  });
+
+  it("accepts the same live Event, Series, Community, Source, Evidence and ranked decision fixture as Python", () => {
+    expect(validateSourceRegistry(liveContractsFixture.sourceRegistry).valid).toBe(true);
+    expect(liveContractsFixture.events.every((value) => validateLiveEvent(value).valid)).toBe(true);
+    expect(liveContractsFixture.series.every((value) => validateEventSeries(value).valid)).toBe(true);
+    expect(liveContractsFixture.communities.every((value) => validateCommunity(value).valid)).toBe(true);
+    expect(liveContractsFixture.connectionEvidence.every((value) => validateConnectionEvidence(value).valid)).toBe(true);
+    expect(liveContractsFixture.opportunities.every((value) => validateOpportunity(value).valid)).toBe(true);
+    expect(validateDecisionResult(liveContractsFixture.decision).valid).toBe(true);
+    expect(validateDecisionResult({
+      ...liveContractsFixture.decision,
+      rankedOpportunities: liveContractsFixture.decision.rankedOpportunities.map((item, index) => ({
+        ...item,
+        rank: index + 2
+      }))
+    }).valid).toBe(false);
+  });
+
+  it("rejects live opportunities without freshness or connection evidence", () => {
+    const opportunity = liveContractsFixture.opportunities[0] as Record<string, unknown>;
+    expect(validateOpportunity(withoutKey(opportunity, "revalidatedAt")).valid).toBe(false);
+    expect(validateOpportunity(withoutKey(opportunity, "connectionEvidence")).valid).toBe(false);
+    expect(validateOpportunity(withoutKey(opportunity, "status")).valid).toBe(false);
   });
 
   it("validates decide as a decision-plus-episode API response", () => {

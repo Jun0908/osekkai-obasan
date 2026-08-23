@@ -4,6 +4,9 @@ export interface OsekkaiContractDependencies {
 inferredPreference: InferredPreference
 fieldProvenance: FieldProvenance
 freeWindow: FreeWindow
+evidence: Evidence
+source: Source
+rankedOpportunity: RankedOpportunity
 }
 export interface InferredPreference {
 value: any
@@ -30,6 +33,48 @@ durationMinutes: number
 verificationStatus: ("synthetic_demo" | "source_verified")
 suggestedVisitStart?: string
 suggestedVisitEnd?: string
+}
+export interface Evidence {
+kind: ("recurrence" | "future_occurrence" | "solo_friendly" | "beginner_friendly" | "structured_conversation" | "shared_meal" | "group_work" | "role_available" | "community_path" | "capacity" | "registration" | "personal_fit" | "risk")
+text: string
+url: string
+classification: ("raw_open_data" | "live_provider" | "ai_derived" | "organizer_verified" | "private_user_data" | "synthetic_demo")
+capturedAt: string
+confidence: number
+evidenceField?: (string | null)
+}
+export interface Source {
+id: string
+displayName: string
+kind: ("open_data" | "live_provider" | "public_official_site" | "organizer_intake" | "deep_link")
+accessMethod: ("api" | "ical" | "json_ld" | "html" | "webhook" | "manual")
+baseUrl: string
+termsUrl: string
+license: string
+attribution: string
+enabled: boolean
+authorized: boolean
+refreshMinutes: number
+staleAfterMinutes: number
+credentialEnv: string[]
+storagePolicy: ("normalized_only" | "metadata_and_normalized" | "ephemeral")
+requiredForDemo: boolean
+}
+export interface RankedOpportunity {
+rank: number
+score: number
+opportunityId: string
+/**
+ * @minItems 1
+ */
+recommendationReasons: [RecommendationReason, ...(RecommendationReason)[]]
+exclusionReasons: ("NO_PUSH_CONSENT" | "QUIET_HOURS" | "COOLDOWN_ACTIVE" | "WEEKLY_LIMIT_REACHED" | "EXPLICIT_PAUSE" | "EXPLICIT_NO_ACTION" | "HUMAN_SUPPORT_REQUIRED" | "NO_FREE_WINDOW" | "NO_VERIFIED_OPPORTUNITY" | "OUTSIDE_FREE_WINDOW" | "TRAVEL_LIMIT" | "OVER_BUDGET" | "SOCIAL_INTENSITY_LIMIT" | "CONNECTION_LEVEL" | "REGISTRATION_UNAVAILABLE" | "INVALID_SOURCE" | "SCORE_BELOW_THRESHOLD" | "FREE_WINDOW_AVAILABLE" | "LOW_SOCIAL_BATTERY" | "LOW_CONVERSATION_REQUIREMENT" | "WITHIN_TRAVEL_LIMIT" | "UNDER_BUDGET")[]
+}
+export interface RecommendationReason {
+code: ("connection" | "continuity" | "solo_friendly" | "personal_fit" | "adjacent_interest" | "calendar_fit" | "travel_fit" | "budget_fit")
+text: string
+evidenceUrl: (string | null)
+classification: ("raw_open_data" | "live_provider" | "ai_derived" | "organizer_verified" | "private_user_data" | "synthetic_demo")
 }
 
 export interface DistanceProfile {
@@ -114,10 +159,128 @@ notice: string
 freeWindows: FreeWindow[]
 }
 
+export interface LiveEvent {
+schemaVersion: "1.0"
+id: string
+provider: string
+sourceRecordId: string
+title: string
+description: string
+startsAt: string
+endsAt: string
+timezone: "Asia/Tokyo"
+venueName: (string | null)
+address: (string | null)
+latitude: (number | null)
+longitude: (number | null)
+communityId: (string | null)
+seriesId: (string | null)
+status: ("scheduled" | "canceled" | "sold_out" | "registration_closed" | "ended" | "unknown")
+registrationStatus: ("open" | "waitlist" | "sold_out" | "closed" | "not_required" | "unknown")
+registrationDeadline: (string | null)
+capacity: (number | null)
+participants: (number | null)
+audience?: (string | null)
+priceYen: (number | null)
+categories: string[]
+sourceUrl: string
+sourceDataset: string
+license: string
+sourceClassification: ("raw_open_data" | "live_provider" | "ai_derived" | "organizer_verified" | "private_user_data" | "synthetic_demo")
+sourceLinks?: {
+provider: string
+sourceRecordId: string
+sourceUrl: string
+fetchedAt: string
+classification: ("raw_open_data" | "live_provider" | "ai_derived" | "organizer_verified" | "private_user_data" | "synthetic_demo")
+}[]
+duplicateEventIds?: string[]
+sourceUpdatedAt: string
+fetchedAt: string
+revalidatedAt: string
+checksum: string
+fieldProvenance: {
+[k: string]: FieldProvenance
+}
+}
+
+export interface EventSeries {
+schemaVersion: "1.0"
+id: string
+provider: string
+communityId: (string | null)
+title: string
+recurrenceText: string
+futureOccurrenceIds: string[]
+sourceUrl: string
+sourceClassification: ("raw_open_data" | "live_provider" | "ai_derived" | "organizer_verified" | "private_user_data" | "synthetic_demo")
+sourceUpdatedAt: string
+fetchedAt: string
+revalidatedAt: string
+/**
+ * @minItems 1
+ */
+evidence: [Evidence, ...(Evidence)[]]
+}
+
+export interface Community {
+schemaVersion: "1.0"
+id: string
+provider: string
+name: string
+description: string
+organizerName: (string | null)
+eventSeriesIds: string[]
+futureEventIds: string[]
+communityUrl: string
+sourceClassification: ("raw_open_data" | "live_provider" | "ai_derived" | "organizer_verified" | "private_user_data" | "synthetic_demo")
+sourceUpdatedAt: string
+fetchedAt: string
+revalidatedAt: string
+/**
+ * @minItems 1
+ */
+evidence: [Evidence, ...(Evidence)[]]
+}
+
+export interface SourceRegistry {
+schemaVersion: "1.0"
+generatedAt: string
+sources: Source[]
+}
+
+export interface ConnectionEvidence {
+schemaVersion: "1.0"
+eventId: string
+connectionLevel: number
+soloFriendly: ("yes" | "no" | "unknown")
+beginnerFriendly: ("yes" | "no" | "unknown")
+recurring: ("yes" | "no" | "unknown")
+structuredConversation: ("yes" | "no" | "unknown")
+sharedMeal: ("yes" | "no" | "unknown")
+groupWork: ("yes" | "no" | "unknown")
+roleAvailable: ("yes" | "no" | "unknown")
+futureOccurrenceCount: number
+solicitationRisk: ("low" | "medium" | "high" | "unknown")
+/**
+ * @minItems 1
+ */
+evidence: [Evidence, ...(Evidence)[]]
+model: {
+method: ("rules" | "ai" | "organizer_verified")
+version: string
+confidence: number
+}
+evaluatedAt: string
+}
+
 export interface Opportunity {
 schemaVersion: "1.0"
 id: string
 sourceRecordId?: string
+eventId?: string
+communityId?: (string | null)
+seriesId?: (string | null)
 title: string
 description?: string
 startsAt: string
@@ -125,23 +288,38 @@ endsAt: string
 address: string
 latitude?: number
 longitude?: number
-priceYen: number
+priceYen: (number | null)
 socialIntensity: number
 conversationRequired: ("none" | "low" | "medium" | "high")
 soloFriendly: boolean
 recurring?: boolean
+futureOccurrences?: {
+eventId: string
+startsAt: string
+endsAt: string
+sourceUrl: string
+}[]
+capacity?: (number | null)
+participants?: (number | null)
+status?: ("scheduled" | "canceled" | "sold_out" | "registration_closed" | "ended" | "unknown")
+registrationStatus?: ("open" | "waitlist" | "sold_out" | "closed" | "not_required" | "unknown")
+registrationDeadline?: (string | null)
 flexibleVisit?: boolean
 visitDurationMinutes?: number
 roleAvailable?: (boolean | null)
 roleDescription?: (string | null)
 categories?: string[]
 provider: string
-sourceType: ("open_data" | "organizer_verified" | "ai_derived")
+sourceType: ("open_data" | "live_provider" | "organizer_verified" | "ai_derived" | "private_user_data")
+sourceClassification?: ("raw_open_data" | "live_provider" | "ai_derived" | "organizer_verified" | "private_user_data" | "synthetic_demo")
 sourceUrl: string
 datasetUrl?: string
 sourceDataset: string
 license: string
 capturedAt: string
+sourceUpdatedAt?: string
+fetchedAt?: string
+revalidatedAt?: string
 checksum: string
 sourceTrust?: number
 confidence?: number
@@ -150,10 +328,9 @@ verificationStatus: ("synthetic_demo" | "source_snapshot" | "source_verified" | 
 fieldProvenance: {
 [k: string]: FieldProvenance
 }
+connectionEvidence?: ConnectionEvidence
 travelEstimate: {
-mode: ("walk" | "transit" | "bicycle")
-minutes: number
-source: ("synthetic_demo" | "maps_verified")
+[k: string]: any
 }
 }
 
@@ -163,12 +340,16 @@ episodeId: string
 policyVersion: string
 decision: ("do_not_push" | "check_in_only" | "suggest_solo_place" | "suggest_light_social" | "suggest_small_role")
 shouldPush: boolean
-reasonCodes: ("NO_PUSH_CONSENT" | "QUIET_HOURS" | "COOLDOWN_ACTIVE" | "WEEKLY_LIMIT_REACHED" | "EXPLICIT_PAUSE" | "EXPLICIT_NO_ACTION" | "HUMAN_SUPPORT_REQUIRED" | "NO_FREE_WINDOW" | "NO_VERIFIED_OPPORTUNITY" | "OUTSIDE_FREE_WINDOW" | "TRAVEL_LIMIT" | "OVER_BUDGET" | "SOCIAL_INTENSITY_LIMIT" | "INVALID_SOURCE" | "SCORE_BELOW_THRESHOLD" | "FREE_WINDOW_AVAILABLE" | "LOW_SOCIAL_BATTERY" | "LOW_CONVERSATION_REQUIREMENT" | "WITHIN_TRAVEL_LIMIT" | "UNDER_BUDGET")[]
+reasonCodes: ("NO_PUSH_CONSENT" | "QUIET_HOURS" | "COOLDOWN_ACTIVE" | "WEEKLY_LIMIT_REACHED" | "EXPLICIT_PAUSE" | "EXPLICIT_NO_ACTION" | "HUMAN_SUPPORT_REQUIRED" | "NO_FREE_WINDOW" | "NO_VERIFIED_OPPORTUNITY" | "OUTSIDE_FREE_WINDOW" | "TRAVEL_LIMIT" | "OVER_BUDGET" | "SOCIAL_INTENSITY_LIMIT" | "CONNECTION_LEVEL" | "REGISTRATION_UNAVAILABLE" | "INVALID_SOURCE" | "SCORE_BELOW_THRESHOLD" | "FREE_WINDOW_AVAILABLE" | "LOW_SOCIAL_BATTERY" | "LOW_CONVERSATION_REQUIREMENT" | "WITHIN_TRAVEL_LIMIT" | "UNDER_BUDGET")[]
 score: (number | null)
 selectedOpportunity: (Opportunity | null)
+/**
+ * @maxItems 8
+ */
+rankedOpportunities?: []|[RankedOpportunity]|[RankedOpportunity, RankedOpportunity]|[RankedOpportunity, RankedOpportunity, RankedOpportunity]|[RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity]|[RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity]|[RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity]|[RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity]|[RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity]
 excludedCandidates: {
 opportunityId: string
-reasonCodes: ("NO_PUSH_CONSENT" | "QUIET_HOURS" | "COOLDOWN_ACTIVE" | "WEEKLY_LIMIT_REACHED" | "EXPLICIT_PAUSE" | "EXPLICIT_NO_ACTION" | "HUMAN_SUPPORT_REQUIRED" | "NO_FREE_WINDOW" | "NO_VERIFIED_OPPORTUNITY" | "OUTSIDE_FREE_WINDOW" | "TRAVEL_LIMIT" | "OVER_BUDGET" | "SOCIAL_INTENSITY_LIMIT" | "INVALID_SOURCE" | "SCORE_BELOW_THRESHOLD" | "FREE_WINDOW_AVAILABLE" | "LOW_SOCIAL_BATTERY" | "LOW_CONVERSATION_REQUIREMENT" | "WITHIN_TRAVEL_LIMIT" | "UNDER_BUDGET")[]
+reasonCodes: ("NO_PUSH_CONSENT" | "QUIET_HOURS" | "COOLDOWN_ACTIVE" | "WEEKLY_LIMIT_REACHED" | "EXPLICIT_PAUSE" | "EXPLICIT_NO_ACTION" | "HUMAN_SUPPORT_REQUIRED" | "NO_FREE_WINDOW" | "NO_VERIFIED_OPPORTUNITY" | "OUTSIDE_FREE_WINDOW" | "TRAVEL_LIMIT" | "OVER_BUDGET" | "SOCIAL_INTENSITY_LIMIT" | "CONNECTION_LEVEL" | "REGISTRATION_UNAVAILABLE" | "INVALID_SOURCE" | "SCORE_BELOW_THRESHOLD" | "FREE_WINDOW_AVAILABLE" | "LOW_SOCIAL_BATTERY" | "LOW_CONVERSATION_REQUIREMENT" | "WITHIN_TRAVEL_LIMIT" | "UNDER_BUDGET")[]
 }[]
 notification: ({
 text: string
@@ -186,7 +367,7 @@ sequence: number
 policyVersion: string
 decision: ("do_not_push" | "check_in_only" | "suggest_solo_place" | "suggest_light_social" | "suggest_small_role")
 shouldPush: boolean
-reasonCodes: ("NO_PUSH_CONSENT" | "QUIET_HOURS" | "COOLDOWN_ACTIVE" | "WEEKLY_LIMIT_REACHED" | "EXPLICIT_PAUSE" | "EXPLICIT_NO_ACTION" | "HUMAN_SUPPORT_REQUIRED" | "NO_FREE_WINDOW" | "NO_VERIFIED_OPPORTUNITY" | "OUTSIDE_FREE_WINDOW" | "TRAVEL_LIMIT" | "OVER_BUDGET" | "SOCIAL_INTENSITY_LIMIT" | "INVALID_SOURCE" | "SCORE_BELOW_THRESHOLD" | "FREE_WINDOW_AVAILABLE" | "LOW_SOCIAL_BATTERY" | "LOW_CONVERSATION_REQUIREMENT" | "WITHIN_TRAVEL_LIMIT" | "UNDER_BUDGET")[]
+reasonCodes: ("NO_PUSH_CONSENT" | "QUIET_HOURS" | "COOLDOWN_ACTIVE" | "WEEKLY_LIMIT_REACHED" | "EXPLICIT_PAUSE" | "EXPLICIT_NO_ACTION" | "HUMAN_SUPPORT_REQUIRED" | "NO_FREE_WINDOW" | "NO_VERIFIED_OPPORTUNITY" | "OUTSIDE_FREE_WINDOW" | "TRAVEL_LIMIT" | "OVER_BUDGET" | "SOCIAL_INTENSITY_LIMIT" | "CONNECTION_LEVEL" | "REGISTRATION_UNAVAILABLE" | "INVALID_SOURCE" | "SCORE_BELOW_THRESHOLD" | "FREE_WINDOW_AVAILABLE" | "LOW_SOCIAL_BATTERY" | "LOW_CONVERSATION_REQUIREMENT" | "WITHIN_TRAVEL_LIMIT" | "UNDER_BUDGET")[]
 score: (number | null)
 profileSnapshot: (DistanceProfile | null)
 freeWindowSnapshot: (FreeWindow | null)
@@ -194,9 +375,13 @@ candidateIdsBeforeFilter: string[]
 candidateIdsAfterFilter: string[]
 excludedCandidates: {
 opportunityId: string
-reasonCodes: ("NO_PUSH_CONSENT" | "QUIET_HOURS" | "COOLDOWN_ACTIVE" | "WEEKLY_LIMIT_REACHED" | "EXPLICIT_PAUSE" | "EXPLICIT_NO_ACTION" | "HUMAN_SUPPORT_REQUIRED" | "NO_FREE_WINDOW" | "NO_VERIFIED_OPPORTUNITY" | "OUTSIDE_FREE_WINDOW" | "TRAVEL_LIMIT" | "OVER_BUDGET" | "SOCIAL_INTENSITY_LIMIT" | "INVALID_SOURCE" | "SCORE_BELOW_THRESHOLD" | "FREE_WINDOW_AVAILABLE" | "LOW_SOCIAL_BATTERY" | "LOW_CONVERSATION_REQUIREMENT" | "WITHIN_TRAVEL_LIMIT" | "UNDER_BUDGET")[]
+reasonCodes: ("NO_PUSH_CONSENT" | "QUIET_HOURS" | "COOLDOWN_ACTIVE" | "WEEKLY_LIMIT_REACHED" | "EXPLICIT_PAUSE" | "EXPLICIT_NO_ACTION" | "HUMAN_SUPPORT_REQUIRED" | "NO_FREE_WINDOW" | "NO_VERIFIED_OPPORTUNITY" | "OUTSIDE_FREE_WINDOW" | "TRAVEL_LIMIT" | "OVER_BUDGET" | "SOCIAL_INTENSITY_LIMIT" | "CONNECTION_LEVEL" | "REGISTRATION_UNAVAILABLE" | "INVALID_SOURCE" | "SCORE_BELOW_THRESHOLD" | "FREE_WINDOW_AVAILABLE" | "LOW_SOCIAL_BATTERY" | "LOW_CONVERSATION_REQUIREMENT" | "WITHIN_TRAVEL_LIMIT" | "UNDER_BUDGET")[]
 }[]
 selectedOpportunity: (Opportunity | null)
+/**
+ * @maxItems 8
+ */
+rankedOpportunities?: []|[RankedOpportunity]|[RankedOpportunity, RankedOpportunity]|[RankedOpportunity, RankedOpportunity, RankedOpportunity]|[RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity]|[RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity]|[RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity]|[RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity]|[RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity, RankedOpportunity]
 notification: ({
 text: string
 tone: ("gentle" | "casual" | "direct" | "quiet")
@@ -305,12 +490,41 @@ export interface ProfileDeleteRequest {
 confirm: true
 }
 
+export interface CalendarCallbackRequest {
+state: string
+code: string
+}
+
+export interface EventRouteRequest {
+eventId: string
+origin: {
+latitude: number
+longitude: number
+}
+}
+
+export interface EventRouteResult {
+eventId: string
+mode: ("walk" | "transit")
+minutes: number
+source: "maps_verified"
+computedAt: string
+distanceMeters: number
+confidence: number
+resolvedAddress: string
+latitude: number
+longitude: number
+}
+
 export type SchemaVersion = "1.0";
 export type DataMode = "demo" | "live";
 export type MetricClassification = "measured" | "reference_estimate" | "demo" | "unverified";
+export type SourceClassification = "raw_open_data" | "live_provider" | "ai_derived" | "organizer_verified" | "private_user_data" | "synthetic_demo";
+export type EventStatus = "scheduled" | "canceled" | "sold_out" | "registration_closed" | "ended" | "unknown";
+export type RegistrationStatus = "open" | "waitlist" | "sold_out" | "closed" | "not_required" | "unknown";
 export type SocialIntensity = 0 | 1 | 2 | 3 | 4 | 5;
 export type PushTone = "gentle" | "casual" | "direct" | "quiet";
-export type ReasonCode = "NO_PUSH_CONSENT" | "QUIET_HOURS" | "COOLDOWN_ACTIVE" | "WEEKLY_LIMIT_REACHED" | "EXPLICIT_PAUSE" | "EXPLICIT_NO_ACTION" | "HUMAN_SUPPORT_REQUIRED" | "NO_FREE_WINDOW" | "NO_VERIFIED_OPPORTUNITY" | "OUTSIDE_FREE_WINDOW" | "TRAVEL_LIMIT" | "OVER_BUDGET" | "SOCIAL_INTENSITY_LIMIT" | "INVALID_SOURCE" | "SCORE_BELOW_THRESHOLD" | "FREE_WINDOW_AVAILABLE" | "LOW_SOCIAL_BATTERY" | "LOW_CONVERSATION_REQUIREMENT" | "WITHIN_TRAVEL_LIMIT" | "UNDER_BUDGET";
+export type ReasonCode = "NO_PUSH_CONSENT" | "QUIET_HOURS" | "COOLDOWN_ACTIVE" | "WEEKLY_LIMIT_REACHED" | "EXPLICIT_PAUSE" | "EXPLICIT_NO_ACTION" | "HUMAN_SUPPORT_REQUIRED" | "NO_FREE_WINDOW" | "NO_VERIFIED_OPPORTUNITY" | "OUTSIDE_FREE_WINDOW" | "TRAVEL_LIMIT" | "OVER_BUDGET" | "SOCIAL_INTENSITY_LIMIT" | "CONNECTION_LEVEL" | "REGISTRATION_UNAVAILABLE" | "INVALID_SOURCE" | "SCORE_BELOW_THRESHOLD" | "FREE_WINDOW_AVAILABLE" | "LOW_SOCIAL_BATTERY" | "LOW_CONVERSATION_REQUIREMENT" | "WITHIN_TRAVEL_LIMIT" | "UNDER_BUDGET";
 export type DecisionType = "do_not_push" | "check_in_only" | "suggest_solo_place" | "suggest_light_social" | "suggest_small_role";
 export type ActionResponse = "accepted" | "declined" | "show_another" | "pause_one_week";
 export type DistanceFeedback = "too_much" | "just_right" | "push_more";

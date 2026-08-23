@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://osekkai.local/contracts/calendar-callback-request.schema.json",
+  "title": "Google Calendar OAuth callback request",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["state", "code"],
+  "properties": {
+    "state": { "type": "string", "pattern": "^[A-Za-z0-9_-]{32,160}$" },
+    "code": { "type": "string", "minLength": 1, "maxLength": 4096 }
+  }
+}

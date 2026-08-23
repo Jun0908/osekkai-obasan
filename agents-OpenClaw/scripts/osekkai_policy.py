@@ -49,6 +49,21 @@ def load_policy_config() -> dict[str, Any]:
         raise ContractError("policy weights are invalid")
     if not 0 <= value.get("pushThreshold", -1) <= 1:
         raise ContractError("policy threshold is invalid")
+    if not 2 <= value.get("maxRankedOpportunities", 0) <= 8:
+        raise ContractError("policy maxRankedOpportunities must be between 2 and 8")
+    if not 2 <= value.get("minimumLiveConnectionLevel", 0) <= 3:
+        raise ContractError("policy minimumLiveConnectionLevel is invalid")
+    live_weights = value.get("liveRankingWeights")
+    if not isinstance(live_weights, dict) or set(live_weights) != {"connection", "personalFit", "adjacentInterest", "continuity", "feasibility"}:
+        raise ContractError("policy liveRankingWeights are invalid")
+    if abs(sum(float(weight) for weight in live_weights.values()) - 1.0) > 0.0001:
+        raise ContractError("policy liveRankingWeights must sum to 1")
+    adjacent = value.get("adjacentCategories")
+    if not isinstance(adjacent, dict) or not all(
+        isinstance(key, str) and isinstance(items, list) and all(isinstance(item, str) for item in items)
+        for key, items in adjacent.items()
+    ):
+        raise ContractError("policy adjacentCategories are invalid")
     return value
 
 
@@ -180,7 +195,9 @@ def filter_candidates(
         if isinstance(travel, bool) or not isinstance(travel, int) or travel > profile.get("maxTravelMinutes", 0):
             reasons.append("TRAVEL_LIMIT")
         price = candidate.get("priceYen")
-        if isinstance(price, bool) or not isinstance(price, int) or price > profile.get("maxBudgetYen", 0):
+        if isinstance(price, bool) or (price is not None and not isinstance(price, int)):
+            reasons.append("INVALID_SOURCE")
+        elif isinstance(price, int) and price > profile.get("maxBudgetYen", 0):
             reasons.append("OVER_BUDGET")
         intensity = candidate.get("socialIntensity")
         if isinstance(intensity, bool) or not isinstance(intensity, int) or intensity > effective_intensity:
@@ -188,6 +205,13 @@ def filter_candidates(
         categories = set(candidate.get("categories", []))
         if avoided & categories:
             reasons.append("SOCIAL_INTENSITY_LIMIT")
+        if data_mode == "live":
+            connection = candidate.get("connectionEvidence", {})
+            level = connection.get("connectionLevel") if isinstance(connection, dict) else None
+            if not isinstance(level, int) or level < int(config["minimumLiveConnectionLevel"]):
+                reasons.append("CONNECTION_LEVEL")
+            if candidate.get("status") != "scheduled" or candidate.get("registrationStatus") not in {"open", "not_required"}:
+                reasons.append("REGISTRATION_UNAVAILABLE")
         reasons = list(dict.fromkeys(reasons))
         if reasons:
             exclusions[candidate_id] = reasons
@@ -222,7 +246,8 @@ def _score_candidate(
     max_travel = max(int(profile.get("maxTravelMinutes", 0)), 1)
     travel = int(opportunity.get("travelEstimate", {}).get("minutes", max_travel))
     max_budget = max(int(profile.get("maxBudgetYen", 0)), 1)
-    price = int(opportunity.get("priceYen", max_budget))
+    raw_price = opportunity.get("priceYen")
+    price = raw_price if isinstance(raw_price, int) and not isinstance(raw_price, bool) else max_budget
     feasibility = max(0.0, 1.0 - 0.35 * (travel / max_travel) - 0.25 * (price / max_budget))
     intensity = int(opportunity.get("socialIntensity", 5))
     burden = min(1.0, 0.5 * (intensity / 5.0) + 0.5 * (travel / max_travel))
@@ -239,6 +264,108 @@ def _score_candidate(
     }
     score = sum(config["weights"][key] * value for key, value in components.items())
     return round(score, 4), components
+
+
+def _live_score_candidate(
+    profile: dict[str, Any], opportunity: dict[str, Any], config: dict[str, Any]
+) -> tuple[float, dict[str, float], dict[str, bool]]:
+    preferred = {str(value).lower() for value in profile.get("preferredCategories", [])}
+    categories = {str(value).lower() for value in opportunity.get("categories", [])}
+    exact = bool(preferred & categories)
+    adjacent_values = {
+        adjacent.lower()
+        for preference in preferred
+        for adjacent in config["adjacentCategories"].get(preference, [])
+    }
+    adjacent = bool(categories & adjacent_values) and not exact
+    connection_value = opportunity.get("connectionEvidence", {})
+    level = int(connection_value.get("connectionLevel", 0))
+    connection = level / 3.0
+    future_count = int(connection_value.get("futureOccurrenceCount", 0))
+    continuity = 1.0 if future_count > 0 else (0.65 if opportunity.get("recurring") else 0.2)
+    personal_fit = 1.0 if exact else (0.7 if adjacent else (0.45 if not preferred else 0.25))
+    adjacent_fit = 1.0 if adjacent else (0.45 if exact else 0.2)
+    max_travel = max(int(profile.get("maxTravelMinutes", 0)), 1)
+    travel = int(opportunity.get("travelEstimate", {}).get("minutes", max_travel))
+    max_budget = max(int(profile.get("maxBudgetYen", 0)), 1)
+    raw_price = opportunity.get("priceYen")
+    price = raw_price if isinstance(raw_price, int) and not isinstance(raw_price, bool) else max_budget
+    intensity = int(opportunity.get("socialIntensity", 5))
+    feasibility = max(0.0, 1.0 - 0.35 * (travel / max_travel) - 0.25 * (price / max_budget) - 0.15 * (intensity / 5))
+    rejection_penalty = min(0.2, int(profile.get("rejectionStreak", 0)) * 0.05)
+    components = {
+        "connection": round(connection, 4),
+        "personalFit": round(personal_fit, 4),
+        "adjacentInterest": round(adjacent_fit, 4),
+        "continuity": round(continuity, 4),
+        "feasibility": round(feasibility, 4),
+    }
+    score = sum(float(config["liveRankingWeights"][key]) * value for key, value in components.items()) - rejection_penalty
+    return round(max(-1.0, min(1.0, score)), 4), components, {"exact": exact, "adjacent": adjacent}
+
+
+def _recommendation_reasons(
+    profile: dict[str, Any], opportunity: dict[str, Any], fit_flags: dict[str, bool]
+) -> list[dict[str, Any]]:
+    connection = opportunity["connectionEvidence"]
+    evidence = connection.get("evidence", [])
+    first_evidence = evidence[0] if evidence else None
+    reasons: list[dict[str, Any]] = []
+    if first_evidence:
+        reasons.append(
+            {
+                "code": "connection",
+                "text": first_evidence["text"],
+                "evidenceUrl": first_evidence["url"],
+                "classification": first_evidence["classification"],
+            }
+        )
+    continuity_evidence = next((item for item in evidence if item.get("kind") in {"future_occurrence", "recurrence", "community_path"}), None)
+    if continuity_evidence:
+        reasons.append(
+            {
+                "code": "continuity",
+                "text": continuity_evidence["text"],
+                "evidenceUrl": continuity_evidence["url"],
+                "classification": continuity_evidence["classification"],
+            }
+        )
+    preferred = ", ".join(str(value) for value in profile.get("preferredCategories", [])[:3]) or "これまでの会話"
+    if fit_flags["adjacent"]:
+        reasons.append(
+            {
+                "code": "adjacent_interest",
+                "text": f"{preferred}から少しずらした、会話の入口が作りやすい隣接ジャンルです。",
+                "evidenceUrl": None,
+                "classification": "ai_derived",
+            }
+        )
+    elif fit_flags["exact"]:
+        reasons.append(
+            {
+                "code": "personal_fit",
+                "text": f"本人が話した好み（{preferred}）と一致します。",
+                "evidenceUrl": None,
+                "classification": "private_user_data",
+            }
+        )
+    reasons.extend(
+        [
+            {
+                "code": "calendar_fit",
+                "text": "Google Calendarの空き時間に往復を含めて収まります。",
+                "evidenceUrl": None,
+                "classification": "private_user_data",
+            },
+            {
+                "code": "travel_fit",
+                "text": f"Google Routes実測で片道{opportunity['travelEstimate']['minutes']}分です。",
+                "evidenceUrl": None,
+                "classification": "private_user_data",
+            },
+        ]
+    )
+    return reasons
 
 
 def _guardrail_reason(
@@ -303,6 +430,8 @@ def evaluate_policy(
         "score": None,
         "scoreComponents": None,
     }
+    if data_mode == "live":
+        base["rankedOpportunities"] = []
     if guardrail:
         base.update(
             {
@@ -332,8 +461,12 @@ def evaluate_policy(
 
     scored = []
     for item in eligible:
-        score, components = _score_candidate(profile, item, config)
-        scored.append((item, score, components))
+        if data_mode == "live":
+            score, components, fit_flags = _live_score_candidate(profile, item, config)
+        else:
+            score, components = _score_candidate(profile, item, config)
+            fit_flags = {"exact": False, "adjacent": False}
+        scored.append((item, score, components, fit_flags))
     scored.sort(
         key=lambda entry: (
             -entry[1],
@@ -343,7 +476,19 @@ def evaluate_policy(
             entry[0].get("id", ""),
         )
     )
-    selected, score, components = scored[0]
+    if data_mode == "live":
+        shortlist = scored[: int(config["maxRankedOpportunities"])]
+        base["rankedOpportunities"] = [
+            {
+                "rank": index,
+                "score": item_score,
+                "opportunityId": item["id"],
+                "recommendationReasons": _recommendation_reasons(profile, item, fit_flags),
+                "exclusionReasons": [],
+            }
+            for index, (item, item_score, _components, fit_flags) in enumerate(shortlist, start=1)
+        ]
+    selected, score, components, _fit_flags = scored[0]
     base["score"] = score
     base["scoreComponents"] = components
     if score < float(config["pushThreshold"]):
@@ -362,14 +507,27 @@ def evaluate_policy(
         reasons.append("LOW_SOCIAL_BATTERY")
     if selected.get("conversationRequired") in {"none", "low"}:
         reasons.append("LOW_CONVERSATION_REQUIREMENT")
-    reasons.extend(["WITHIN_TRAVEL_LIMIT", "UNDER_BUDGET"])
+    reasons.append("WITHIN_TRAVEL_LIMIT")
+    selected_price = selected.get("priceYen")
+    if isinstance(selected_price, int) and not isinstance(selected_price, bool):
+        reasons.append("UNDER_BUDGET")
     validate_reason_codes(reasons)
     travel = selected["travelEstimate"]["minutes"]
-    message = (
-        f"会話をほとんどしなくても見られる「{selected['title']}」があるわよ。"
-        f"移動はデモ上で徒歩{travel}分。短く見るだけでもどう？"
-    )
-    decision = "suggest_solo_place" if selected.get("conversationRequired") == "none" else "suggest_light_social"
+    if data_mode == "live":
+        preference = str(profile.get("preferredCategories", ["それ"])[0]) if profile.get("preferredCategories") else "それ"
+        continuity = "次もある" if selected.get("connectionEvidence", {}).get("futureOccurrenceCount", 0) else "少人数の"
+        solo = "ひとり参加OKで、" if selected.get("connectionEvidence", {}).get("soloFriendly") == "yes" else ""
+        message = (
+            f"あんた、この前{preference}好きって言うてたやろ。片道{travel}分のとこで{continuity}「{selected['title']}」あるで。"
+            f"{solo}合わんかったら次は別のにしたらええ。"
+        )
+        decision = "suggest_small_role" if selected.get("connectionEvidence", {}).get("roleAvailable") == "yes" else "suggest_light_social"
+    else:
+        message = (
+            f"会話をほとんどしなくても見られる「{selected['title']}」があるわよ。"
+            f"移動はデモ上で徒歩{travel}分。短く見るだけでもどう？"
+        )
+        decision = "suggest_solo_place" if selected.get("conversationRequired") == "none" else "suggest_light_social"
     base.update(
         {
             "decision": decision,
@@ -382,4 +540,3 @@ def evaluate_policy(
         }
     )
     return base
-

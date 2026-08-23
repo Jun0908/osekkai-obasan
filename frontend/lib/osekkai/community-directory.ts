@@ -297,6 +297,25 @@ function isAgeUnrelatedCommunity(category: string, description: string): boolean
   return AGE_UNRELATED_KEYWORDS.some((keyword) => text.includes(keyword));
 }
 
+// Keywords covering the ball sports, martial arts, dance, and health-exercise
+// category/description values actually present in communities.csv (surveyed
+// across all ~1,000 distinct raw values). Kept specific (e.g. "健康体操" not
+// bare "健康") so it does not also match unrelated entries like 健康・医療.
+const SPORTS_KEYWORDS = [
+  'バレーボール', 'バドミントン', 'バスケットボール', 'サッカー', 'フットサル', '卓球', '水泳', '野球',
+  'テニス', '剣道', 'ソフトボール', '太極拳', 'ダンス', '舞踊', '踊り', 'スポーツ', '空手', '合気道',
+  '柔道', '少林寺拳法', 'なぎなた', '弓道', '相撲', '銃剣道', '居合道', 'テコンドー', '体操', 'ヨガ',
+  'ヨーガ', '気功', 'ピラティス', '自彊術', 'エアロビクス', '球技', 'ビーチボール', 'ゲートボール',
+  'グラウンドゴルフ', 'インディアカ', 'ラグビー', '登山', 'ハイキング', 'ウォーキング', 'スキー',
+  '陸上競技', 'トライアスロン', 'ローラースケート', 'アーチェリー', 'レスリング', 'アクアサイズ',
+  'ニュースポーツ',
+];
+
+function isSportsCommunity(category: string, description: string): boolean {
+  const text = `${category} ${description}`;
+  return SPORTS_KEYWORDS.some((keyword) => text.includes(keyword));
+}
+
 const DATA_SOURCE_NOTE =
   '区が公開する地域コミュニティ一覧（Open Data CSV）を地図へ表示しています。単一会場住所、複数会場の代表地点、確認済み施設、公式区域または地域名・町丁目、区役所の順に位置を解決します。複数会場は一覧の最初の住所、地域名・町丁目は活動区域の目安です。個々の開催日時・現在の活動有無は確認していません。';
 
@@ -327,8 +346,11 @@ async function readRows(): Promise<{ header: string[]; columnAt: (column: (typeo
   return { header, columnAt: (column) => columnIndex.get(column) as number, rows: rows.slice(1) };
 }
 
-export async function loadCommunityDirectorySummary(options?: { excludeAgeUnrelated?: boolean }): Promise<CommunityDirectoryResult> {
+export async function loadCommunityDirectorySummary(
+  options?: { excludeAgeUnrelated?: boolean; onlySports?: boolean },
+): Promise<CommunityDirectoryResult> {
   const excludeAgeUnrelated = options?.excludeAgeUnrelated ?? false;
+  const onlySports = options?.onlySports ?? false;
   const [{ header, columnAt, rows }, wards, addresses] = await Promise.all([
     readRows(),
     readWardGeocodingDirectory(),
@@ -350,6 +372,7 @@ export async function loadCommunityDirectorySummary(options?: { excludeAgeUnrela
     const name = (row[at('name')] ?? '').trim();
     if (!ward || !id || !name) continue;
     if (excludeAgeUnrelated && isAgeUnrelatedCommunity(row[at('category')] ?? '', row[at('description')] ?? '')) continue;
+    if (onlySports && !isSportsCommunity(row[at('category')] ?? '', row[at('description')] ?? '')) continue;
     const venueName = (row[at('venue_name')] ?? '').trim();
     const venueAddress = (row[at('venue_address')] ?? '').trim();
     const facility = resolveFacility(ward, venueName, venueAddress, mapLocationFromRow(row, at), wards, addresses);
@@ -393,9 +416,10 @@ export async function loadCommunityDirectorySummary(options?: { excludeAgeUnrela
 
 export async function loadCommunityFacilityDetail(
   facilityKey: string,
-  options?: { excludeAgeUnrelated?: boolean },
+  options?: { excludeAgeUnrelated?: boolean; onlySports?: boolean },
 ): Promise<CommunityFacilityDetail | null> {
   const excludeAgeUnrelated = options?.excludeAgeUnrelated ?? false;
+  const onlySports = options?.onlySports ?? false;
   const [{ header, columnAt, rows }, wards, addresses] = await Promise.all([
     readRows(),
     readWardGeocodingDirectory(),
@@ -414,6 +438,7 @@ export async function loadCommunityFacilityDetail(
     const name = (row[at('name')] ?? '').trim();
     if (!ward || !id || !name) continue;
     if (excludeAgeUnrelated && isAgeUnrelatedCommunity(row[at('category')] ?? '', row[at('description')] ?? '')) continue;
+    if (onlySports && !isSportsCommunity(row[at('category')] ?? '', row[at('description')] ?? '')) continue;
     const venueName = (row[at('venue_name')] ?? '').trim();
     const venueAddress = (row[at('venue_address')] ?? '').trim();
     const facility = resolveFacility(ward, venueName, venueAddress, mapLocationFromRow(row, at), wards, addresses);

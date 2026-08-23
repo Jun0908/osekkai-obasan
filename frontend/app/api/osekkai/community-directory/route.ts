@@ -9,12 +9,13 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const key = params.get('key')?.trim();
   const excludeAgeUnrelated = params.get('excludeAgeUnrelated') === '1';
+  const onlySports = params.get('onlySports') === '1';
   if (key) {
     if (key.length > 80) {
       return NextResponse.json({ error: 'key is invalid' }, { status: 400 });
     }
     try {
-      const detail = await loadCommunityFacilityDetail(key, { excludeAgeUnrelated });
+      const detail = await loadCommunityFacilityDetail(key, { excludeAgeUnrelated, onlySports });
       if (!detail) {
         return NextResponse.json({ error: 'facility not found' }, { status: 404 });
       }
@@ -24,7 +25,7 @@ export async function GET(request: Request) {
     }
   }
   try {
-    const summary = await loadCommunityDirectorySummary({ excludeAgeUnrelated });
+    const summary = await loadCommunityDirectorySummary({ excludeAgeUnrelated, onlySports });
     return NextResponse.json(summary);
   } catch {
     return NextResponse.json({ error: 'community directory is unavailable' }, { status: 503 });

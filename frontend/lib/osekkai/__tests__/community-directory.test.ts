@@ -153,6 +153,19 @@ describe('loadCommunityDirectorySummary', () => {
     expect(result.facilities.find((facility) => facility.key === 'sports-center')).toMatchObject({ count: 1 });
   });
 
+  it('keeps only sports/exercise rows when onlySports is set', async () => {
+    writeCommunitiesCsv([
+      row({ community_id: 'community_1', ward_name: '千代田区', name: '卓球クラブ', description: 'スポーツ', venue_name: 'スポーツセンター' }),
+      row({ community_id: 'community_2', ward_name: '千代田区', name: '読書会さくら', description: '読書', venue_name: '九段' }),
+    ]);
+
+    const result = await loadCommunityDirectorySummary({ onlySports: true });
+
+    expect(result.counts).toEqual({ total: 1, withVenueAddress: 0, withKnownFacility: 1, withAreaLocation: 0, withWardOfficeFallback: 0 });
+    expect(result.facilities.find((facility) => facility.key === 'sports-center')).toMatchObject({ count: 1 });
+    expect(result.facilities.find((facility) => facility.key === 'kudan')).toBeUndefined();
+  });
+
   it('labels the first point of an explicit multi-venue record as representative', async () => {
     writeCommunitiesCsv([
       row({

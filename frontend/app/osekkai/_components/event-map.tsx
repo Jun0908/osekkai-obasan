@@ -109,6 +109,7 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
   const [facilityError, setFacilityError] = useState('');
   const [wardChoice, setWardChoice] = useState(DEFAULT_WARD);
   const [excludeAgeUnrelated, setExcludeAgeUnrelated] = useState(false);
+  const [onlySports, setOnlySports] = useState(false);
   const [filter, setFilter] = useState<Filter>('all');
   const [origin, setOrigin] = useState<Coordinates | null>(null);
   const [locationState, setLocationState] = useState('地図は麹町中心・現在地は保存しません');
@@ -177,25 +178,33 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
     };
   }, []);
 
+  const communityFilterParams = useMemo(() => {
+    const params = new URLSearchParams();
+    if (excludeAgeUnrelated) params.set('excludeAgeUnrelated', '1');
+    if (onlySports) params.set('onlySports', '1');
+    return params;
+  }, [excludeAgeUnrelated, onlySports]);
+
   useEffect(() => {
     let cancelled = false;
-    const query = excludeAgeUnrelated ? '?excludeAgeUnrelated=1' : '';
-    void fetch(`/api/osekkai/community-directory${query}`)
+    const query = communityFilterParams.toString();
+    void fetch(`/api/osekkai/community-directory${query ? `?${query}` : ''}`)
       .then((response) => (response.ok ? (response.json() as Promise<CommunityDirectoryResult>) : null))
       .then((data) => { if (!cancelled && data) setCommunities(data); })
       .catch(() => {
         // Community directory pins are enhancement-only and never block the Event map.
       });
     return () => { cancelled = true; };
-  }, [excludeAgeUnrelated]);
+  }, [communityFilterParams]);
 
   const openFacility = useCallback((facility: CommunityFacilitySummary) => {
     setSelected(null);
     setSelectedFacility(null);
     setFacilityError('');
     setFacilityLoading(true);
-    const query = excludeAgeUnrelated ? '&excludeAgeUnrelated=1' : '';
-    void fetch(`/api/osekkai/community-directory?key=${encodeURIComponent(facility.key)}${query}`)
+    const params = new URLSearchParams(communityFilterParams);
+    params.set('key', facility.key);
+    void fetch(`/api/osekkai/community-directory?${params.toString()}`)
       .then((response) => (response.ok ? (response.json() as Promise<CommunityFacilityDetail>) : null))
       .then((detail) => {
         if (detail) setSelectedFacility(detail);
@@ -203,7 +212,7 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
       })
       .catch(() => setFacilityError('この拠点の一覧を取得できませんでした。'))
       .finally(() => setFacilityLoading(false));
-  }, [excludeAgeUnrelated]);
+  }, [communityFilterParams]);
 
   const visibleFacilities = useMemo(() => {
     if (!communities) return [];
@@ -338,6 +347,15 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
         >
           20〜30代向けのみ
         </button>
+        <button
+          type="button"
+          data-active={onlySports}
+          aria-pressed={onlySports}
+          onClick={() => setOnlySports((value) => !value)}
+          title="スポーツ・運動系のコミュニティのみ表示します"
+        >
+          スポーツ・運動系のみ
+        </button>
         <select aria-label="表示する区を選ぶ" value={wardChoice} onChange={(event) => jumpToWard(event.target.value)}>
           {wardOptions.map((option) => <option key={option.ward} value={option.ward}>{option.ward}</option>)}
           <option value={ALL_WARDS_VALUE}>全23区をまとめて表示</option>
@@ -363,6 +381,7 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
             ? `東京23区の地域コミュニティ${communities.counts.total.toLocaleString()}件を${communities.facilities.length.toLocaleString()}地点に表示。地域名・町丁目の活動区域${communities.counts.withAreaLocation.toLocaleString()}件を区役所から分散（Open Data・開催日時未確認）。`
             : `${wardChoice}の地域コミュニティ${visibleCommunityCount.toLocaleString()}件を${visibleFacilities.length.toLocaleString()}地点で表示中（東京23区全体では${communities.counts.total.toLocaleString()}件）。他の区は上のセレクトから選べます。`}
           {excludeAgeUnrelated ? '町会・自治会・シニア向けクラブなどを除いています。' : ''}
+          {onlySports ? 'スポーツ・運動系のみに絞っています。' : ''}
         </p>
       ) : null}
       {facilityError ? <p className={styles.mapRouteError} role="alert">{facilityError}</p> : null}

@@ -446,7 +446,7 @@ export async function loadCommunityFacilityDetail(
   };
 }
 
-export type CommunityExample = { name: string; ward: string; description: string | null };
+export type CommunityExample = { name: string; ward: string; description: string | null; officialUrl: string | null };
 
 // Single-pass, position-agnostic lookup for the chat fallback: it only needs
 // a handful of real community *names* to ground replies in, not the
@@ -472,7 +472,12 @@ export async function pickCommunityExamples(
     const genres = row[at('genres')] ?? '';
     if (options.genre && !matchesGenreFilter(genres, options.genre)) continue;
     seen.add(name);
-    examples.push({ name, ward, description: (row[at('description')] ?? '').trim() || null });
+    examples.push({
+      name,
+      ward,
+      description: (row[at('description')] ?? '').trim() || null,
+      officialUrl: (row[at('official_url')] ?? '').trim() || null,
+    });
   }
   return examples;
 }

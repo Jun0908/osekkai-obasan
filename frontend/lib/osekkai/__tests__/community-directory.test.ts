@@ -202,7 +202,7 @@ describe('loadCommunityFacilityDetail', () => {
 describe('pickCommunityExamples', () => {
   it('returns distinct titles filtered by genre and ward in a single pass', async () => {
     writeOpportunitiesCsv([
-      row({ opportunity_id: 'opp_1', ward_name: '千代田区', title: '卓球クラブ', genres: 'sports' }),
+      row({ opportunity_id: 'opp_1', ward_name: '千代田区', title: '卓球クラブ', genres: 'sports', official_url: 'https://example.com/table-tennis' }),
       row({ opportunity_id: 'opp_2', ward_name: '千代田区', title: '読書会さくら', genres: 'learning' }),
       row({ opportunity_id: 'opp_3', ward_name: '新宿区', title: 'サッカー教室', genres: 'sports' }),
       row({ opportunity_id: 'opp_4', ward_name: '千代田区', title: '卓球クラブ', genres: 'sports' }),
@@ -210,7 +210,9 @@ describe('pickCommunityExamples', () => {
 
     const examples = await pickCommunityExamples({ genre: 'sports', ward: '千代田区' });
 
-    expect(examples.map((example) => example.name)).toEqual(['卓球クラブ']);
+    expect(examples).toEqual([
+      { name: '卓球クラブ', ward: '千代田区', description: null, officialUrl: 'https://example.com/table-tennis' },
+    ]);
   });
 
   it('caps results to the requested limit', async () => {

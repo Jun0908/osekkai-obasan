@@ -8,12 +8,10 @@ import { loadCommunityDirectorySummary, loadCommunityFacilityDetail } from '../c
 const ORIGINAL_ROOT = process.env.OSEKKAI_COMMUNITY_DATA_ROOT;
 
 const HEADER = [
-  'community_id', 'ward_code', 'ward_name', 'name', 'name_kana', 'category', 'activity_status',
-  'description', 'source_comment', 'target_audience', 'target_audience_notes', 'venue_name',
-  'venue_notes', 'venue_address', 'official_url', 'online_participation', 'foreign_language_support',
-  'area_name', 'map_location_id', 'latitude', 'longitude', 'geocoded_address',
-  'location_precision', 'location_source', 'location_source_url',
-  'supported_languages', 'inbound_program', 'notes', 'source_updated_at', 'fetched_at',
+  'opportunity_id', 'ward_code', 'ward_name', 'title', 'genres', 'opportunity_type', 'verification_status',
+  'participation_mode', 'target_age_min', 'target_age_max', 'eligibility_evidence', 'description', 'venue_name',
+  'venue_address', 'latitude', 'longitude', 'official_url', 'source_classification', 'source_updated_at',
+  'fetched_at', 'venue_address_source_url', 'venue_address_match_status',
 ];
 
 const WARD_DIRECTORY_FIXTURE = {
@@ -40,21 +38,12 @@ const VENUE_ADDRESS_DIRECTORY_FIXTURE = {
   },
 };
 
-function writeCommunitiesCsv(
-  rows: string[][],
-  addressFixture: Record<string, unknown> = VENUE_ADDRESS_DIRECTORY_FIXTURE,
-  youngAdultRows?: Array<{ ward_name: string; title: string }>,
-): void {
+function writeOpportunitiesCsv(rows: string[][], addressFixture: Record<string, unknown> = VENUE_ADDRESS_DIRECTORY_FIXTURE): void {
   const dir = mkdtempSync(path.join(tmpdir(), 'osekkai-community-'));
   const lines = [HEADER, ...rows].map((row) => row.map((value) => `"${value.replace(/"/g, '""')}"`).join(','));
-  writeFileSync(path.join(dir, 'communities.csv'), `﻿${lines.join('\n')}\n`, 'utf-8');
+  writeFileSync(path.join(dir, 'adult_official_opportunities.csv'), `﻿${lines.join('\n')}\n`, 'utf-8');
   writeFileSync(path.join(dir, 'ward-geocoding-directory.json'), JSON.stringify(WARD_DIRECTORY_FIXTURE, null, 2), 'utf-8');
   writeFileSync(path.join(dir, 'venue-address-directory.json'), JSON.stringify(addressFixture, null, 2), 'utf-8');
-  if (youngAdultRows) {
-    const youngAdultLines = [['ward_name', 'title'], ...youngAdultRows.map((entry) => [entry.ward_name, entry.title])]
-      .map((cells) => cells.map((value) => `"${value.replace(/"/g, '""')}"`).join(','));
-    writeFileSync(path.join(dir, 'young_adult_opportunities.csv'), `﻿${youngAdultLines.join('\n')}\n`, 'utf-8');
-  }
   process.env.OSEKKAI_COMMUNITY_DATA_ROOT = dir;
 }
 
@@ -69,12 +58,12 @@ function row(overrides: Partial<Record<(typeof HEADER)[number], string>>): strin
 
 describe('loadCommunityDirectorySummary', () => {
   it('resolves Chiyoda venues to their known facility and other wards to the ward office', async () => {
-    writeCommunitiesCsv([
-      row({ community_id: 'community_1', ward_name: '千代田区', name: '読書会さくら', description: '読書', venue_name: '九段;スポーツセンター' }),
-      row({ community_id: 'community_2', ward_name: '千代田区', name: '卓球クラブ', description: 'スポーツ', venue_name: 'スポーツセンター' }),
-      row({ community_id: 'community_3', ward_name: '千代田区', name: '未知施設の会', description: '謎', venue_name: '未知の施設' }),
-      row({ community_id: 'community_4', ward_name: '新宿区', name: '新宿の会', description: 'その他', venue_name: '公民館' }),
-      row({ community_id: 'community_5', ward_name: '福岡県', name: '対象外の会', description: 'その他', venue_name: '九段' }),
+    writeOpportunitiesCsv([
+      row({ opportunity_id: 'opp_1', ward_name: '千代田区', title: '読書会さくら', description: '読書', venue_name: '九段' }),
+      row({ opportunity_id: 'opp_2', ward_name: '千代田区', title: '卓球クラブ', description: 'スポーツ', venue_name: 'スポーツセンター' }),
+      row({ opportunity_id: 'opp_3', ward_name: '千代田区', title: '未知施設の会', description: '謎', venue_name: '未知の施設' }),
+      row({ opportunity_id: 'opp_4', ward_name: '新宿区', title: '新宿の会', description: 'その他', venue_name: '公民館' }),
+      row({ opportunity_id: 'opp_5', ward_name: '福岡県', title: '対象外の会', description: 'その他', venue_name: '九段' }),
     ]);
 
     const result = await loadCommunityDirectorySummary();
@@ -95,13 +84,31 @@ describe('loadCommunityDirectorySummary', () => {
     expect(shinjukuOffice).toMatchObject({ ward: '新宿区', count: 1, name: '新宿区役所' });
   });
 
-  it('prefers a geocoded venue_address over the ward office fallback', async () => {
-    writeCommunitiesCsv([
+  it('uses the row\'s own latitude/longitude when the source pipeline geocoded one', async () => {
+    writeOpportunitiesCsv([
       row({
-        community_id: 'community_1', ward_name: '渋谷区', name: 'あみもの教室', description: '手芸',
+        opportunity_id: 'opp_1', ward_name: '渋谷区', title: 'ヨガサークル', description: 'ヨガ',
+        venue_name: '渋谷区民会館', venue_address: '東京都渋谷区渋谷1-1-1',
+        latitude: '35.6598', longitude: '139.7036', venue_address_match_status: 'official_facility_exact',
+      }),
+    ]);
+
+    const result = await loadCommunityDirectorySummary();
+
+    expect(result.counts).toEqual({ total: 1, withVenueAddress: 1, withKnownFacility: 0, withAreaLocation: 0, withWardOfficeFallback: 0 });
+    expect(result.facilities[0]).toMatchObject({
+      key: 'latlng:35.659800,139.703600', ward: '渋谷区', latitude: 35.6598, longitude: 139.7036,
+      locationKind: 'exact_address', locationPrecision: 'official_facility_exact',
+    });
+  });
+
+  it('prefers a geocoded venue_address over the ward office fallback when no own coordinates exist', async () => {
+    writeOpportunitiesCsv([
+      row({
+        opportunity_id: 'opp_1', ward_name: '渋谷区', title: 'あみもの教室', description: '手芸',
         venue_name: '本町区民会館', venue_address: '東京都渋谷区本町3-46-1',
       }),
-      row({ community_id: 'community_2', ward_name: '渋谷区', name: '住所なしの会', description: 'その他', venue_name: '未登録施設' }),
+      row({ opportunity_id: 'opp_2', ward_name: '渋谷区', title: '住所なしの会', description: 'その他', venue_name: '未登録施設' }),
     ]);
 
     const result = await loadCommunityDirectorySummary();
@@ -110,14 +117,14 @@ describe('loadCommunityDirectorySummary', () => {
     const addressFacility = result.facilities.find((facility) => facility.key === 'addr:東京都渋谷区本町3-46-1');
     expect(addressFacility).toMatchObject({ ward: '渋谷区', count: 1, latitude: 35.687641, longitude: 139.682785 });
     // 渋谷区 has no ward-geocoding-directory entry in this fixture, so the second
-    // (address-less) row cannot resolve anywhere and is simply excluded.
+    // (address-less, coordinate-less) row cannot resolve anywhere and is excluded.
     expect(result.facilities.some((facility) => facility.ward === '渋谷区' && facility.key !== addressFacility?.key)).toBe(false);
   });
 
   it('ignores a venue_address entry recorded under a different ward', async () => {
-    writeCommunitiesCsv([
+    writeOpportunitiesCsv([
       row({
-        community_id: 'community_1', ward_name: '千代田区', name: '間違った区の会', description: '謎',
+        opportunity_id: 'opp_1', ward_name: '千代田区', title: '間違った区の会', description: '謎',
         venue_name: '未知の施設', venue_address: '東京都渋谷区本町3-46-1',
       }),
     ]);
@@ -130,29 +137,10 @@ describe('loadCommunityDirectorySummary', () => {
     expect(result.facilities[0].key).toBe('chiyoda-office');
   });
 
-  it('uses a CSV activity-area point before the ward office and labels it approximate', async () => {
-    writeCommunitiesCsv([
-      row({
-        community_id: 'community_area', ward_name: '新宿区', name: '西新宿一丁目町会', description: '町会・自治会',
-        area_name: '西新宿一丁目', map_location_id: 'map_nishishinjuku', latitude: '35.6912', longitude: '139.6996',
-        geocoded_address: '東京都新宿区西新宿一丁目', location_precision: 'name_chome',
-        location_source: 'community_name', location_source_url: 'https://maps.gsi.go.jp/',
-      }),
-    ]);
-
-    const result = await loadCommunityDirectorySummary();
-
-    expect(result.counts).toEqual({ total: 1, withVenueAddress: 0, withKnownFacility: 0, withAreaLocation: 1, withWardOfficeFallback: 0 });
-    expect(result.facilities[0]).toMatchObject({
-      key: 'map_nishishinjuku', locationKind: 'activity_area', locationPrecision: 'name_chome',
-      name: '西新宿一丁目（活動区域の目安）',
-    });
-  });
-
   it('excludes town-association and senior-club rows when excludeAgeUnrelated is set', async () => {
-    writeCommunitiesCsv([
-      row({ community_id: 'community_1', ward_name: '千代田区', name: '九段町会', category: '町会・自治会', venue_name: '九段' }),
-      row({ community_id: 'community_2', ward_name: '千代田区', name: '卓球クラブ', description: 'スポーツ', venue_name: 'スポーツセンター' }),
+    writeOpportunitiesCsv([
+      row({ opportunity_id: 'opp_1', ward_name: '千代田区', title: '九段町会', genres: 'community_exchange', description: '町会・自治会', venue_name: '九段' }),
+      row({ opportunity_id: 'opp_2', ward_name: '千代田区', title: '卓球クラブ', genres: 'sports', description: 'スポーツ', venue_name: 'スポーツセンター' }),
     ]);
 
     const result = await loadCommunityDirectorySummary({ excludeAgeUnrelated: true });
@@ -163,9 +151,9 @@ describe('loadCommunityDirectorySummary', () => {
   });
 
   it('keeps only sports/exercise rows when onlySports is set', async () => {
-    writeCommunitiesCsv([
-      row({ community_id: 'community_1', ward_name: '千代田区', name: '卓球クラブ', description: 'スポーツ', venue_name: 'スポーツセンター' }),
-      row({ community_id: 'community_2', ward_name: '千代田区', name: '読書会さくら', description: '読書', venue_name: '九段' }),
+    writeOpportunitiesCsv([
+      row({ opportunity_id: 'opp_1', ward_name: '千代田区', title: '卓球クラブ', genres: 'sports', description: 'スポーツ', venue_name: 'スポーツセンター' }),
+      row({ opportunity_id: 'opp_2', ward_name: '千代田区', title: '読書会さくら', genres: 'learning', description: '読書', venue_name: '九段' }),
     ]);
 
     const result = await loadCommunityDirectorySummary({ onlySports: true });
@@ -174,63 +162,13 @@ describe('loadCommunityDirectorySummary', () => {
     expect(result.facilities.find((facility) => facility.key === 'sports-center')).toMatchObject({ count: 1 });
     expect(result.facilities.find((facility) => facility.key === 'kudan')).toBeUndefined();
   });
-
-  it('uses the young-adult allowlist when present, keeping only listed rows', async () => {
-    writeCommunitiesCsv(
-      [
-        row({ community_id: 'community_1', ward_name: '千代田区', name: '卓球クラブ', description: 'スポーツ', venue_name: 'スポーツセンター' }),
-        row({ community_id: 'community_2', ward_name: '千代田区', name: '読書会さくら', description: '読書', venue_name: '九段' }),
-      ],
-      VENUE_ADDRESS_DIRECTORY_FIXTURE,
-      [{ ward_name: '千代田区', title: '卓球クラブ' }],
-    );
-
-    const result = await loadCommunityDirectorySummary({ excludeAgeUnrelated: true });
-
-    expect(result.counts.total).toBe(1);
-    expect(result.facilities.find((facility) => facility.key === 'sports-center')).toMatchObject({ count: 1 });
-    expect(result.facilities.find((facility) => facility.key === 'kudan')).toBeUndefined();
-  });
-
-  it('falls back to keyword-only exclusion when the allowlist file is absent', async () => {
-    writeCommunitiesCsv([
-      row({ community_id: 'community_1', ward_name: '千代田区', name: '卓球クラブ', description: 'スポーツ', venue_name: 'スポーツセンター' }),
-      row({ community_id: 'community_2', ward_name: '千代田区', name: '九段町会', category: '町会・自治会', venue_name: '九段' }),
-    ]);
-
-    const result = await loadCommunityDirectorySummary({ excludeAgeUnrelated: true });
-
-    expect(result.counts.total).toBe(1);
-    expect(result.facilities.find((facility) => facility.key === 'sports-center')).toMatchObject({ count: 1 });
-    expect(result.facilities.find((facility) => facility.key === 'kudan')).toBeUndefined();
-  });
-
-  it('labels the first point of an explicit multi-venue record as representative', async () => {
-    writeCommunitiesCsv([
-      row({
-        community_id: 'community_multi', ward_name: '千代田区', name: '二会場の会', description: '文化',
-        venue_address: '東京都千代田区九段南1-5-10 | 東京都千代田区内神田2-1-8',
-        map_location_id: 'map_multi', latitude: '35.6953', longitude: '139.7520',
-        geocoded_address: '東京都千代田区九段南一丁目5番10号',
-        location_precision: 'multiple_addresses_representative', location_source: 'venue_address',
-      }),
-    ]);
-
-    const result = await loadCommunityDirectorySummary();
-
-    expect(result.counts.withVenueAddress).toBe(1);
-    expect(result.facilities[0]).toMatchObject({
-      key: 'map_multi', locationKind: 'multiple_addresses',
-      name: '千代田区九段南一丁目5番10号（複数会場の代表）',
-    });
-  });
 });
 
 describe('loadCommunityFacilityDetail', () => {
   it('returns only the communities resolved to the requested facility', async () => {
-    writeCommunitiesCsv([
-      row({ community_id: 'community_1', ward_name: '千代田区', name: '読書会さくら', description: '読書', venue_name: '九段' }),
-      row({ community_id: 'community_2', ward_name: '千代田区', name: '卓球クラブ', description: 'スポーツ', venue_name: 'スポーツセンター' }),
+    writeOpportunitiesCsv([
+      row({ opportunity_id: 'opp_1', ward_name: '千代田区', title: '読書会さくら', description: '読書', venue_name: '九段' }),
+      row({ opportunity_id: 'opp_2', ward_name: '千代田区', title: '卓球クラブ', description: 'スポーツ', venue_name: 'スポーツセンター' }),
     ]);
 
     const detail = await loadCommunityFacilityDetail('kudan');
@@ -241,17 +179,17 @@ describe('loadCommunityFacilityDetail', () => {
   });
 
   it('returns null for a facility key with no matching communities', async () => {
-    writeCommunitiesCsv([
-      row({ community_id: 'community_1', ward_name: '千代田区', name: '読書会さくら', description: '読書', venue_name: '九段' }),
+    writeOpportunitiesCsv([
+      row({ opportunity_id: 'opp_1', ward_name: '千代田区', title: '読書会さくら', description: '読書', venue_name: '九段' }),
     ]);
 
     expect(await loadCommunityFacilityDetail('sports-center')).toBeNull();
   });
 
   it('drops town-association communities from the list when excludeAgeUnrelated is set', async () => {
-    writeCommunitiesCsv([
-      row({ community_id: 'community_1', ward_name: '千代田区', name: '読書会さくら', description: '読書', venue_name: 'スポーツセンター' }),
-      row({ community_id: 'community_2', ward_name: '千代田区', name: '九段町会', category: '町会・自治会', venue_name: 'スポーツセンター' }),
+    writeOpportunitiesCsv([
+      row({ opportunity_id: 'opp_1', ward_name: '千代田区', title: '読書会さくら', description: '読書', venue_name: 'スポーツセンター' }),
+      row({ opportunity_id: 'opp_2', ward_name: '千代田区', title: '九段町会', description: '町会・自治会', venue_name: 'スポーツセンター' }),
     ]);
 
     const detail = await loadCommunityFacilityDetail('sports-center', { excludeAgeUnrelated: true });

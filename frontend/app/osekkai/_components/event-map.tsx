@@ -371,7 +371,7 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
       {communities ? (
         <p className={styles.mapCount}>
           {wardChoice === ALL_WARDS_VALUE
-            ? `東京23区の地域コミュニティ${communities.counts.total.toLocaleString()}件を${communities.facilities.length.toLocaleString()}地点に表示。地域名・町丁目の活動区域${communities.counts.withAreaLocation.toLocaleString()}件を区役所から分散（Open Data・開催日時未確認）。`
+            ? `東京23区の地域コミュニティ${communities.counts.total.toLocaleString()}件を${communities.facilities.length.toLocaleString()}地点に表示（Open Data・開催日時未確認）。`
             : `${wardChoice}の地域コミュニティ${visibleCommunityCount.toLocaleString()}件を${visibleFacilities.length.toLocaleString()}地点で表示中（東京23区全体では${communities.counts.total.toLocaleString()}件）。他の区は上のセレクトから選べます。`}
           {excludeAgeUnrelated ? '町会・自治会・シニア向けクラブなどを除いています。' : ''}
           {onlySports ? 'スポーツ・運動系のみに絞っています。' : ''}

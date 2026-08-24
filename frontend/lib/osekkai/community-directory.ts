@@ -11,20 +11,17 @@ import type {
 
 /**
  * Each community is placed on the map by trying, in order:
- *   1. a verified single venue address, or the representative first point of
- *      an explicitly listed multi-venue record, carried by communities.csv;
- *   2. a known venue-name anchor such as 九段生涯学習館;
- *   3. an activity-area point derived from an official area statement or the
- *      town/chome in an official town-association name;
+ *   1. the row's own geocoded latitude/longitude, carried directly by
+ *      adult_official_opportunities.csv when the source pipeline resolved one;
+ *   2. a legacy verified venue address kept in venue-address-directory.json;
+ *   3. a known venue-name anchor such as 九段生涯学習館;
  *   4. otherwise the ward office.
- * Area points are explicitly approximate and must never be presented as a
- * confirmed meeting venue.
- * Address and area coordinates are geocoded once via the Geospatial
- * Information Authority of Japan address-search API and carried in the CSV.
- * Shared venue anchors and ward-office fallbacks remain in
- * `ward-geocoding-directory.json`; the legacy address dictionary remains a
- * compatibility fallback. TypeScript and Python read the same files, so their
- * coordinates and precision labels cannot drift apart.
+ * Coordinates are geocoded once via the Geospatial Information Authority of
+ * Japan address-search API and carried in the CSV. Shared venue anchors and
+ * ward-office fallbacks remain in `ward-geocoding-directory.json`; the legacy
+ * address dictionary remains a compatibility fallback. TypeScript and Python
+ * read the same files, so their coordinates and precision labels cannot
+ * drift apart.
  */
 type FacilityDefinition = {
   key: string;
@@ -45,17 +42,6 @@ type WardDefinition = {
 
 type VenueAddressEntry = { ward: string; latitude: number; longitude: number };
 
-type CsvMapLocation = {
-  id: string;
-  areaName: string;
-  latitude: number | null;
-  longitude: number | null;
-  geocodedAddress: string;
-  precision: string;
-  source: string;
-  sourceUrl: string;
-};
-
 function addressFacility(address: string, entry: VenueAddressEntry): FacilityDefinition {
   return {
     key: `addr:${address}`,
@@ -69,23 +55,28 @@ function addressFacility(address: string, entry: VenueAddressEntry): FacilityDef
   };
 }
 
-function csvMapFacility(location: CsvMapLocation): FacilityDefinition | null {
-  if (!location.id || location.latitude === null || location.longitude === null || !location.geocodedAddress) return null;
-  const exact = ['venue_address', 'venue_name_address'].includes(location.source) && location.precision === 'exact_address';
-  const multiple = location.source === 'venue_address' && location.precision === 'multiple_addresses_representative';
+function ownLocationFacility(
+  venueAddress: string,
+  venueName: string,
+  ward: string,
+  latitude: number,
+  longitude: number,
+  matchStatus: string,
+  sourceUrl: string,
+): FacilityDefinition {
+  // A row can list multiple venue addresses separated by " | "; only the
+  // first is used for the facility label (it also matches the coordinate).
+  const firstAddress = venueAddress.split('|')[0]?.trim() ?? '';
+  const label = firstAddress ? firstAddress.replace(/^東京都/, '') : venueName || `${ward}内の確認済み場所`;
   return {
-    key: location.id,
-    name: exact
-      ? location.geocodedAddress.replace(/^東京都/, '')
-      : multiple
-        ? `${location.geocodedAddress.replace(/^東京都/, '')}（複数会場の代表）`
-        : `${location.areaName || location.geocodedAddress.replace(/^東京都[^区]+区/, '')}（活動区域の目安）`,
-    address: location.geocodedAddress,
-    latitude: location.latitude,
-    longitude: location.longitude,
-    sourceUrl: location.sourceUrl,
-    locationKind: exact ? 'exact_address' : multiple ? 'multiple_addresses' : 'activity_area',
-    locationPrecision: location.precision || null,
+    key: `latlng:${latitude.toFixed(6)},${longitude.toFixed(6)}`,
+    name: label,
+    address: firstAddress || label,
+    latitude,
+    longitude,
+    sourceUrl,
+    locationKind: 'exact_address',
+    locationPrecision: matchStatus || null,
   };
 }
 
@@ -93,12 +84,16 @@ function resolveFacility(
   ward: string,
   venueName: string,
   venueAddress: string,
-  mapLocation: CsvMapLocation,
+  latitude: number | null,
+  longitude: number | null,
+  matchStatus: string,
+  sourceUrl: string,
   wards: Map<string, WardDefinition>,
   addresses: Map<string, VenueAddressEntry>,
 ): FacilityDefinition | null {
-  const csvFacility = csvMapFacility(mapLocation);
-  if (csvFacility?.locationKind === 'exact_address' || csvFacility?.locationKind === 'multiple_addresses') return csvFacility;
+  if (latitude !== null && longitude !== null) {
+    return ownLocationFacility(venueAddress, venueName, ward, latitude, longitude, matchStatus, sourceUrl);
+  }
   if (venueAddress) {
     const known = addresses.get(venueAddress);
     if (known && known.ward === ward) return addressFacility(venueAddress, known);
@@ -110,7 +105,6 @@ function resolveFacility(
       return { ...anchor, locationKind: 'known_facility', locationPrecision: 'known_facility' };
     }
   }
-  if (csvFacility) return csvFacility;
   return { ...definition.wardOffice, locationKind: 'ward_office', locationPrecision: 'ward_office' };
 }
 
@@ -183,10 +177,12 @@ function resolveDataRoot(): string {
   return path.resolve(process.cwd(), '..', 'data', 'tokyo-community');
 }
 
+const OPPORTUNITIES_CSV_FILE = 'adult_official_opportunities.csv';
+
 let csvCache: { path: string; mtimeMs: number; text: string } | null = null;
 
-async function readCommunitiesCsv(): Promise<string> {
-  const filePath = path.join(resolveDataRoot(), 'communities.csv');
+async function readOpportunitiesCsv(): Promise<string> {
+  const filePath = path.join(resolveDataRoot(), OPPORTUNITIES_CSV_FILE);
   const stat = await fs.stat(filePath);
   if (csvCache && csvCache.path === filePath && csvCache.mtimeMs === stat.mtimeMs) return csvCache.text;
   const text = await fs.readFile(filePath, 'utf-8');
@@ -261,107 +257,40 @@ async function readVenueAddressDirectory(): Promise<Map<string, VenueAddressEntr
   return addresses;
 }
 
-// young_adult_opportunities.csv is a ward-official-sourced allowlist of
-// community listings already screened for general-adult/young-adult
-// participation. 96.8% of its rows match an existing communities.csv row by
-// exact (ward_name, name) text, so it is used as the primary signal for the
-// "18〜39" map toggle instead of a category/description keyword guess. The
-// remaining ~3% are genuinely new listings, but none carry a venue address or
-// coordinates, so they cannot be placed on the map and are not surfaced here.
-function youngAdultKey(ward: string, name: string): string {
-  return `${ward}::${name}`;
-}
-
-let youngAdultCache: { path: string; mtimeMs: number; keys: Set<string> } | null = null;
-
-// Returns null (rather than throwing) when the file is absent, so callers can
-// fall back to the keyword-only classification instead of failing the whole
-// community-directory request.
-async function readYoungAdultAllowlist(): Promise<Set<string> | null> {
-  const filePath = path.join(resolveDataRoot(), 'young_adult_opportunities.csv');
-  let stat;
-  try {
-    stat = await fs.stat(filePath);
-  } catch {
-    return null;
-  }
-  if (youngAdultCache && youngAdultCache.path === filePath && youngAdultCache.mtimeMs === stat.mtimeMs) {
-    return youngAdultCache.keys;
-  }
-  const raw = await fs.readFile(filePath, 'utf-8');
-  const rows = parseCsv(raw.replace(/^﻿/, ''));
-  const keys = new Set<string>();
-  if (rows.length > 0) {
-    const header = rows[0].map((value) => value.trim());
-    const wardAt = header.indexOf('ward_name');
-    const titleAt = header.indexOf('title');
-    if (wardAt !== -1 && titleAt !== -1) {
-      for (const row of rows.slice(1)) {
-        const ward = (row[wardAt] ?? '').trim();
-        const title = (row[titleAt] ?? '').trim();
-        if (ward && title) keys.add(youngAdultKey(ward, title));
-      }
-    }
-  }
-  youngAdultCache = { path: filePath, mtimeMs: stat.mtimeMs, keys };
-  return keys;
-}
-
 const REQUIRED_COLUMNS = [
-  'community_id',
+  'opportunity_id',
   'ward_name',
-  'name',
-  'name_kana',
-  'category',
+  'title',
+  'genres',
   'description',
   'venue_name',
   'venue_address',
-  'area_name',
-  'map_location_id',
   'latitude',
   'longitude',
-  'geocoded_address',
-  'location_precision',
-  'location_source',
-  'location_source_url',
-  'target_audience',
+  'venue_address_match_status',
+  'venue_address_source_url',
   'official_url',
-  'online_participation',
   'source_updated_at',
   'fetched_at',
 ] as const;
 
-// Raw category text spans two CSV columns depending on which ward's source
-// listed it: `category` for ward-association style listings (e.g. 町会・自治会),
-// `description` for hobby/genre-style listings (e.g. ダンス). The "20〜30代向け"
-// map toggle excludes rows whose combined text names a town association,
-// neighborhood council, or senior/elderly-only club.
+// Raw genre/category text spans two CSV columns: the structured `genres`
+// field (e.g. sports, learning, community_exchange) and the free-text
+// `description` field (e.g. 町会・自治会, ダンス). The "18〜39" map toggle
+// excludes rows whose combined text names a town association, neighborhood
+// council, or senior/elderly-only club — the source pipeline already screens
+// most of these out, so only a small residual is left to catch here.
 const AGE_UNRELATED_KEYWORDS = ['町会', '自治会', '住区住民会議', 'シニアクラブ', '高齢者クラブ', '老人会', '老人クラブ'];
 
-function isAgeUnrelatedCommunity(category: string, description: string): boolean {
-  const text = `${category} ${description}`;
+function isAgeUnrelatedCommunity(genres: string, description: string): boolean {
+  const text = `${genres} ${description}`;
   return AGE_UNRELATED_KEYWORDS.some((keyword) => text.includes(keyword));
 }
 
-// A row counts as "18〜39" material only if the curated young-adult allowlist
-// includes it AND it does not still carry a town-association/senior keyword
-// (a small residual the source data did not fully screen out).
-function isYoungAdultRelevant(
-  ward: string,
-  name: string,
-  category: string,
-  description: string,
-  allowlist: Set<string> | null,
-): boolean {
-  if (isAgeUnrelatedCommunity(category, description)) return false;
-  if (!allowlist) return true;
-  return allowlist.has(youngAdultKey(ward, name));
-}
-
 // Keywords covering the ball sports, martial arts, dance, and health-exercise
-// category/description values actually present in communities.csv (surveyed
-// across all ~1,000 distinct raw values). Kept specific (e.g. "健康体操" not
-// bare "健康") so it does not also match unrelated entries like 健康・医療.
+// genres/description values actually present in the CSV. Kept specific (e.g.
+// "健康体操" not bare "健康") so it does not also match unrelated entries
+// like 健康・医療.
 const SPORTS_KEYWORDS = [
   'バレーボール', 'バドミントン', 'バスケットボール', 'サッカー', 'フットサル', '卓球', '水泳', '野球',
   'テニス', '剣道', 'ソフトボール', '太極拳', 'ダンス', '舞踊', '踊り', 'スポーツ', '空手', '合気道',
@@ -372,36 +301,23 @@ const SPORTS_KEYWORDS = [
   'ニュースポーツ',
 ];
 
-function isSportsCommunity(category: string, description: string): boolean {
-  const text = `${category} ${description}`;
+function isSportsCommunity(genres: string, description: string): boolean {
+  const text = `${genres} ${description}`;
   return SPORTS_KEYWORDS.some((keyword) => text.includes(keyword));
 }
 
 const DATA_SOURCE_NOTE =
-  '区が公開する地域コミュニティ一覧（Open Data CSV）を地図へ表示しています。単一会場住所、複数会場の代表地点、確認済み施設、公式区域または地域名・町丁目、区役所の順に位置を解決します。複数会場は一覧の最初の住所、地域名・町丁目は活動区域の目安です。個々の開催日時・現在の活動有無は確認していません。';
-
-function mapLocationFromRow(row: string[], at: (column: (typeof REQUIRED_COLUMNS)[number]) => number): CsvMapLocation {
-  return {
-    id: (row[at('map_location_id')] ?? '').trim(),
-    areaName: (row[at('area_name')] ?? '').trim(),
-    latitude: optionalNumber(row[at('latitude')] ?? ''),
-    longitude: optionalNumber(row[at('longitude')] ?? ''),
-    geocodedAddress: (row[at('geocoded_address')] ?? '').trim(),
-    precision: (row[at('location_precision')] ?? '').trim(),
-    source: (row[at('location_source')] ?? '').trim(),
-    sourceUrl: (row[at('location_source_url')] ?? '').trim(),
-  };
-}
+  '区の公式名簿・案内をもとにした地域コミュニティ一覧（Open Data CSV）を地図へ表示しています。掲載団体自身のジオコーディング済み座標、確認済み施設、区役所の順に位置を解決します。個々の開催日時・現在の活動有無は確認していません。';
 
 async function readRows(): Promise<{ header: string[]; columnAt: (column: (typeof REQUIRED_COLUMNS)[number]) => number; rows: string[][] }> {
-  const raw = await readCommunitiesCsv();
+  const raw = await readOpportunitiesCsv();
   const rows = parseCsv(raw.replace(/^﻿/, ''));
-  if (rows.length === 0) throw new Error('communities.csv is empty');
+  if (rows.length === 0) throw new Error(`${OPPORTUNITIES_CSV_FILE} is empty`);
   const header = rows[0].map((value) => value.trim());
   const columnIndex = new Map<string, number>();
   for (const column of REQUIRED_COLUMNS) {
     const at = header.indexOf(column);
-    if (at === -1) throw new Error(`communities.csv is missing expected column: ${column}`);
+    if (at === -1) throw new Error(`${OPPORTUNITIES_CSV_FILE} is missing expected column: ${column}`);
     columnIndex.set(column, at);
   }
   return { header, columnAt: (column) => columnIndex.get(column) as number, rows: rows.slice(1) };
@@ -412,11 +328,10 @@ export async function loadCommunityDirectorySummary(
 ): Promise<CommunityDirectoryResult> {
   const excludeAgeUnrelated = options?.excludeAgeUnrelated ?? false;
   const onlySports = options?.onlySports ?? false;
-  const [{ header, columnAt, rows }, wards, addresses, youngAdultAllowlist] = await Promise.all([
+  const [{ header, columnAt, rows }, wards, addresses] = await Promise.all([
     readRows(),
     readWardGeocodingDirectory(),
     readVenueAddressDirectory(),
-    excludeAgeUnrelated ? readYoungAdultAllowlist() : Promise.resolve(null),
   ]);
   const at = columnAt;
 
@@ -424,28 +339,30 @@ export async function loadCommunityDirectorySummary(
   let total = 0;
   let withVenueAddress = 0;
   let withKnownFacility = 0;
-  let withAreaLocation = 0;
+  const withAreaLocation = 0;
   let withWardOfficeFallback = 0;
 
   for (const row of rows) {
     if (row.length < header.length) continue;
     const ward = (row[at('ward_name')] ?? '').trim();
-    const id = (row[at('community_id')] ?? '').trim();
-    const name = (row[at('name')] ?? '').trim();
+    const id = (row[at('opportunity_id')] ?? '').trim();
+    const name = (row[at('title')] ?? '').trim();
     if (!ward || !id || !name) continue;
-    if (
-      excludeAgeUnrelated &&
-      !isYoungAdultRelevant(ward, name, row[at('category')] ?? '', row[at('description')] ?? '', youngAdultAllowlist)
-    ) continue;
-    if (onlySports && !isSportsCommunity(row[at('category')] ?? '', row[at('description')] ?? '')) continue;
+    const genres = row[at('genres')] ?? '';
+    const description = row[at('description')] ?? '';
+    if (excludeAgeUnrelated && isAgeUnrelatedCommunity(genres, description)) continue;
+    if (onlySports && !isSportsCommunity(genres, description)) continue;
     const venueName = (row[at('venue_name')] ?? '').trim();
     const venueAddress = (row[at('venue_address')] ?? '').trim();
-    const facility = resolveFacility(ward, venueName, venueAddress, mapLocationFromRow(row, at), wards, addresses);
+    const latitude = optionalNumber(row[at('latitude')] ?? '');
+    const longitude = optionalNumber(row[at('longitude')] ?? '');
+    const matchStatus = (row[at('venue_address_match_status')] ?? '').trim();
+    const sourceUrl = (row[at('venue_address_source_url')] ?? '').trim();
+    const facility = resolveFacility(ward, venueName, venueAddress, latitude, longitude, matchStatus, sourceUrl, wards, addresses);
     if (!facility) continue;
     total += 1;
     if (facility.locationKind === 'exact_address' || facility.locationKind === 'multiple_addresses') withVenueAddress += 1;
     else if (facility.locationKind === 'known_facility') withKnownFacility += 1;
-    else if (facility.locationKind === 'activity_area') withAreaLocation += 1;
     else withWardOfficeFallback += 1;
     const entry = counts.get(facility.key);
     if (entry) entry.count += 1;
@@ -470,7 +387,7 @@ export async function loadCommunityDirectorySummary(
   return {
     generatedAt: new Date().toISOString(),
     dataSource: {
-      file: 'data/tokyo-community/communities.csv',
+      file: `data/tokyo-community/${OPPORTUNITIES_CSV_FILE}`,
       classification: 'raw_open_data_unverified',
       note: DATA_SOURCE_NOTE,
     },
@@ -485,11 +402,10 @@ export async function loadCommunityFacilityDetail(
 ): Promise<CommunityFacilityDetail | null> {
   const excludeAgeUnrelated = options?.excludeAgeUnrelated ?? false;
   const onlySports = options?.onlySports ?? false;
-  const [{ header, columnAt, rows }, wards, addresses, youngAdultAllowlist] = await Promise.all([
+  const [{ header, columnAt, rows }, wards, addresses] = await Promise.all([
     readRows(),
     readWardGeocodingDirectory(),
     readVenueAddressDirectory(),
-    excludeAgeUnrelated ? readYoungAdultAllowlist() : Promise.resolve(null),
   ]);
   const at = columnAt;
 
@@ -500,34 +416,37 @@ export async function loadCommunityFacilityDetail(
   for (const row of rows) {
     if (row.length < header.length) continue;
     const ward = (row[at('ward_name')] ?? '').trim();
-    const id = (row[at('community_id')] ?? '').trim();
-    const name = (row[at('name')] ?? '').trim();
+    const id = (row[at('opportunity_id')] ?? '').trim();
+    const name = (row[at('title')] ?? '').trim();
     if (!ward || !id || !name) continue;
-    if (
-      excludeAgeUnrelated &&
-      !isYoungAdultRelevant(ward, name, row[at('category')] ?? '', row[at('description')] ?? '', youngAdultAllowlist)
-    ) continue;
-    if (onlySports && !isSportsCommunity(row[at('category')] ?? '', row[at('description')] ?? '')) continue;
+    const genres = row[at('genres')] ?? '';
+    const description = row[at('description')] ?? '';
+    if (excludeAgeUnrelated && isAgeUnrelatedCommunity(genres, description)) continue;
+    if (onlySports && !isSportsCommunity(genres, description)) continue;
     const venueName = (row[at('venue_name')] ?? '').trim();
     const venueAddress = (row[at('venue_address')] ?? '').trim();
-    const facility = resolveFacility(ward, venueName, venueAddress, mapLocationFromRow(row, at), wards, addresses);
+    const latitude = optionalNumber(row[at('latitude')] ?? '');
+    const longitude = optionalNumber(row[at('longitude')] ?? '');
+    const matchStatus = (row[at('venue_address_match_status')] ?? '').trim();
+    const sourceUrl = (row[at('venue_address_source_url')] ?? '').trim();
+    const facility = resolveFacility(ward, venueName, venueAddress, latitude, longitude, matchStatus, sourceUrl, wards, addresses);
     if (!facility || facility.key !== facilityKey) continue;
     matchedFacility = facility;
     matchedWard = ward;
     communities.push({
       id,
       name,
-      nameKana: (row[at('name_kana')] ?? '').trim() || null,
-      category: (row[at('description')] ?? '').trim() || null,
+      nameKana: null,
+      category: description.trim() || null,
       venueName: facility.name,
-      venueAddress: (row[at('venue_address')] ?? '').trim() || facility.address,
+      venueAddress: venueAddress || facility.address,
       latitude: facility.latitude,
       longitude: facility.longitude,
       locationKind: facility.locationKind ?? 'ward_office',
       locationPrecision: facility.locationPrecision ?? null,
-      targetAudience: (row[at('target_audience')] ?? '').trim() || null,
+      targetAudience: null,
       officialUrl: (row[at('official_url')] ?? '').trim() || null,
-      onlineParticipation: (row[at('online_participation')] ?? '').trim() || null,
+      onlineParticipation: null,
       sourceUpdatedAt: (row[at('source_updated_at')] ?? '').trim() || null,
       fetchedAt: (row[at('fetched_at')] ?? '').trim() || null,
     });

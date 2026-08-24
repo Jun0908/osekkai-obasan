@@ -76,6 +76,7 @@ export default function ChatClient() {
             body: {
               action: 'start',
               remember: false,
+              history: [],
               idempotencyKey: startKeyRef.current,
             },
           }),
@@ -152,6 +153,7 @@ export default function ChatClient() {
       speaker: 'you',
       text: clean,
     };
+    const history = turns.map((turn) => ({ speaker: turn.speaker, text: turn.text }));
     setTurns((current) => [...current, userTurn]);
     setMessage('');
     setSubmitting(true);
@@ -165,6 +167,7 @@ export default function ChatClient() {
           action,
           message: clean,
           remember,
+          history,
           idempotencyKey: newIdempotencyKey(`chat-${action}`),
         },
       });

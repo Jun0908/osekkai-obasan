@@ -3,8 +3,10 @@ import { randomUUID } from 'crypto';
 import { NextResponse } from 'next/server';
 import mapEventsSnapshotJson from '@/lib/osekkai/map-events-snapshot.generated.json';
 import type { MapEventsResult } from '@/lib/osekkai/types.generated';
+import { validateChatResult } from '@/lib/osekkai/validators.generated';
 import { ensureOsekkaiDemoSeed } from './osekkai-demo-seed';
 import { OsekkaiHttpError } from './osekkai-errors';
+import { generateLlmChatReply, isLlmChatAvailable, parseLlmChatHistory, type LlmChatAction } from './osekkai-llm-chat';
 import { getOsekkaiMetrics } from './osekkai-metrics';
 import {
   assertAllowedFields,
@@ -226,8 +228,17 @@ export function profileGet(request: Request) {
   return withOsekkaiErrors(async () => {
     assertSafeGetRequest(request);
     const session = await getOrCreateOsekkaiSession();
-    const result = await getOsekkaiProfile(session.userId);
-    return osekkaiSuccess(result.data, result.requestId);
+    try {
+      const result = await getOsekkaiProfile(session.userId);
+      return osekkaiSuccess(result.data, result.requestId);
+    } catch (error) {
+      // Vercel can't spawn the Python-owned profile store. The chat page
+      // only needs *a* profile to normalize defaults from — an empty object
+      // is a valid, safe stand-in (see components/osekkai/models.ts's
+      // normalizeProfile, which already treats every field as optional).
+      if (!isPythonUnavailableError(error)) throw error;
+      return osekkaiSuccess({}, randomUUID());
+    }
   });
 }
 
@@ -275,10 +286,83 @@ export function chatGet(request: Request) {
   });
 }
 
+function buildSyntheticProfile(userId: string): JsonObject {
+  const now = new Date().toISOString();
+  return {
+    schemaVersion: '1.0',
+    id: randomUUID(),
+    userId,
+    memoryConsent: false,
+    pushConsent: false,
+    quietHours: { start: '21:00', end: '08:00', timezone: 'Asia/Tokyo' },
+    maxPushesPerWeek: 2,
+    preferredTone: 'gentle',
+    maxTravelMinutes: 40,
+    maxBudgetYen: 2000,
+    socialBattery: null,
+    maxSocialIntensity: 2,
+    preferredCategories: [],
+    avoidedCategories: [],
+    rejectionStreak: 0,
+    cooldownUntil: null,
+    pauseUntil: null,
+    lastPushAt: null,
+    explicitPreferences: {},
+    inferredPreferences: {},
+    participationFriction: {},
+    currentSignals: {
+      interventionHint: 'none',
+      currentReceptivity: null,
+      safety: { level: 'normal', requiresHumanSupport: false },
+      observedAt: null,
+    },
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function buildSyntheticChatResult(reply: string, userId: string): JsonObject {
+  const value: JsonObject = {
+    schemaVersion: '1.0',
+    reply,
+    profileDelta: {},
+    frictionDelta: [],
+    interventionHint: 'none',
+    confidence: 0.5,
+    safety: {
+      requiresHumanSupport: false,
+      level: 'normal',
+      message: null,
+      supportResourcesVerified: false,
+    },
+    persisted: false,
+    conversationId: null,
+    profile: buildSyntheticProfile(userId),
+    context: {
+      schemaVersion: '1.0',
+      episodeId: null,
+      state: 'getting_to_know',
+      trigger: 'user_initiated',
+      quickReplies: [],
+      recommendations: [],
+      calendarSummary: null,
+      selectedOpportunityId: null,
+      checkInDueAt: null,
+      canSendMessage: true,
+      notice: 'いまは簡易モードです。雑談と活動紹介のみ対応し、この会話は保存されません。',
+    },
+  };
+  const validated = validateChatResult(value);
+  if (!validated.valid) {
+    throw new OsekkaiHttpError('PYTHON_INVALID_RESPONSE', 'おっせかいエンジンの応答形式が正しくありません。', 502);
+  }
+  return value;
+}
+
 export function chatPost(request: Request) {
   return withOsekkaiErrors(async () => {
     const parsed = await parseMutationRequest(request);
-    assertAllowedFields(parsed.body, ['action', 'message', 'opportunityId', 'remember']);
+    assertAllowedFields(parsed.body, ['action', 'message', 'opportunityId', 'remember', 'history']);
     const action = parsed.body.action ?? 'message';
     if (!['start', 'message', 'select', 'check_in'].includes(String(action))) {
       throw new OsekkaiHttpError('VALIDATION_ERROR', '未対応の会話操作です。', 400);
@@ -294,12 +378,27 @@ export function chatPost(request: Request) {
     if (remember !== undefined) {
       payload.remember = remember;
     }
-    const result = await runOsekkaiChat(
-      parsed.session.userId,
-      payload,
-      parsed.idempotencyKey,
-    );
-    return osekkaiSuccess(result.data, result.requestId);
+    try {
+      const result = await runOsekkaiChat(
+        parsed.session.userId,
+        payload,
+        parsed.idempotencyKey,
+      );
+      return osekkaiSuccess(result.data, result.requestId);
+    } catch (error) {
+      // Vercel can't spawn the Python conversation engine at all. If an LLM
+      // key is configured, fall back to a stateless, casual-chat-only path
+      // that calls OpenAI directly from Node (see osekkai-llm-chat.ts) —
+      // no friction/safety classification, no server-side memory.
+      if (!isPythonUnavailableError(error) || !isLlmChatAvailable()) throw error;
+      const history = parseLlmChatHistory(parsed.body.history);
+      const reply = await generateLlmChatReply({
+        action: action as LlmChatAction,
+        message: typeof payload.message === 'string' ? payload.message : undefined,
+        history,
+      });
+      return osekkaiSuccess(buildSyntheticChatResult(reply, parsed.session.userId), randomUUID());
+    }
   });
 }
 

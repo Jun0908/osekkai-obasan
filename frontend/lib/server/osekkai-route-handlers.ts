@@ -6,7 +6,13 @@ import type { MapEventsResult } from '@/lib/osekkai/types.generated';
 import { validateChatResult } from '@/lib/osekkai/validators.generated';
 import { ensureOsekkaiDemoSeed } from './osekkai-demo-seed';
 import { OsekkaiHttpError } from './osekkai-errors';
-import { generateLlmChatReply, isLlmChatAvailable, parseLlmChatHistory, type LlmChatAction } from './osekkai-llm-chat';
+import {
+  FIXED_START_GREETING,
+  generateLlmChatReply,
+  isLlmChatAvailable,
+  parseLlmChatHistory,
+  type LlmChatAction,
+} from './osekkai-llm-chat';
 import { getOsekkaiMetrics } from './osekkai-metrics';
 import {
   assertAllowedFields,
@@ -392,11 +398,16 @@ export function chatPost(request: Request) {
       // no friction/safety classification, no server-side memory.
       if (!isPythonUnavailableError(error) || !isLlmChatAvailable()) throw error;
       const history = parseLlmChatHistory(parsed.body.history);
-      const reply = await generateLlmChatReply({
-        action: action as LlmChatAction,
-        message: typeof payload.message === 'string' ? payload.message : undefined,
-        history,
-      });
+      // The opening line skips the LLM entirely — a first-visit request is
+      // the one most likely to hit a cold Vercel function, and a slow or
+      // failed greeting there reads as "she never speaks first."
+      const reply = action === 'start'
+        ? FIXED_START_GREETING
+        : await generateLlmChatReply({
+          action: action as LlmChatAction,
+          message: typeof payload.message === 'string' ? payload.message : undefined,
+          history,
+        });
       return osekkaiSuccess(buildSyntheticChatResult(reply, parsed.session.userId), randomUUID());
     }
   });

@@ -445,3 +445,34 @@ export async function loadCommunityFacilityDetail(
     communities,
   };
 }
+
+export type CommunityExample = { name: string; ward: string; description: string | null };
+
+// Single-pass, position-agnostic lookup for the chat fallback: it only needs
+// a handful of real community *names* to ground replies in, not the
+// map's per-pin lat/lng resolution. Reuses the same cached CSV text and
+// genre matching as the map endpoint, but skips the facility/detail split
+// (and its repeated CSV passes) entirely, so it stays fast even when the
+// chat route tries several genre/ward combinations per turn.
+export async function pickCommunityExamples(
+  options: { genre?: CommunityGenreFilter; ward?: string; limit?: number } = {},
+): Promise<CommunityExample[]> {
+  const limit = options.limit ?? 3;
+  const { header, columnAt, rows } = await readRows();
+  const at = columnAt;
+  const examples: CommunityExample[] = [];
+  const seen = new Set<string>();
+  for (const row of rows) {
+    if (examples.length >= limit) break;
+    if (row.length < header.length) continue;
+    const ward = (row[at('ward_name')] ?? '').trim();
+    if (options.ward && ward !== options.ward) continue;
+    const name = (row[at('title')] ?? '').trim();
+    if (!ward || !name || seen.has(name)) continue;
+    const genres = row[at('genres')] ?? '';
+    if (options.genre && !matchesGenreFilter(genres, options.genre)) continue;
+    seen.add(name);
+    examples.push({ name, ward, description: (row[at('description')] ?? '').trim() || null });
+  }
+  return examples;
+}

@@ -1,4 +1,4 @@
-import { loadCommunityDirectorySummary } from '@/lib/osekkai/community-directory';
+import { pickCommunityExamples, type CommunityExample, type CommunityGenreFilter } from '@/lib/osekkai/community-directory';
 
 /**
  * Vercel-only fallback for /api/osekkai/chat when the Python bridge can't be
@@ -8,16 +8,29 @@ import { loadCommunityDirectorySummary } from '@/lib/osekkai/community-directory
  * and none of the Python-side friction/safety classification is replicated —
  * this is casual chat and activity introductions only, not a substitute for
  * the full conversation engine.
+ *
+ * The opening line is a fixed string (see FIXED_START_GREETING), not an LLM
+ * call — a first-visit request is the most likely to hit a cold Vercel
+ * function, and a slow/failed greeting reads as "she never speaks first."
+ * From the first real user message onward, every reply is required (via the
+ * system prompt) to name up to three real communities pulled from the CSV —
+ * there is no real user profile to narrow candidates by relevance the way
+ * the Python engine does, so this narrows by data quality (a resolvable
+ * venue over a generic ward-office catch-all) and freshness instead, and is
+ * framed to the model as "here are some examples," never as a personalized
+ * pick.
  */
 
 export type LlmChatTurn = { speaker: 'you' | 'osekkai'; text: string };
 export type LlmChatAction = 'start' | 'message' | 'check_in' | 'select';
 
+export const FIXED_START_GREETING = 'まず、最近ちょっと気になってることを一つ聞かせて。';
+
 const DEFAULT_MODEL = 'gpt-5.4-mini';
 const DEFAULT_BASE_URL = 'https://api.openai.com/v1';
-const GROUNDING_WARD = '千代田区';
 const MAX_HISTORY_TURNS = 20;
 const MAX_TURN_TEXT_LENGTH = 2000;
+const EXAMPLE_COUNT = 3;
 
 export function isLlmChatAvailable(): boolean {
   const key = (process.env.OPENAI_API_KEY ?? '').trim();
@@ -41,29 +54,66 @@ export function parseLlmChatHistory(value: unknown): LlmChatTurn[] {
   return turns.slice(-MAX_HISTORY_TURNS);
 }
 
-async function buildGroundingNote(): Promise<string> {
-  try {
-    const summary = await loadCommunityDirectorySummary();
-    const nearby = summary.facilities
-      .filter((facility) => facility.ward === GROUNDING_WARD)
-      .sort((left, right) => right.count - left.count)
-      .slice(0, 6)
-      .map((facility) => `- ${facility.name}（${facility.ward}、関連コミュニティ${facility.count}件）`)
-      .join('\n');
-    return nearby || '（付近の地域コミュニティ情報は現在取得できません）';
-  } catch {
-    return '（付近の地域コミュニティ情報は現在取得できません）';
+const GENRE_KEYWORDS: Record<CommunityGenreFilter, string[]> = {
+  sports: ['スポーツ', '運動', '体操', 'ヨガ', 'ウォーキング', 'ジョギング', '卓球', 'テニス', 'バスケ', 'バレー', 'サッカー', '野球', 'ダンス', '武道', '空手', '柔道', '筋トレ', 'ストレッチ', '球技', '水泳'],
+  music_culture: ['音楽', '文化', '美術', '絵', '書道', '茶道', '華道', '楽器', '歌', '合唱', '工芸', '写真', '演劇', 'アート'],
+  learning: ['学習', '勉強', '語学', '英語', '読書', '歴史', '講座', '教室', 'パソコン', '資格'],
+  social: ['交流', 'ボランティア', '貢献', '地域活動', '子育て', '福祉'],
+};
+
+function detectGenre(text: string): CommunityGenreFilter | null {
+  for (const genre of Object.keys(GENRE_KEYWORDS) as CommunityGenreFilter[]) {
+    if (GENRE_KEYWORDS[genre].some((keyword) => text.includes(keyword))) return genre;
   }
+  return null;
 }
 
-function systemInstructions(groundingNote: string): string {
+const WARD_NAMES = [
+  '千代田区', '中央区', '港区', '新宿区', '文京区', '台東区', '墨田区', '江東区', '品川区', '目黒区',
+  '大田区', '世田谷区', '渋谷区', '中野区', '杉並区', '豊島区', '北区', '荒川区', '板橋区', '練馬区',
+  '足立区', '葛飾区', '江戸川区',
+];
+
+function detectWard(text: string): string | null {
+  return WARD_NAMES.find((ward) => text.includes(ward)) ?? null;
+}
+
+// Always returns up to EXAMPLE_COUNT real communities: narrows by genre and
+// ward when detected, but broadens step by step (drop ward, drop genre)
+// rather than ever coming back empty — "must always show 3" beats "must
+// match exactly what was asked."
+async function pickActivities(genre: CommunityGenreFilter | null, ward: string | null): Promise<CommunityExample[]> {
+  const attempts: Array<{ genre?: CommunityGenreFilter; ward?: string }> = [];
+  if (genre && ward) attempts.push({ genre, ward });
+  if (genre) attempts.push({ genre });
+  if (ward) attempts.push({ ward });
+  attempts.push({});
+  for (const attempt of attempts) {
+    const found = await pickCommunityExamples({ ...attempt, limit: EXAMPLE_COUNT });
+    if (found.length >= EXAMPLE_COUNT) return found;
+  }
+  return pickCommunityExamples({ limit: EXAMPLE_COUNT });
+}
+
+function activitiesNote(activities: CommunityExample[]): string {
+  if (activities.length === 0) {
+    return '（実例を取得できませんでした。一般的な案内にとどめ、存在しない団体名を作り話ししないでください）';
+  }
+  return activities
+    .map((item) => `- ${item.name}（${item.ward}${item.description ? `、${item.description}` : ''}）`)
+    .join('\n');
+}
+
+function systemInstructions(activitiesText: string): string {
   return [
     'あなたは「おっせかいおばさん」という、東京の地域コミュニティ活動を紹介する、世話好きだけど押しつけがましくない案内役です。',
-    '一人称は「わたし」。やわらかく丁寧な話し言葉で、2〜4文程度の短い返信を心がけてください。',
-    '相手の話をまず受け止め、質問は一度に一つだけにしてください。',
+    '一人称は「わたし」。二人称は「あんた」も使ってよい、砕けた親しみやすい話し言葉で、2〜4文程度の短い返信にしてください。',
+    '相手の話をまず一言だけ受け止めてください。',
+    '質問を重ねて絞り込もうとしないでください。次の返信では、必ず下記の実例（最大3件）をそのまま短く紹介してください。3件に満たない場合はある分だけ紹介し、存在しない団体名・日時・料金・定員を作り話ししないでください。',
+    '「あなたに一番合う」のような、個人の好みに合わせて選んだかのような言い方はせず、「こういうのがあるよ」という紹介の言い方にしてください。',
     'これは簡易デモモードで、深刻な相談・自傷や危険に関する話には対応できません。そうした話が出たら、地域の相談窓口や身近な信頼できる人へつながるよう促し、それ以上の提案は控えてください。',
-    '以下は実在する地域コミュニティ拠点の参考情報です。関連する話題のときだけ自然に触れてください。存在しない日時・料金・定員などを断定的に作り話ししないでください。',
-    groundingNote,
+    '実在する地域コミュニティの参考情報（この中から選んで紹介してください）:',
+    activitiesText,
   ].join('\n');
 }
 
@@ -121,13 +171,15 @@ export async function generateLlmChatReply(options: {
   message?: string;
   history: LlmChatTurn[];
 }): Promise<string> {
-  const instructions = systemInstructions(await buildGroundingNote());
+  const combinedText = [...options.history.map((turn) => turn.text), options.message ?? ''].join(' ');
+  const genre = detectGenre(combinedText);
+  const ward = detectWard(combinedText);
+  const activities = await pickActivities(genre, ward);
+  const instructions = systemInstructions(activitiesNote(activities));
   const historyText = options.history
     .map((turn) => `${turn.speaker === 'you' ? 'ユーザー' : 'おっせかいおばさん'}: ${turn.text}`)
     .join('\n');
-  const latest = options.action === 'start'
-    ? '（会話開始。まず一言、気さくに挨拶して、どんなことに興味があるか聞いてください）'
-    : (options.message ?? '');
+  const latest = options.message ?? '';
   const input = historyText ? `${historyText}\nユーザー: ${latest}` : `ユーザー: ${latest}`;
   return callOpenAiResponses(instructions, input);
 }

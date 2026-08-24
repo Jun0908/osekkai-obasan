@@ -238,12 +238,13 @@ export function profileGet(request: Request) {
       const result = await getOsekkaiProfile(session.userId);
       return osekkaiSuccess(result.data, result.requestId);
     } catch (error) {
-      // Vercel can't spawn the Python-owned profile store. The chat page
-      // only needs *a* profile to normalize defaults from — an empty object
-      // is a valid, safe stand-in (see components/osekkai/models.ts's
-      // normalizeProfile, which already treats every field as optional).
+      // Vercel can't spawn the Python-owned profile store. The client
+      // validates this response against the full DistanceProfile schema
+      // (see components/osekkai/api-client.ts's validatePayload) before it
+      // ever reaches normalizeProfile, so an empty object fails validation —
+      // it must be a complete, schema-valid synthetic profile instead.
       if (!isPythonUnavailableError(error)) throw error;
-      return osekkaiSuccess({}, randomUUID());
+      return osekkaiSuccess(buildSyntheticProfile(session.userId), randomUUID());
     }
   });
 }

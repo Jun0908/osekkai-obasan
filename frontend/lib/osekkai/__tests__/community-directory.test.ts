@@ -137,30 +137,31 @@ describe('loadCommunityDirectorySummary', () => {
     expect(result.facilities[0].key).toBe('chiyoda-office');
   });
 
-  it('excludes town-association and senior-club rows when excludeAgeUnrelated is set', async () => {
-    writeOpportunitiesCsv([
-      row({ opportunity_id: 'opp_1', ward_name: '千代田区', title: '九段町会', genres: 'community_exchange', description: '町会・自治会', venue_name: '九段' }),
-      row({ opportunity_id: 'opp_2', ward_name: '千代田区', title: '卓球クラブ', genres: 'sports', description: 'スポーツ', venue_name: 'スポーツセンター' }),
-    ]);
-
-    const result = await loadCommunityDirectorySummary({ excludeAgeUnrelated: true });
-
-    expect(result.counts).toEqual({ total: 1, withVenueAddress: 0, withKnownFacility: 1, withAreaLocation: 0, withWardOfficeFallback: 0 });
-    expect(result.facilities.find((facility) => facility.key === 'kudan')).toBeUndefined();
-    expect(result.facilities.find((facility) => facility.key === 'sports-center')).toMatchObject({ count: 1 });
-  });
-
-  it('keeps only sports/exercise rows when onlySports is set', async () => {
+  it('keeps only rows tagged with the requested genre', async () => {
     writeOpportunitiesCsv([
       row({ opportunity_id: 'opp_1', ward_name: '千代田区', title: '卓球クラブ', genres: 'sports', description: 'スポーツ', venue_name: 'スポーツセンター' }),
       row({ opportunity_id: 'opp_2', ward_name: '千代田区', title: '読書会さくら', genres: 'learning', description: '読書', venue_name: '九段' }),
     ]);
 
-    const result = await loadCommunityDirectorySummary({ onlySports: true });
+    const result = await loadCommunityDirectorySummary({ genre: 'sports' });
 
     expect(result.counts).toEqual({ total: 1, withVenueAddress: 0, withKnownFacility: 1, withAreaLocation: 0, withWardOfficeFallback: 0 });
     expect(result.facilities.find((facility) => facility.key === 'sports-center')).toMatchObject({ count: 1 });
     expect(result.facilities.find((facility) => facility.key === 'kudan')).toBeUndefined();
+  });
+
+  it('treats the "social" genre filter as social_contribution or community_exchange', async () => {
+    writeOpportunitiesCsv([
+      row({ opportunity_id: 'opp_1', ward_name: '千代田区', title: '九段町会', genres: 'community_exchange', venue_name: '九段' }),
+      row({ opportunity_id: 'opp_2', ward_name: '千代田区', title: 'ボランティア会', genres: 'social_contribution', venue_name: '九段' }),
+      row({ opportunity_id: 'opp_3', ward_name: '千代田区', title: '卓球クラブ', genres: 'sports', venue_name: 'スポーツセンター' }),
+    ]);
+
+    const result = await loadCommunityDirectorySummary({ genre: 'social' });
+
+    expect(result.counts.total).toBe(2);
+    expect(result.facilities.find((facility) => facility.key === 'kudan')).toMatchObject({ count: 2 });
+    expect(result.facilities.find((facility) => facility.key === 'sports-center')).toBeUndefined();
   });
 });
 
@@ -186,14 +187,14 @@ describe('loadCommunityFacilityDetail', () => {
     expect(await loadCommunityFacilityDetail('sports-center')).toBeNull();
   });
 
-  it('drops town-association communities from the list when excludeAgeUnrelated is set', async () => {
+  it('filters the community list to the requested genre', async () => {
     writeOpportunitiesCsv([
-      row({ opportunity_id: 'opp_1', ward_name: '千代田区', title: '読書会さくら', description: '読書', venue_name: 'スポーツセンター' }),
-      row({ opportunity_id: 'opp_2', ward_name: '千代田区', title: '九段町会', description: '町会・自治会', venue_name: 'スポーツセンター' }),
+      row({ opportunity_id: 'opp_1', ward_name: '千代田区', title: '卓球クラブ', genres: 'sports', venue_name: 'スポーツセンター' }),
+      row({ opportunity_id: 'opp_2', ward_name: '千代田区', title: '読書会さくら', genres: 'learning', venue_name: 'スポーツセンター' }),
     ]);
 
-    const detail = await loadCommunityFacilityDetail('sports-center', { excludeAgeUnrelated: true });
+    const detail = await loadCommunityFacilityDetail('sports-center', { genre: 'sports' });
 
-    expect(detail?.communities.map((community) => community.name)).toEqual(['読書会さくら']);
+    expect(detail?.communities.map((community) => community.name)).toEqual(['卓球クラブ']);
   });
 });

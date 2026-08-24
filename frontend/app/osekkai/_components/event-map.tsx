@@ -81,6 +81,11 @@ const filters: Array<[Filter, string]> = [
   ['meal', 'みんなで食事'], ['recommended', 'おすすめのみ'],
 ];
 
+type CommunityGenreChoice = 'all' | 'sports' | 'music_culture' | 'learning' | 'social';
+const communityGenreOptions: Array<[CommunityGenreChoice, string]> = [
+  ['all', 'すべて'], ['sports', 'スポーツ'], ['music_culture', '音楽・文化'], ['learning', '学習'], ['social', '交流・貢献'],
+];
+
 function markerColor(event: MapEventSummary, recommended: boolean) {
   if (event.status === 'canceled' || event.status === 'ended') return '#6b7280';
   if (event.status === 'sold_out' || event.registrationStatus === 'closed') return '#9e2f2f';
@@ -103,13 +108,11 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
   const communityMarkers = useRef<MarkerLike[]>([]);
   const [selected, setSelected] = useState<MapEventSummary | null>(null);
   const [communities, setCommunities] = useState<CommunityDirectoryResult | null>(null);
-  const [showCommunities, setShowCommunities] = useState(true);
   const [selectedFacility, setSelectedFacility] = useState<CommunityFacilityDetail | null>(null);
   const [facilityLoading, setFacilityLoading] = useState(false);
   const [facilityError, setFacilityError] = useState('');
   const [wardChoice, setWardChoice] = useState(DEFAULT_WARD);
-  const [excludeAgeUnrelated, setExcludeAgeUnrelated] = useState(true);
-  const [onlySports, setOnlySports] = useState(false);
+  const [communityGenre, setCommunityGenre] = useState<CommunityGenreChoice>('all');
   const [filter, setFilter] = useState<Filter>('all');
   const [origin, setOrigin] = useState<Coordinates | null>(null);
   const [locationState, setLocationState] = useState('地図は麹町中心・現在地は保存しません');
@@ -180,10 +183,9 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
 
   const communityFilterParams = useMemo(() => {
     const params = new URLSearchParams();
-    if (excludeAgeUnrelated) params.set('excludeAgeUnrelated', '1');
-    if (onlySports) params.set('onlySports', '1');
+    if (communityGenre !== 'all') params.set('genre', communityGenre);
     return params;
-  }, [excludeAgeUnrelated, onlySports]);
+  }, [communityGenre]);
 
   useEffect(() => {
     let cancelled = false;
@@ -229,7 +231,6 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
     const activeMap = map.current;
     if (!api || !activeMap) return;
     communityMarkers.current.forEach((marker) => marker.setMap(null));
-    if (!showCommunities) { communityMarkers.current = []; return; }
     communityMarkers.current = visibleFacilities.map((facility) => {
       const marker = new api.Marker({
         map: activeMap,
@@ -240,7 +241,7 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
       marker.addListener('click', () => openFacility(facility));
       return marker;
     });
-  }, [visibleFacilities, showCommunities, mapRevision, openFacility]);
+  }, [visibleFacilities, mapRevision, openFacility]);
 
   useEffect(() => {
     const api = window.google?.maps;
@@ -328,32 +329,16 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
     <div className={styles.eventMapLayout}>
       <div className={styles.mapToolbar}>
         <button type="button" onClick={locate}>◎ 現在地を移動時間に使う</button>
-        <button type="button" data-active={showCommunities} onClick={() => setShowCommunities((value) => !value)}>
-          ⌂ 地域コミュニティ{showCommunities ? 'を隠す' : 'を表示'}
-        </button>
-        <button
-          type="button"
-          data-active={excludeAgeUnrelated}
-          aria-pressed={excludeAgeUnrelated}
-          onClick={() => setExcludeAgeUnrelated((value) => !value)}
-          title="町会・自治会・シニア向けクラブなどを除いて表示します"
-        >
-          18〜39
-        </button>
-        <button
-          type="button"
-          data-active={onlySports}
-          aria-pressed={onlySports}
-          onClick={() => setOnlySports((value) => !value)}
-          title="スポーツ・運動系のコミュニティのみ表示します"
-        >
-          スポーツ・運動系のみ
-        </button>
         <select aria-label="表示する区を選ぶ" value={wardChoice} onChange={(event) => jumpToWard(event.target.value)}>
           {wardOptions.map((option) => <option key={option.ward} value={option.ward}>{option.ward}</option>)}
           <option value={ALL_WARDS_VALUE}>全23区をまとめて表示</option>
         </select>
         <span aria-live="polite">{locationState}</span>
+      </div>
+      <div className={styles.mapFilters} aria-label="地域コミュニティ絞り込み">
+        {communityGenreOptions.map(([value, label]) => (
+          <button type="button" data-active={communityGenre === value} aria-pressed={communityGenre === value} onClick={() => setCommunityGenre(value)} key={value}>{label}</button>
+        ))}
       </div>
       <div className={styles.mapFilters} aria-label="Event絞り込み">
         {filters.map(([value, label]) => <button type="button" data-active={filter === value} aria-pressed={filter === value} onClick={() => { setFilter(value); setListLimit(INITIAL_LIST_LIMIT); }} key={value}>{label}</button>)}
@@ -373,8 +358,9 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
           {wardChoice === ALL_WARDS_VALUE
             ? `東京23区の地域コミュニティ${communities.counts.total.toLocaleString()}件を${communities.facilities.length.toLocaleString()}地点に表示（Open Data・開催日時未確認）。`
             : `${wardChoice}の地域コミュニティ${visibleCommunityCount.toLocaleString()}件を${visibleFacilities.length.toLocaleString()}地点で表示中（東京23区全体では${communities.counts.total.toLocaleString()}件）。他の区は上のセレクトから選べます。`}
-          {excludeAgeUnrelated ? '町会・自治会・シニア向けクラブなどを除いています。' : ''}
-          {onlySports ? 'スポーツ・運動系のみに絞っています。' : ''}
+          {communityGenre !== 'all'
+            ? `「${communityGenreOptions.find(([value]) => value === communityGenre)?.[1]}」に絞っています。`
+            : ''}
         </p>
       ) : null}
       {facilityError ? <p className={styles.mapRouteError} role="alert">{facilityError}</p> : null}

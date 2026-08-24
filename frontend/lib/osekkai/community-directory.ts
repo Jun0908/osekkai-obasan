@@ -274,36 +274,17 @@ const REQUIRED_COLUMNS = [
   'fetched_at',
 ] as const;
 
-// Raw genre/category text spans two CSV columns: the structured `genres`
-// field (e.g. sports, learning, community_exchange) and the free-text
-// `description` field (e.g. 町会・自治会, ダンス). The "18〜39" map toggle
-// excludes rows whose combined text names a town association, neighborhood
-// council, or senior/elderly-only club — the source pipeline already screens
-// most of these out, so only a small residual is left to catch here.
-const AGE_UNRELATED_KEYWORDS = ['町会', '自治会', '住区住民会議', 'シニアクラブ', '高齢者クラブ', '老人会', '老人クラブ'];
+// The CSV's own `genres` column is a `|`-separated set of structured tags
+// (sports, music_culture, learning, social_contribution, community_exchange)
+// assigned upstream, so the map's category buttons filter on it directly
+// instead of guessing from free text. "social" is a UI-level grouping of the
+// two civic-participation tags, which are usually reported together anyway.
+export type CommunityGenreFilter = 'sports' | 'music_culture' | 'learning' | 'social';
 
-function isAgeUnrelatedCommunity(genres: string, description: string): boolean {
-  const text = `${genres} ${description}`;
-  return AGE_UNRELATED_KEYWORDS.some((keyword) => text.includes(keyword));
-}
-
-// Keywords covering the ball sports, martial arts, dance, and health-exercise
-// genres/description values actually present in the CSV. Kept specific (e.g.
-// "健康体操" not bare "健康") so it does not also match unrelated entries
-// like 健康・医療.
-const SPORTS_KEYWORDS = [
-  'バレーボール', 'バドミントン', 'バスケットボール', 'サッカー', 'フットサル', '卓球', '水泳', '野球',
-  'テニス', '剣道', 'ソフトボール', '太極拳', 'ダンス', '舞踊', '踊り', 'スポーツ', '空手', '合気道',
-  '柔道', '少林寺拳法', 'なぎなた', '弓道', '相撲', '銃剣道', '居合道', 'テコンドー', '体操', 'ヨガ',
-  'ヨーガ', '気功', 'ピラティス', '自彊術', 'エアロビクス', '球技', 'ビーチボール', 'ゲートボール',
-  'グラウンドゴルフ', 'インディアカ', 'ラグビー', '登山', 'ハイキング', 'ウォーキング', 'スキー',
-  '陸上競技', 'トライアスロン', 'ローラースケート', 'アーチェリー', 'レスリング', 'アクアサイズ',
-  'ニュースポーツ',
-];
-
-function isSportsCommunity(genres: string, description: string): boolean {
-  const text = `${genres} ${description}`;
-  return SPORTS_KEYWORDS.some((keyword) => text.includes(keyword));
+function matchesGenreFilter(genres: string, filter: CommunityGenreFilter): boolean {
+  const tokens = new Set(genres.split('|').map((token) => token.trim()));
+  if (filter === 'social') return tokens.has('social_contribution') || tokens.has('community_exchange');
+  return tokens.has(filter);
 }
 
 const DATA_SOURCE_NOTE =
@@ -324,10 +305,9 @@ async function readRows(): Promise<{ header: string[]; columnAt: (column: (typeo
 }
 
 export async function loadCommunityDirectorySummary(
-  options?: { excludeAgeUnrelated?: boolean; onlySports?: boolean },
+  options?: { genre?: CommunityGenreFilter },
 ): Promise<CommunityDirectoryResult> {
-  const excludeAgeUnrelated = options?.excludeAgeUnrelated ?? false;
-  const onlySports = options?.onlySports ?? false;
+  const genre = options?.genre;
   const [{ header, columnAt, rows }, wards, addresses] = await Promise.all([
     readRows(),
     readWardGeocodingDirectory(),
@@ -349,9 +329,7 @@ export async function loadCommunityDirectorySummary(
     const name = (row[at('title')] ?? '').trim();
     if (!ward || !id || !name) continue;
     const genres = row[at('genres')] ?? '';
-    const description = row[at('description')] ?? '';
-    if (excludeAgeUnrelated && isAgeUnrelatedCommunity(genres, description)) continue;
-    if (onlySports && !isSportsCommunity(genres, description)) continue;
+    if (genre && !matchesGenreFilter(genres, genre)) continue;
     const venueName = (row[at('venue_name')] ?? '').trim();
     const venueAddress = (row[at('venue_address')] ?? '').trim();
     const latitude = optionalNumber(row[at('latitude')] ?? '');
@@ -398,10 +376,9 @@ export async function loadCommunityDirectorySummary(
 
 export async function loadCommunityFacilityDetail(
   facilityKey: string,
-  options?: { excludeAgeUnrelated?: boolean; onlySports?: boolean },
+  options?: { genre?: CommunityGenreFilter },
 ): Promise<CommunityFacilityDetail | null> {
-  const excludeAgeUnrelated = options?.excludeAgeUnrelated ?? false;
-  const onlySports = options?.onlySports ?? false;
+  const genre = options?.genre;
   const [{ header, columnAt, rows }, wards, addresses] = await Promise.all([
     readRows(),
     readWardGeocodingDirectory(),
@@ -420,9 +397,8 @@ export async function loadCommunityFacilityDetail(
     const name = (row[at('title')] ?? '').trim();
     if (!ward || !id || !name) continue;
     const genres = row[at('genres')] ?? '';
+    if (genre && !matchesGenreFilter(genres, genre)) continue;
     const description = row[at('description')] ?? '';
-    if (excludeAgeUnrelated && isAgeUnrelatedCommunity(genres, description)) continue;
-    if (onlySports && !isSportsCommunity(genres, description)) continue;
     const venueName = (row[at('venue_name')] ?? '').trim();
     const venueAddress = (row[at('venue_address')] ?? '').trim();
     const latitude = optionalNumber(row[at('latitude')] ?? '');

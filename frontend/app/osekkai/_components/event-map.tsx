@@ -7,6 +7,7 @@ import { osekkaiApi } from '@/lib/osekkai/api';
 import type { CommunityDirectoryResult, CommunityFacilityDetail, CommunityFacilitySummary } from '@/lib/osekkai/community-directory-types';
 import type { EventRouteResult, MapEventSummary, MapEventsResult, RankedOpportunity } from '@/lib/osekkai/types.generated';
 import CommunityDirectorySheet from './community-directory-sheet';
+import EventClusterSheet from './event-cluster-sheet';
 import MapEventSheet from './map-event-sheet';
 import styles from '../osekkai.module.css';
 
@@ -107,6 +108,7 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
   const markers = useRef<MarkerLike[]>([]);
   const communityMarkers = useRef<MarkerLike[]>([]);
   const [selected, setSelected] = useState<MapEventSummary | null>(null);
+  const [selectedCluster, setSelectedCluster] = useState<MapEventSummary[] | null>(null);
   const [communities, setCommunities] = useState<CommunityDirectoryResult | null>(null);
   const [selectedFacility, setSelectedFacility] = useState<CommunityFacilityDetail | null>(null);
   const [facilityLoading, setFacilityLoading] = useState(false);
@@ -201,6 +203,7 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
 
   const openFacility = useCallback((facility: CommunityFacilitySummary) => {
     setSelected(null);
+    setSelectedCluster(null);
     setSelectedFacility(null);
     setFacilityError('');
     setFacilityLoading(true);
@@ -279,8 +282,8 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
       });
       marker.addListener('click', () => {
         setSelectedFacility(null);
-        if (single) setSelected(single);
-        else { activeMap.setCenter(center); activeMap.setZoom(Math.min(17, zoom + 2)); }
+        if (single) { setSelectedCluster(null); setSelected(single); }
+        else { setSelected(null); setSelectedCluster(group); }
       });
       return marker;
     });
@@ -369,12 +372,15 @@ export default function EventMap({ events, ranking, counts, loading, loadingMore
         <div><h2 id="all-events-heading">Event一覧</h2><span>{filtered.length}件</span></div>
         {visibleList.length > 0 ? <ul>{visibleList.map((event) => (
           <li key={event.id} data-status={event.status}>
-            <button type="button" onClick={() => { setSelectedFacility(null); setSelected(event); }}><strong>{event.title}</strong><span>{event.venueName || event.address || '場所未確認'} · {event.status}</span></button>
+            <button type="button" onClick={() => { setSelectedFacility(null); setSelectedCluster(null); setSelected(event); }}><strong>{event.title}</strong><span>{event.venueName || event.address || '場所未確認'} · {event.status}</span></button>
           </li>
         ))}</ul> : <p className={styles.mapEmptyState}>{loading ? 'Eventは地図の後から読み込まれます。' : 'この条件のEventはありません。'}</p>}
         {visibleList.length < filtered.length ? <button className={styles.mapListMore} type="button" onClick={() => setListLimit((value) => value + INITIAL_LIST_LIMIT)}>続きを表示</button> : null}
       </section>
       {selected ? <MapEventSheet event={selected} evidence={selected.connectionEvidence ?? undefined} ranking={rankingByEvent.get(selected.id)} route={routes[selected.id]} routeBusy={routeBusy} canRoute={Boolean(origin)} onRoute={loadRoute} onClose={() => setSelected(null)} /> : null}
+      {selectedCluster ? (
+        <EventClusterSheet events={selectedCluster} onSelect={(event) => { setSelectedCluster(null); setSelected(event); }} onClose={() => setSelectedCluster(null)} />
+      ) : null}
       {selectedFacility && communities ? (
         <CommunityDirectorySheet facility={selectedFacility} note={communities.dataSource.note} onClose={() => setSelectedFacility(null)} />
       ) : null}

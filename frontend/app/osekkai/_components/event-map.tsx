@@ -27,7 +27,7 @@ type MapsApi = {
 };
 
 declare global {
-  interface Window { google?: { maps: MapsApi } }
+  interface Window { google?: { maps: MapsApi }; gm_authFailure?: () => void }
 }
 
 const KOJIMACHI = { latitude: 35.6840, longitude: 139.7373 };
@@ -61,15 +61,27 @@ function loadMaps(key: string): Promise<MapsApi> {
   if (window.google?.maps) return readyMaps(window.google.maps);
   if (mapsPromise) return mapsPromise;
   mapsPromise = new Promise((resolve, reject) => {
+    // Google calls this global hook (rather than script.onerror, which only
+    // fires on network failure) when the key itself is rejected — wrong
+    // referrer restriction, API not enabled, or billing disabled. Without
+    // it, that failure mode is silent: the script "loads" fine, but Maps
+    // never renders and no error ever reaches our state.
+    window.gm_authFailure = () => {
+      reject(new Error('Google MapsのAPIキーが拒否されました（リファラー制限・API有効化・課金設定を確認してください）。'));
+    };
+    const timeout = window.setTimeout(() => {
+      reject(new Error('Google Mapsの読み込みがタイムアウトしました。'));
+    }, 15_000);
     const script = document.createElement('script');
     script.src = `https://maps.googleapis.com/maps/api/js?key=${encodeURIComponent(key)}&v=weekly&language=ja&region=JP&libraries=marker&loading=async`;
     script.async = true;
     script.onload = () => {
+      window.clearTimeout(timeout);
       const api = window.google?.maps;
       if (!api) { reject(new Error('Maps APIを読み込めませんでした。')); return; }
       void readyMaps(api).then(resolve, reject);
     };
-    script.onerror = () => reject(new Error('Maps APIを読み込めませんでした。'));
+    script.onerror = () => { window.clearTimeout(timeout); reject(new Error('Maps APIを読み込めませんでした。')); };
     document.head.appendChild(script);
   });
   return mapsPromise;
